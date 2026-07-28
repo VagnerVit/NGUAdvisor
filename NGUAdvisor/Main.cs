@@ -355,6 +355,8 @@ namespace NGUAdvisor
                 Settings.FlushSettings();
                 Settings.LoadSettings();
 
+                SeedBoostPriorityOnce();
+
                 ZoneStatHelper.CreateOverrides(_dir);
 
                 settingsForm.UpdateFromSettings(Settings);
@@ -656,6 +658,71 @@ namespace NGUAdvisor
                 num = Character.hardCapPowBar();
 
             return num;
+        }
+
+        // One-time migration for the boosts change (spec 2026-07-28 §4). Boosting used to include every
+        // equipped item and every locked inventory item implicitly; now only the priority list is boosted.
+        // Copy those two groups into the list ONCE so nobody's gear silently stops receiving boosts, and
+        // clear the retired BoostBlacklist — it survives as a persisted field but the UI no longer shows
+        // it, and a leftover entry would keep blocking quest/MacGuffin merges invisibly.
+        // Main thread, after settings are loaded — the ids are live game reads.
+        private static void SeedBoostPriorityOnce()
+        {
+            try
+            {
+                if (Settings == null || Settings.BoostSeeded) return;
+
+                List<int> equipped = new List<int>();
+                List<int> locked = new List<int>();
+                Inventory inv = Character.inventory;
+
+                void AddEquip(Equipment e)
+                {
+                    if (e != null && e.id != 0 && e.isEquipment()) equipped.Add(e.id);
+                }
+
+                AddEquip(inv.weapon);
+                if (InventoryController.weapon2Unlocked()) AddEquip(inv.weapon2);
+                AddEquip(inv.head);
+                AddEquip(inv.chest);
+                AddEquip(inv.legs);
+                AddEquip(inv.boots);
+                if (inv.accs != null)
+                    foreach (Equipment a in inv.accs) AddEquip(a);
+
+                if (inv.inventory != null)
+                {
+                    for (int i = 0; i < inv.inventory.Count; i++)
+                    {
+                        Equipment e = inv.inventory[i];
+                        if (e == null || e.id == 0 || !e.isEquipment()) continue;
+                        if (e.removable) continue;   // locked = the game's inventory padlock
+                        locked.Add(e.id);
+                    }
+                }
+
+                int before = Settings.PriorityBoosts?.Length ?? 0;
+                Settings.PriorityBoosts = Managers.BoostSeed.SeedPriorityBoosts(
+                    Settings.PriorityBoosts, equipped.ToArray(), locked.ToArray());
+
+                int[] retiredBlacklist = Settings.BoostBlacklist;
+                if (retiredBlacklist != null && retiredBlacklist.Length > 0)
+                {
+                    string names = string.Join(", ", retiredBlacklist.Select(id => $"{ItemNameNice(id)}  (#{id})"));
+                    Log($"Boost blacklist retired: clearing {retiredBlacklist.Length} entries ({names}) " +
+                        "so quest/MacGuffin merges are no longer blocked by them.");
+                    Settings.BoostBlacklist = new int[0];
+                }
+
+                Settings.BoostSeeded = true;
+
+                Log($"Boost priority seeded once: {before} existing + {equipped.Count} equipped + {locked.Count} locked " +
+                    $"-> {Settings.PriorityBoosts.Length} entries. Boosting now follows this list only; edit it in Systems > Boosts.");
+            }
+            catch (Exception e)
+            {
+                LogDebug($"Boost priority seed failed: {e.Message}");
+            }
         }
 
         private void QuickSave()
