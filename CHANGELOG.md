@@ -2,7 +2,7 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
-## [Unreleased]
+## [1.2.9] - 2026-07-28
 
 Existing settings and profile files remain compatible with version 1.1.0. Boosting now follows one list
 instead of three implicit sources, and the Boosts page gets a picker and proper reordering.
