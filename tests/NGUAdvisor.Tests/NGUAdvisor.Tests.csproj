@@ -27,6 +27,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\ProfileModel.cs" Link="Linked\ProfileModel.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NumberFormatter.cs" Link="Linked\NumberFormatter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\BoostSeed.cs" Link="Linked\BoostSeed.cs" />
   </ItemGroup>
 
 </Project>
