@@ -74,9 +74,12 @@ reverting this change.
   removing a persisted property churns `MassUpdate`/validation and would drop user data that an older
   DLL still understands. Mark it unused in code with a pointer to this spec.
 - **`bool BoostSeeded`** — makes the migration idempotent.
-- **`bool BoostDragReorder`** (default `true`) — kill switch for drag & drop. If Mono's DnD
-  misbehaves in the game, the user flips this in settings.json; buttons keep working. This exists
-  because DnD is the one part of this design that cannot be verified outside the running game.
+- **`bool BoostDragReorderOff`** (default `false` = drag enabled) — kill switch for drag & drop. If
+  Mono's DnD misbehaves in the game, the user flips this in settings.json; buttons keep working. Named
+  and defaulted this way (not `BoostDragReorder` default `true`) because `MassUpdate` reads
+  `other?.X ?? false` and `JsonUtility` turns a missing bool into `false`, so a default-true flag could
+  never actually default to on. This exists because DnD is the one part of this design that cannot be
+  verified outside the running game.
 
 ## 4. One-time migration
 
@@ -180,12 +183,20 @@ The panel's header layout comment is updated to the new pre-flight numbers.
 
 Game-coupled paths cannot be unit-tested; verification is explicit and manual:
 
-1. `dotnet test` — 53 existing tests stay green, plus new tests for `SeedPriorityBoosts`.
+1. `dotnet test` — 53 existing tests stay green, plus new tests for `SeedPriorityBoosts`. (Shipped: 59.)
 2. In game: `debug.log` shows zero `UI AUDIT` lines and a sane `UI metrics:` line.
 3. Manual pass: seed happens once and is logged; picker adds/filters/sorts; already-listed items are
-   unselectable; buttons and keyboard reorder; DnD reorder; `BoostDragReorder=false` disables DnD only;
-   removing an item drops it from the live readout; a maxed chain copy under "Keep max" is still not
-   boosted.
+   unselectable; buttons and keyboard reorder; DnD reorder; `BoostDragReorderOff=true` disables DnD
+   only; removing an item drops it from the live readout; a maxed chain copy under "Keep max" is still
+   not boosted.
+4. **Modal freeze check (added during execution, user decision).** `BoostPickerForm` uses `ShowDialog`,
+   which is the first modal window in this app — `SettingsForm` and `ProfileEditorForm` both use
+   `Show()`. A modal runs its own nested WinForms message loop on the Unity main thread, so while the
+   picker is open Unity gets no `Update()` tick: the game stops rendering and the advisor's automation
+   stalls. Open the picker, hold it open, and judge whether that reads as a brief pause or as a crash.
+   Accepted for now because the picker is opened deliberately while configuring, not during combat. If
+   it reads as a crash, the fix is to follow `ProfileEditorForm`'s non-modal pattern and return the
+   selection through a callback instead of a return value — bounded work, not a redesign.
 
 ## 10. Documentation to update
 

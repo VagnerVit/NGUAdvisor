@@ -291,6 +291,24 @@ namespace NGUAdvisor
                     try { _dragInsert = -1; _prio.Invalidate(); }
                     catch (Exception ex) { LogDebug($"Boosts drag leave: {ex.Message}"); }
                 };
+                // Insertion-line feedback (spec 2026-07-28 §3): appended AFTER UiTheme.StyleList's own
+                // DrawItem so it paints over the styled row, same technique as BoostPickerForm's greying.
+                // Top of the target row, or the bottom of the last row when dropping at the list's end.
+                _prio.DrawItem += (s, e) =>
+                {
+                    try
+                    {
+                        if (_dragInsert < 0) return;
+                        int count = _prio.Items.Count;
+                        if (count == 0) return;
+                        bool atEnd = _dragInsert >= count;
+                        Rectangle bounds = _prio.GetItemRectangle(atEnd ? count - 1 : _dragInsert);
+                        int lineY = atEnd ? bounds.Bottom - 1 : bounds.Top;
+                        using (Pen pen = new Pen(UiTheme.Accent, UiTheme.S(2)))
+                            e.Graphics.DrawLine(pen, bounds.Left, lineY, bounds.Right, lineY);
+                    }
+                    catch (Exception ex) { LogDebug($"Boosts drag paint: {ex.Message}"); }
+                };
             }
             _manualView.Controls.Add(_prio);
             y = _prio.Bottom + UiTheme.S(8);
@@ -629,6 +647,7 @@ namespace NGUAdvisor
                 Point p = _prio.PointToClient(new Point(e.X, e.Y));
                 int idx = _prio.IndexFromPoint(p);
                 _dragInsert = idx < 0 ? _prio.Items.Count : idx;
+                _prio.Invalidate();
             }
             catch (Exception ex) { LogDebug($"Boosts drag over: {ex.Message}"); }
         }
@@ -712,8 +731,7 @@ namespace NGUAdvisor
             {
                 if (Main.Character != null)
                 {
-                    ih[] converted = Main.Character.inventory.GetConvertedInventory().ToArray();
-                    ih[] slots = InventoryManager.GetBoostSlots(converted);
+                    ih[] slots = InventoryManager.GetBoostSlots(new ih[0]);
                     foreach (ih s in slots)
                         _manualReadout.Items.Add($"{ItemNameNice(s.id)}  (#{s.id})   lvl {s.level}/100");
                     if (slots.Length == 0)

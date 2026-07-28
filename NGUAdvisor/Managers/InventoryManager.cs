@@ -709,7 +709,9 @@ namespace NGUAdvisor.Managers
         #endregion
 
         #region Lambda
-        // Boost-path exclusion: user blacklist + the per-COPY chain freeze (kept at-100 copies).
+        // Quest-item and MacGuffin-merge exclusion only (ManageQuestItems, MergeGuffs) — the boost path
+        // calls TransformManager.Frozen directly now. Settings.BoostBlacklist survives as a persisted
+        // field so settings.json round-trips and an older-DLL rollback still finds the data.
         private static bool IsBlacklisted(ih x) => Settings.BoostBlacklist.Contains(x.id) || TransformManager.Frozen(x);
 
         private static bool IsBlacklisted(int id) => Settings.BoostBlacklist.Contains(id);

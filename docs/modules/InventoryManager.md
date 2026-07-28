@@ -13,7 +13,6 @@ filtering. Operates on `ih[]` inventory-helper snapshots (`GetConvertedInventory
 | `IsGuff` | in `macguffinList` |
 | `IsMaxxed` | `itemList.itemMaxxed[id]` |
 | `IsLocked` | `!inventory[slot].removable` |
-| `IsPriority` | in `Settings.PriorityBoosts` |
 
 ## Boost targets: the priority list, and nothing else
 

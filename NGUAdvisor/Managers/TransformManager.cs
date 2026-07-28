@@ -185,7 +185,8 @@ namespace NGUAdvisor.Managers
             _keptSlot = kept;
         }
 
-        // Per-COPY freeze, consulted by InventoryManager.IsBlacklisted(ih) on boost/merge targeting.
+        // Per-COPY freeze. The boost path (InventoryManager.GetBoostSlots) and the merge path
+        // (InventoryManager.MergeBlocked) both call this directly now, not through IsBlacklisted.
         // Only at-100 copies of held chains freeze; sub-100 spares merge and boost freely.
         public static bool Frozen(ih x)
         {

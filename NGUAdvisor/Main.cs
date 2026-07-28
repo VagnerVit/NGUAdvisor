@@ -672,9 +672,15 @@ namespace NGUAdvisor
             {
                 if (Settings == null || Settings.BoostSeeded) return;
 
+                Inventory inv = Character.inventory;
+                if (inv == null || inv.inventory == null || inv.inventory.Count == 0)
+                {
+                    LogDebug("Boost priority seed deferred: inventory not populated yet, will retry next launch.");
+                    return;
+                }
+
                 List<int> equipped = new List<int>();
                 List<int> locked = new List<int>();
-                Inventory inv = Character.inventory;
 
                 void AddEquip(Equipment e)
                 {
