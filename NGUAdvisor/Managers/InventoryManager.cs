@@ -98,26 +98,30 @@ namespace NGUAdvisor.Managers
             _cubeBoostAvg.Reset();
         }
 
+        // THE priority list is the ONLY source of boosting (spec 2026-07-28). It used to be one of three:
+        // the list, every equipped item, and every locked inventory item — so removing an item from the
+        // list did not stop it being boosted, and the blacklist was the only "never boost this" lever.
+        // Main.Start seeds the two implicit groups into the list ONCE (BoostSeed) so this is not a silent
+        // behavior change; from then on the list is exactly what gets boosted, in its own order.
+        //
+        // `ci` is unused now and kept only because callers pass their existing snapshot.
         public static ih[] GetBoostSlots(ih[] ci)
         {
-            var result = new List<ih>();
-            // First, find items in our priority list
-            foreach (var id in Settings.PriorityBoosts.Except(Settings.BoostBlacklist))
+            List<ih> result = new List<ih>();
+            int[] priority = Settings.PriorityBoosts;
+            if (priority == null) return new ih[0];
+
+            foreach (int id in priority)
             {
-                var f = LoadoutManager.FindItemSlot(id);
-                if (f?.equipment.isEquipment() == true)
-                    result.Add(f);
+                ih f = LoadoutManager.FindItemSlot(id);
+                if (f?.equipment.isEquipment() != true) continue;
+                // Transform protection is NOT part of the retired blacklist: a maxed chain copy the user
+                // holds back must never be boosted, because applying a boost runs the game's
+                // checkItemTransform and would trigger the transformation.
+                if (TransformManager.Frozen(f)) continue;
+                result.Add(f);
             }
 
-            // Next, get equipped items that aren't in our priority list and aren't blacklisted
-            var equipped = Inventory.GetConvertedEquips().Where(x => !IsPriority(x) && !IsBlacklisted(x));
-            result.AddRange(equipped);
-
-            // Finally, find locked items in inventory that aren't blacklisted
-            var invItems = Array.FindAll(ci, x => x.locked && x.equipment.isEquipment() && !IsPriority(x) && !IsBlacklisted(x));
-            result.AddRange(invItems);
-
-            // Make sure we filter out non-equips again, just in case one snuck into priorityboosts
             return result.FindAll(x => x.equipment.GetNeededBoosts().Total() > 0).ToArray();
         }
 
@@ -179,7 +183,7 @@ namespace NGUAdvisor.Managers
 
         public static void MergeBoosts(ih[] ci)
         {
-            var grouped = Array.FindAll(ci, x => IsBoost(x) && !IsBlacklisted(x) && IsLocked(x) && !IsMaxxed(x));
+            var grouped = Array.FindAll(ci, x => IsBoost(x) && IsLocked(x) && !IsMaxxed(x));
             foreach (var target in grouped)
             {
                 if (ci.Count(x => x.id == target.id) <= 1)
@@ -705,31 +709,31 @@ namespace NGUAdvisor.Managers
         #endregion
 
         #region Lambda
-        private static bool IsPriority(ih x) => Settings.PriorityBoosts.Contains(x.id);
-
-        // Frozen = transform-chain protection (TransformManager): a maxed chain item whose transform
-        // the user is holding back (Keep max lvl, or Auto-climb off) must not be boosted or merged —
-        // both paths run the game's checkItemTransform and would trigger the transformation.
         // Boost-path exclusion: user blacklist + the per-COPY chain freeze (kept at-100 copies).
         private static bool IsBlacklisted(ih x) => Settings.BoostBlacklist.Contains(x.id) || TransformManager.Frozen(x);
 
         private static bool IsBlacklisted(int id) => Settings.BoostBlacklist.Contains(id);
 
-        // Merge-path exclusion: chain items answer to their CLIMB toggle (boost blacklist must not
-        // stop consolidation — user-reported: blacklisted Sir Lootys at lv 0/5/77 never merged);
-        // everything else keeps the blacklist rules.
+        // Frozen = transform-chain protection (TransformManager): a maxed chain item whose transform the
+        // user is holding back (Keep max lvl, or Auto-climb off) must not be boosted or merged — both
+        // paths run the game's checkItemTransform and would trigger the transformation.
+        //
+        // The boost blacklist that used to live here is RETIRED (spec 2026-07-28): boosting is driven by
+        // the priority list alone, and merging is governed by the chain toggles that actually govern it.
+        // Its second job — blocking merges — had already needed an exception carved out of it (blacklisted
+        // Sir Lootys at lv 0/5/77 never merged), which is what a rule serving two purposes looks like.
         private static bool MergeBlocked(ih x)
         {
             var chain = TransformManager.MergeAllowed(x.id);
             if (chain.HasValue) return !chain.Value || TransformManager.Frozen(x);
-            return IsBlacklisted(x);
+            return false;
         }
 
         private static bool MergeBlockedId(int id)
         {
             var chain = TransformManager.MergeAllowed(id);
             if (chain.HasValue) return !chain.Value;
-            return IsBlacklisted(id);
+            return false;
         }
 
         private static bool IsLocked(ih x) => !Inventory.inventory[x.slot].removable;

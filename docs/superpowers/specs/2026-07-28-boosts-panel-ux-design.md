@@ -104,6 +104,14 @@ have locked for an unrelated reason. That is acceptable because the seed is a ON
 an editable list: after it runs the padlock has no further influence on boosting, and the user prunes
 what they don't want. This is the trade for a silent behavior change on update.
 
+**Also clears `BoostBlacklist` (added 2026-07-28 during execution, user decision).** Task 3 revealed that
+the blacklist has three consumers §2 did not account for: quest-item merging
+(`InventoryManager.ManageQuestItems`) and MacGuffin merging (`MergeGuffs`, two call sites). Those keep
+working as they are — but once §5 removes the blacklist from the UI, a non-empty array would keep
+blocking those merges with no way for the user to see or edit it. So the migration empties the array and
+logs what it contained, leaving the three consumers live but permanently unfed. Nobody is left with an
+invisible active blacklist, and the old contents stay recoverable from inject.log.
+
 The list transformation is extracted as a pure static helper with no game/Unity dependency:
 
 ```
