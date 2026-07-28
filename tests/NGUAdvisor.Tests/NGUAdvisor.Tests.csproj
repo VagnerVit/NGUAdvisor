@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Pure-logic tests. We LINK the Unity-free source files (see the Compile items below) directly into
+         this test assembly instead of referencing NGUAdvisor.csproj. That deliberately avoids the Unity /
+         Assembly-CSharp compile-time <Reference>s (which need a local NGU Idle install) and the timestamped
+         output-assembly name. The code under test pins CultureInfo.InvariantCulture on every number path,
+         so results here are identical to the net48/Mono runtime.
+         (This comment used to cite a "Release-only DeployToInjector target on NGUAdvisor.csproj" as the
+         critical reason — no such target exists in that project.) -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\NGUAdvisor\SimpleJson.cs" Link="Linked\SimpleJson.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\ProfileModel.cs" Link="Linked\ProfileModel.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NumberFormatter.cs" Link="Linked\NumberFormatter.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
+  </ItemGroup>
+
+</Project>

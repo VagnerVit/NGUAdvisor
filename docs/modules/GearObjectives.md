@@ -1,0 +1,36 @@
+# GearObjectives (`Managers/GearObjectives.cs`)
+
+Phase 1b: the scoring vocabulary — stat names, the game's `specType` → stat mapping, and the
+selectable objective presets. Pure data, no game references.
+
+## Contents
+
+- **`Stat`** — string constants for every scoreable stat. Names are IDENTICAL to the reference's
+  `Stat` map (`external/gear-optimizer/src/assets/ItemAux.js` line ~152) — e.g. `"Raw NGU Speed"`,
+  `"Yggdrasil Yield"`. Keep them in sync; `GearScorer.Item.Stats` is keyed by these strings.
+- **`SpecTypeToStats`** — game `specType` enum int → stat name(s). Tiered specs (…2, …3 variants)
+  map to the same stat; composite specs (27 AllPower, 28 AllPerBar, 29 AllCap) map to multiple
+  stats. specTypes 0 (None), 10 (BoostRecycle), 46 (Blood) are not scored.
+- **`Objectives`** — named presets: stat list + optional exponents (null = all 1.0). Consumed by
+  `GearOptimizer.FindObjective` (name match is what profiles/settings store — renaming an
+  objective breaks saved configs).
+
+## Divergences from the reference `Factors` (intentional until decided otherwise)
+
+See gear-optimizer-comparison.md §Objective-set divergences for the full table. Highlights:
+
+- **Advanced Training** = `[ATSpeed^1, EPower^0.5]` — the site's `AT` factor also carries
+  `ECap^1`. Omitted deliberately (decided 2026-07-28): the advisor's allocator BBs AT (full
+  bars), where extra cap adds no training speed; ECap only matters under manual, under-fed play.
+- **Augments / Beards / Wandoos** score raw speed only; the site mixes in E/M cap/power/bars.
+- **Adventure** (`Power × Toughness`) and **Yggdrasil** (descending-exponent harvest priority
+  4/4/3/2/1) are native extensions with no site counterpart.
+- **Adventure excludes Respawn on purpose**: base-0 stats explode the product at low totals
+  (16→36 respawn would "double" the score). Respawn coverage is the TopRespawn pin's job.
+
+## Adding an objective
+
+1. Use existing `Stat` constants (or add one that matches the site's name exactly).
+2. Express priority as exponents (weights in the product), not stat order.
+3. Beware base-0 stats (Power/Toughness/Respawn) in composites — they dominate at low values.
+4. Name it once and never rename (persisted in settings/profiles).

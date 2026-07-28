@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{2F930638-EA52-446D-AD62-4EBEC6A03556}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>NGUAdvisor</RootNamespace>
+    <AssemblyName>NGUAdvisor</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>false</Deterministic>
+    <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.XML" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEngine">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.JSONSerializeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\UnityEngine.UI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AllocationProfiles\Breakpoints\BaseBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\BeardBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ConsumablesBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\DiggerBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\EnergyBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\GearBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\MagicBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\NGUDiffBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\R3Breakpoints.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\AdvancedTrainingBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\AugmentBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\ResourceBreakpoint.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\BasicTrainingBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\BestAug.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\BR.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\CapCalc.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\HackBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\RitualBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\TimeMachineBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\WandoosBP.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\WandoosBreakpoints.cs" />
+    <Compile Include="AllocationProfiles\CustomAllocation.cs" />
+    <Compile Include="AllocationProfiles\Breakpoints\ResourceBreakpoints\NGUBP.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\MoneyPitRunRebirth.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\MuffinRebirth.cs" />
+    <Compile Include="Managers\BeardManager.cs" />
+    <Compile Include="Managers\BloodMagicManager.cs" />
+    <Compile Include="Managers\CardManager.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\BaseRebirth.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\BossNumRebirth.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\NumberRebirth.cs" />
+    <Compile Include="AllocationProfiles\RebirthStuff\TimeRebirth.cs" />
+    <Compile Include="Consts.cs" />
+    <Compile Include="Managers\CombatAI.cs" />
+    <Compile Include="Managers\ConsumablesManager.cs" />
+    <Compile Include="Managers\CookingManager.cs" />
+    <Compile Include="Managers\ITOPODManager.cs" />
+    <Compile Include="Managers\LockManager.cs" />
+    <Compile Include="Managers\ZoneStatHelper.cs" />
+    <Compile Include="Managers\ZoneHelpers.cs" />
+    <Compile Include="Managers\CombatHelpers.cs" />
+    <Compile Include="Managers\CombatManager.cs" />
+    <Compile Include="Managers\DiggerManager.cs" />
+    <Compile Include="Extensions.cs" />
+    <Compile Include="Managers\InventoryManager.cs" />
+    <Compile Include="Loader.cs" />
+    <Compile Include="Managers\LoadoutManager.cs" />
+    <Compile Include="Main.cs" />
+    <Compile Include="Managers\MoneyPitManager.cs" />
+    <Compile Include="Managers\WishManager.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Managers\QuestManager.cs" />
+    <Compile Include="SavedSettings.cs" />
+    <Compile Include="SettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SettingsForm.Designer.cs">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="SimpleJson.cs" />
+    <Compile Include="Managers\YggdrasilManager.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assembly-CSharp.dll" />
+    <Content Include="inject\SharpMonoInjector.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="inject\smi.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="defaultZoneStats.json" />
+    <None Include="Run NGU Advisor (no hot-reload).bat">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SettingsForm.dje.resx">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SettingsForm.resx">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>rmdir /S /Q dist
+md dist
+xcopy /E /I inject dist\injector
+copy NGUAdvisor.dll dist\injector
+copy Run NGU Advisor (no hot-reload).bat dist\
+xcopy /E /I $(ProjectDir)SampleProfiles dist\sampleprofiles</PostBuildEvent>
+  </PropertyGroup>
+</Project>

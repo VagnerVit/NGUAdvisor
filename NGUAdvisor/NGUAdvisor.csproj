@@ -1,0 +1,192 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SDK-style project targeting .NET Framework 4.8 (net48).
+    net48 is REQUIRED: the DLL is injected into NGU Idle's Unity 2019.4 Mono (.NET 4.x) runtime,
+    which cannot load a modern .NET assembly. See BUILD.md.
+
+    Builds with just the .NET SDK (no Visual Studio, no admin targeting-pack install) because
+    Microsoft.NETFramework.ReferenceAssemblies supplies the net48 reference assemblies via NuGet.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NGUAdvisor</RootNamespace>
+    <!--
+      The output name carries a per-build timestamp (NGUAdvisor.r<stamp>.dll) that Main.BuildTag
+      parses into the build id shown in the rail footer. The deploy step renames the copy to
+      NGUAdvisor.dll; the on-disk name is irrelevant to smi and injection, which resolve the entry
+      point by namespace/class (NGUAdvisor.Loader.Init). Embedded resources are unaffected: fixed
+      LogicalName + RootNamespace-based preset names.
+    -->
+    <AssemblyName>NGUAdvisor.r$([System.DateTime]::Now.ToString(yyMMddHHmmss))</AssemblyName>
+    <!-- Properties/AssemblyInfo.cs provides the assembly attributes -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- AssemblyVersion("1.0.*") wildcard requires non-deterministic builds -->
+    <Deterministic>false</Deterministic>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <!-- Keep the stale committed copy of the game assembly and old release zip out of the build -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Assembly-CSharp.dll;dist_3.6.1.zip</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!--
+    Public-release hardening: strip debug metadata from the Release DLL. The SDK default
+    (DebugType=portable) writes a PE CodeView record that embeds the local obj\Release PDB
+    path into the shipped assembly. DebugType=None removes that debug directory and emits no
+    PDB, so no local build path is embedded. Release only; Debug keeps its normal symbols.
+    Method names stay in metadata (stack traces still name methods) and no PDB was ever
+    shipped, so runtime line-number diagnostics are unchanged.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- net48 reference assemblies from NuGet so no Visual Studio / targeting pack is needed -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Embed pre-generated CLASSIC .resources (built from the .resx by build/convert-resx.ps1
+      under Windows PowerShell 5.1). The .NET SDK's resource generator would emit the
+      "preserialized" format, which needs System.Resources.Extensions.dll at runtime - that
+      won't resolve inside NGU Idle's Mono domain. Classic .resources read natively under Mono.
+      Exclude the source .resx so the SDK does not also try to generate resources from them.
+      LogicalName must match what ComponentResourceManager(typeof(SettingsForm)) looks up.
+    -->
+    <EmbeddedResource Remove="**\*.resx" />
+    <EmbeddedResource Include="SettingsForm.resources">
+      <LogicalName>NGUAdvisor.SettingsForm.resources</LogicalName>
+    </EmbeddedResource>
+    <!-- Inputs for the regeneration target below (not compiled — see the EmbeddedResource Remove above). -->
+    <None Include="SettingsForm.resx" />
+    <None Include="..\build\convert-resx.ps1" />
+    <_ResxSource Include="SettingsForm.resx" />
+    <!--
+      SettingsForm.dje.resx is a dead leftover (no code loads it; its ".dje." middle segment
+      is misread as the Zarma culture and would spawn a stray satellite assembly). Not embedded.
+    -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Goal loadout presets: embedded and auto-installed into the runtime profiles dir on first run
+      (Managers/PresetInstaller). Plain JSON streams read fine under Mono (unlike WinForms resx).
+      Resource names become NGUAdvisor.Presets.<file>.json.
+    -->
+    <None Remove="Presets\*.json" />
+    <EmbeddedResource Include="Presets\*.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Framework assemblies not referenced implicitly by the SDK -->
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Data.DataSetExtensions" />
+  </ItemGroup>
+
+  <!--
+    Where NGU Idle's Managed assemblies live. This used to be an absolute path repeated in all seven
+    HintPaths below, so a different Steam library meant editing seven lines before the project would
+    build at all (and BUILD.md documented a path the csproj did not actually use).
+
+    Resolution order, first hit wins:
+      1. NGUManagedDir set on the command line (`dotnet build -p:NGUManagedDir=...`), in an environment
+         variable, or in a Directory.Build.props next to the solution — the escape hatch for any layout.
+      2. The usual Steam install roots, including secondary libraries on D:/E:.
+    A trailing slash is normalised in so the HintPaths stay readable.
+  -->
+  <PropertyGroup>
+    <_NGUManagedCandidates>$(ProgramFiles)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;C:\Program Files (x86)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;C:\Program Files\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;C:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed;E:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed</_NGUManagedCandidates>
+  </PropertyGroup>
+
+  <!--
+    _NGUManaged is the resolved, slash-terminated directory the HintPaths use. It has to be a SEPARATE
+    property from the NGUManagedDir input: a value passed as -p:NGUManagedDir=... is an MSBuild GLOBAL
+    property, and those are immutable inside the project, so normalising NGUManagedDir in place silently
+    did nothing and the HintPaths came out as "...ManagedAssembly-CSharp.dll".
+  -->
+  <PropertyGroup>
+    <_NGUManaged Condition="'$(NGUManagedDir)' != ''">$([MSBuild]::EnsureTrailingSlash('$(NGUManagedDir)'))</_NGUManaged>
+
+    <!-- No explicit value: take the first candidate root that actually holds the game assembly. -->
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('$(ProgramFiles)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">$(ProgramFiles)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('C:\Program Files (x86)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">C:\Program Files (x86)\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('C:\Program Files\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">C:\Program Files\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('C:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">C:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+    <_NGUManaged Condition="'$(_NGUManaged)' == '' and Exists('E:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\Assembly-CSharp.dll')">E:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed\</_NGUManaged>
+  </PropertyGroup>
+
+  <!--
+    Regenerate SettingsForm.resources from the .resx whenever the .resx (or the converter) is newer.
+    This was a MANUAL step documented in BUILD.md, which meant every designer edit had a window where
+    the build silently embedded the previous form's resources. Inputs/Outputs make it incremental, so
+    a normal build skips it entirely.
+
+    powershell.exe, not pwsh: the converter needs .NET Framework's classic ResXResourceReader /
+    ResourceWriter (see the note on the EmbeddedResource above for why classic and not preserialized).
+    ContinueOnError: on a non-Windows or PowerShell-less host, fall back to the committed .resources
+    rather than failing the build — a warning is enough, because the file IS checked in.
+  -->
+  <Target Name="ConvertResx" BeforeTargets="BeforeBuild"
+          Inputs="@(_ResxSource);$(MSBuildProjectDirectory)\..\build\convert-resx.ps1"
+          Outputs="$(MSBuildProjectDirectory)\SettingsForm.resources">
+    <Message Importance="high" Text="SettingsForm.resx changed — regenerating classic .resources" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build\convert-resx.ps1&quot;"
+          ContinueOnError="WarnAndContinue" />
+  </Target>
+
+  <!--
+    Fail with the actual problem instead of ~200 "type or namespace not found" errors, which is what a
+    missing game install produced before.
+  -->
+  <Target Name="CheckNGUManagedDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(_NGUManaged)' == '' and '$(NGUManagedDir)' == ''"
+           Text="Could not locate NGU Idle's Managed folder. Pass it explicitly, e.g. dotnet build -p:NGUManagedDir=&quot;D:\SteamLibrary\steamapps\common\NGU IDLE\NGUIdle_Data\Managed&quot; (or set NGUManagedDir in a Directory.Build.props / environment variable). Searched: $(_NGUManagedCandidates)" />
+    <Error Condition="!Exists('$(_NGUManaged)Assembly-CSharp.dll')"
+           Text="NGU Idle Managed folder resolved to '$(_NGUManaged)' but Assembly-CSharp.dll is not there." />
+  </Target>
+
+  <ItemGroup>
+    <!--
+      NGU Idle game assemblies (Unity 2019.4 / Mono), resolved via $(NGUManagedDir) above.
+      Private=false: these are compile-time references only; never copy them to output.
+    -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(_NGUManaged)Assembly-CSharp.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(_NGUManaged)UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(_NGUManaged)UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(_NGUManaged)UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(_NGUManaged)UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>$(_NGUManaged)UnityEngine.JSONSerializeModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(_NGUManaged)UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

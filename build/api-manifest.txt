@@ -1,0 +1,48 @@
+# NGUAdvisor game-API manifest — every game member the injector calls, reflects, or
+# replicates math from. decomp-diff.ps1 verifies each line against a fresh decompile
+# after a game update; a MISSING line = that subsystem needs review before injecting.
+# Format: <decompiled file><TAB><literal substring to find>
+# (substrings, not regex — keep them short and load-bearing)
+Character.cs	public string display(double number)
+Character.cs	public double realGold
+Character.cs	public long idleEnergy
+PitController.cs	public float currentPitTime()
+PitController.cs	private void oneTossReward(double gold)
+PitController.cs	public int tossFactor()
+Rebirth.cs	character.pit.tossCount = 0
+BloodMagicController.cs	public double goldConsumedPerSecond()
+AllBloodMagicController.cs	public BloodMagicController[] bloodMagics
+FruitController.cs	public float tierThreshold()
+FruitController.cs	public int harvestTier(int fruitID)
+Fruit.cs	public float seconds
+Fruit.cs	public bool usePoop
+Fruit.cs	public bool eatFruit
+Fruit.cs	public long maxTier
+AllYggdrasil.cs	public List<string> fruitName
+ItemList.cs	public List<bool> itemMaxxed
+ItemList.cs	public List<bool> itemDropped
+ItemList.cs	public List<bool> itemFiltered
+LootDrop.cs	public void zone0Drop(Enemy enemy)
+LootDrop.cs	public void zone45Drop(Enemy enemy)
+BeastQuestController.cs	public int curQuestZone()
+BeastQuestController.cs	public int maxBankedQuests()
+BeastQuestController.cs	public int timerThreshold()
+BeastQuestController.cs	public float expectedTimePerDrop()
+BeastQuestController.cs	public bool readyToHandIn()
+BeastQuestController.cs	public void completeQuest()
+BeastQuestController.cs	public void startQuest()
+BeastQuestController.cs	public void skipQuest()
+BeastQuestController.cs	public void tryUseButter()
+BeastQuest.cs	public bool reducedRewards
+BeastQuest.cs	public int curBankedQuests
+BeastQuest.cs	public bool usedButter
+Challenge.cs	public int curCompletions
+Challenge.cs	public int maxCompletions
+Challenges.cs	public Challenge hour24Challenge
+Challenges.cs	public Challenge timeMachineChallenge
+Challenges.cs	public Challenge nguChallenge
+Challenges.cs	public Challenge noAugsChallenge
+AdventureController.cs	public bool autokillTitan6V1Achieved
+DailyRewardController.cs	public float targetSpinTime()
+DailyRewardController.cs	public void startNoBullshitSpin()
+ItemListController.cs	public int getSetID()

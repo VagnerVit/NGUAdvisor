@@ -1,0 +1,35 @@
+{
+  "Breakpoints": {
+    "_Preset": "Normal Challenge Block 2 (auto-installed). The injector runs the Challenges queue below, rebirthing into the next valid challenge (and waiting out No-Rebirth automatically). Loadout + allocation swap per active challenge: gear auto-optimizes (smart defaults: NORB->Adventure, NOTM->Gold, etc.) and the NOTM-tagged priorities drop Time Machine. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target A Very Strange Place with Fallthrough (ITOPOD after TM for PP). Gold tab: CBlock Mode ON. Put low targets on AT-0/1/2 and high/infinite on AT-3/4.",
+    "Energy": [
+      { "Time": 0, "Priorities": [ "CAPALLBT", "CAPWAN:50", "CAPTM:40", "BESTAUG:50", "CAPALLAT", "WAN", "BESTAUG" ] },
+      { "Time": 0, "Challenge": "NOTM", "Priorities": [ "CAPALLBT", "CAPWAN:50", "CAPALLAT", "WAN", "BESTAUG" ] }
+    ],
+    "Magic": [
+      { "Time": 0, "Priorities": [ "CAPWAN:50", "BR-300:20", "CAPTM", "WAN", "BR" ] },
+      { "Time": 0, "Challenge": "NOTM", "Priorities": [ "CAPWAN:50", "RIT-0:20", "WAN" ] }
+    ],
+    "R3": [ { "Time": 0, "Priorities": [] } ],
+    "Gear": [
+      { "Time": 0, "Objective": "Adventure", "TopRespawn": true }
+    ],
+    "Wandoos": [ { "Time": 0, "OS": 1 } ],
+    "Diggers": [
+      { "Time": 0, "List": [ 1, 2, 3, 10, 11 ] }
+    ],
+    "Beards": [
+      { "Time": 0, "List": [ 0, 2, 4, 6, 5 ] }
+    ],
+    "NGUDiff": [ { "Time": 0, "Diff": 0 } ],
+    "Rebirth": [ { "Type": "Number", "Target": 1000 } ],
+    "Challenges": [
+      "TC-5", "TC-6", "TC-7",
+      "NOTM-4", "NOTM-5",
+      "BLIND-5", "BLIND-6", "BLIND-7", "BLIND-8", "BLIND-9", "BLIND-10",
+      "NORB-5", "NORB-6", "NORB-7", "NORB-8", "NORB-9", "NORB-10",
+      "NONGU-5", "NONGU-6", "NONGU-7", "NONGU-8", "NONGU-9", "NONGU-10",
+      "24HR-4", "24HR-5", "24HR-6"
+    ]
+  }
+}
