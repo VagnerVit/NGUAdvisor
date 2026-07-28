@@ -99,9 +99,9 @@ namespace NGUAdvisor.Managers
             return v;
         }
 
-        // Advisor-driven boost priority: unequipped KEEP items ranked by objective usage, then chain
-        // climbers (highest owned tier still below max). Equipped gear is boosted first by the
-        // existing InventoryManager pass regardless of this list.
+        // Advisor-driven boost priority: equipped gear FIRST (since the 2026-07-28 change the priority list
+        // is the only boost source — the old "equipped is boosted anyway" pass no longer exists), then
+        // unequipped KEEP items ranked by objective usage, then chain climbers.
         // Fully-boosted items have nothing left to receive — they neither rank nor display.
         private static bool NeedsBoosts(int id)
         {
@@ -115,19 +115,28 @@ namespace NGUAdvisor.Managers
 
         public static int[] AutoBoostPriority(Verdict v)
         {
-            var equipped = new HashSet<int>(LoadoutManager.CurrentGearIds());
-            var list = v.Keep
+            List<int> list = new List<int>();
+
+            // Equipped first, in slot order: it is what the character is actually using right now.
+            foreach (int id in LoadoutManager.CurrentGearIds())
+                if (id > 0 && !list.Contains(id) && NeedsBoosts(id))
+                    list.Add(id);
+
+            HashSet<int> equipped = new HashSet<int>(LoadoutManager.CurrentGearIds());
+            foreach (KeyValuePair<int, string> kv in v.Keep
                 .Where(kv => !equipped.Contains(kv.Key) && NeedsBoosts(kv.Key))
-                .OrderByDescending(kv => v.Usage.TryGetValue(kv.Key, out var n) ? n : 0)
-                .Select(kv => kv.Key)
-                .ToList();
+                .OrderByDescending(kv => v.Usage.TryGetValue(kv.Key, out int n) ? n : 0))
+            {
+                if (!list.Contains(kv.Key)) list.Add(kv.Key);
+            }
+
             for (int i = 0; i < TransformManager.Chains.Length; i++)
             {
                 try
                 {
-                    var s = TransformManager.Read(i);
+                    TransformManager.State s = TransformManager.Read(i);
                     if (s.OwnedTier >= 0 && s.NextId > 0 && s.Level < 100 && !list.Contains(s.OwnedId)
-                        && !equipped.Contains(s.OwnedId) && NeedsBoosts(s.OwnedId))
+                        && NeedsBoosts(s.OwnedId))
                         list.Add(s.OwnedId);
                 }
                 catch { }
