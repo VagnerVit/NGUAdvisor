@@ -17,12 +17,12 @@ namespace NGUAdvisor
     // (red: editable priority + blacklist lists). Cube priority + favored MacGuffin ride the top row.
     // TRANSFORMS: one row per chain — live tier/level state + Auto-climb / Keep max lvl / Filter lower.
     //
-    // Layout pre-flight (page 620 wide, ~350 tall): top row toggle 10..160, "Cube" 180..215, combo
-    // 218..318, "Guffin" 330..377, combo 382..502, refresh 580..608 — no overlaps. Advisor readout
-    // list 600x190 at y44. Manual view: priority list h100 + edit row (tb 10..130, Add 136..196,
-    // Remove 202..272, Up 278..318, Down 324..364), blacklist h80 + edit row — bottom 328 < 350.
-    // Transforms rows at 56px pitch: name 10..120, status 125..375, checkboxes 385/479/563 (measured
-    // 86/76/56 wide) right edge 619. Stacked-label pitch rule: all single lines, 18px+ spacing.
+    // Layout pre-flight: everything below the top row is derived from measured rows, not tuned pixels —
+    // priority list ListH(14), two button rows at SCtl(24), a hint line, the live readout ListH(4), then
+    // the Apply-order row. The page grows to its content inside the scrolling host (one scroll owner per
+    // screen), so no fixed height may be reintroduced here.
+    // BLACKLIST REMOVED 2026-07-28: the priority list is the only boost source; merges answer to the
+    // transform-chain toggles. Spec: docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md
     public class BoostsPanel : Panel
     {
         private Button _segBoost;
@@ -42,9 +42,7 @@ namespace NGUAdvisor
         private Panel _manualView;
         private ListBox _readout;
         private ListBox _prio;
-        private TextBox _prioAdd;
-        private ListBox _black;
-        private TextBox _blackAdd;
+        private ListBox _manualReadout;
         private ComboBox _order;
 
         // Layout C (user-approved): two-line cards. Line 1 = full item name + right-aligned toggle
@@ -260,65 +258,56 @@ namespace NGUAdvisor
                 BackColor = UiTheme.Ground
             });
 
-            // MANUAL view: editable priority + blacklist.
+            // MANUAL view: the editable priority list IS the boost list (spec 2026-07-28 — the blacklist is
+            // retired and equipped/locked are no longer boosted implicitly), plus a live readout of what
+            // will actually be boosted, filled by the same GetBoostSlots the automation uses so the panel
+            // cannot disagree with behavior.
             _manualView = new Panel { Location = new Point(0, UiTheme.S(44)), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
             _boostPage.Controls.Add(_manualView);
 
-            // ROWS, NOT OFFSETS. This view is where the boost list is actually edited, and its two lists
-            // were pitched in raw pixels (90px and 56px) against rows that pitch from the measured line —
-            // so at 200% they showed THREE and ONE entry with a scrollbar, inside a section that had
-            // hundreds of unused pixels below. Asking for a row count instead (UiTheme.ListH) makes the
-            // usable space the thing that is specified, and a running cursor keeps everything below the
-            // lists honest when they change.
-            const int PrioRows = 8, BlackRows = 4;
+            // ROWS, NOT OFFSETS (see the note this replaced): the lists are asked for a row count so the
+            // usable space is what is specified, and a running cursor keeps everything below them honest.
+            // The blacklist's rows went to the priority list, which is why it is 14 now.
+            const int PrioRows = 14, ReadoutRows = 4;
             int listW = _pw - UiTheme.S(30);
             int y = 0;
 
-            _manualView.Controls.Add(new Label { Text = "PRIORITY BOOSTS (item IDs, boosted top-down)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            _manualView.Controls.Add(new Label { Text = "PRIORITY BOOSTS (boosted top-down — this list is the only thing boosted)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
             y += UiTheme.HeadPitch;
-            _prio = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(PrioRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle };
+            _prio = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(PrioRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
             UiTheme.StyleList(_prio);
+            _prio.KeyDown += PrioKeyDown;
             _manualView.Controls.Add(_prio);
             y = _prio.Bottom + UiTheme.S(8);
 
-            int wAdd = MeasureBtn("Add"), wRem = MeasureBtn("Remove"), wUp = MeasureBtn("Up"), wDown = MeasureBtn("Down");
-            _prioAdd = new TextBox { Location = new Point(UiTheme.S(10), y), Width = UiTheme.S(120), Font = UiTheme.Ui };
-            _manualView.Controls.Add(_prioAdd);
-            int bx = UiTheme.S(10) + _prioAdd.Width + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Add", bx, y, wAdd, () => EditList(true, add: true))); bx += wAdd + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Remove", bx, y, wRem, () => EditList(true, add: false))); bx += wRem + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Up", bx, y, wUp, () => MovePrio(-1))); bx += wUp + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Down", bx, y, wDown, () => MovePrio(1)));
-            // The row's height is whatever the tallest control in it turned out to be — the TextBox sizes
-            // itself from the font and the buttons are floored at SCtl, so neither is a known pixel here.
-            y += Math.Max(_prioAdd.Height, UiTheme.SCtl(24)) + UiTheme.S(14);
+            int wPick = MeasureBtn("Add from inventory"), wRem = MeasureBtn("Remove");
+            int wTop = MeasureBtn("Top"), wUp = MeasureBtn("Up"), wDown = MeasureBtn("Down"), wBottom = MeasureBtn("Bottom");
+            int bx = UiTheme.S(10);
+            _manualView.Controls.Add(MkBtn("Add from inventory", bx, y, wPick, AddFromInventory)); bx += wPick + UiTheme.S(6);
+            _manualView.Controls.Add(MkBtn("Remove", bx, y, wRem, RemoveSelectedPrio));
+            y += UiTheme.SCtl(24) + UiTheme.S(6);
 
-            _manualView.Controls.Add(new Label { Text = "BOOST BLACKLIST (never boost/merge these IDs)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            bx = UiTheme.S(10);
+            _manualView.Controls.Add(MkBtn("Top", bx, y, wTop, () => MovePrioBlock(-1, true))); bx += wTop + UiTheme.S(6);
+            _manualView.Controls.Add(MkBtn("Up", bx, y, wUp, () => MovePrioBlock(-1, false))); bx += wUp + UiTheme.S(6);
+            _manualView.Controls.Add(MkBtn("Down", bx, y, wDown, () => MovePrioBlock(1, false))); bx += wDown + UiTheme.S(6);
+            _manualView.Controls.Add(MkBtn("Bottom", bx, y, wBottom, () => MovePrioBlock(1, true)));
+            y += UiTheme.SCtl(24) + UiTheme.S(4);
+
+            _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves the selection · Alt+Home/End sends it to the ends", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            y += UiTheme.HeadPitch + UiTheme.S(6);
+
+            _manualView.Controls.Add(new Label { Text = "WILL BOOST NOW (live, in order)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
             y += UiTheme.HeadPitch;
-            _black = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(BlackRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle };
-            UiTheme.StyleList(_black);
-            _manualView.Controls.Add(_black);
-            y = _black.Bottom + UiTheme.S(8);
+            _manualReadout = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(ReadoutRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.None };
+            UiTheme.StyleList(_manualReadout);
+            _manualView.Controls.Add(_manualReadout);
+            y = _manualReadout.Bottom + UiTheme.S(10);
 
-            _blackAdd = new TextBox { Location = new Point(UiTheme.S(10), y), Width = UiTheme.S(120), Font = UiTheme.Ui };
-            _manualView.Controls.Add(_blackAdd);
-            bx = UiTheme.S(10) + _blackAdd.Width + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Add", bx, y, wAdd, () => EditList(false, add: true))); bx += wAdd + UiTheme.S(6);
-            _manualView.Controls.Add(MkBtn("Remove", bx, y, wRem, () => EditList(false, add: false)));
-            int blackRowH = Math.Max(_blackAdd.Height, UiTheme.SCtl(24));
-
-            // Re-homed from the retired Old Boosts page (Phase C): the boost APPLICATION order —
-            // Power/Toughness/Special as a six-permutation combo (Mono-safe: no reorder listbox).
-            // Narrow M1 column: the combo won't fit after the Remove button — own row below.
-            int ordX = bx + wRem + UiTheme.S(20), ordY = y;
-            if (_pw < UiTheme.S(560))
-            {
-                ordX = UiTheme.S(10);
-                ordY = y + blackRowH + UiTheme.S(10);
-            }
-            var ordLbl = new Label { Text = "Apply order", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(ordX, ordY + UiTheme.S(4)) };
+            // Boost APPLICATION order (Power/Toughness/Special) — six permutations in a combo, Mono-safe.
+            var ordLbl = new Label { Text = "Apply order", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y + UiTheme.S(4)) };
             _manualView.Controls.Add(ordLbl);
-            _order = new ComboBox { Width = UiTheme.S(170), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(ordX + UiLayout.MeasureText("Apply order", UiTheme.Ui) + UiTheme.S(8), ordY) };
+            _order = new ComboBox { Width = UiTheme.S(170), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(UiTheme.S(10) + UiLayout.MeasureText("Apply order", UiTheme.Ui) + UiTheme.S(8), y) };
             UiTheme.StyleCombo(_order);
             foreach (var p in OrderPerms)
                 _order.Items.Add(string.Join(" → ", p));
@@ -512,41 +501,88 @@ namespace NGUAdvisor
             return b;
         }
 
-        private void EditList(bool prio, bool add)
+        private void AddFromInventory()
         {
             if (Settings == null) return;
-            var box = prio ? _prio : _black;
-            var tb = prio ? _prioAdd : _blackAdd;
-            var cur = (prio ? Settings.PriorityBoosts : Settings.BoostBlacklist)?.ToList() ?? new List<int>();
+            int[] picked = BoostPickerForm.Pick(FindForm(), Settings.PriorityBoosts ?? new int[0]);
+            if (picked == null || picked.Length == 0) return;
 
-            if (add)
-            {
-                if (!int.TryParse(tb.Text.Trim(), out var id) || id <= 0) return;
-                if (!cur.Contains(id)) cur.Add(id);
-                tb.Text = "";
-            }
-            else
-            {
-                int sel = box.SelectedIndex;
-                if (sel < 0 || sel >= cur.Count) return;
-                cur.RemoveAt(sel);
-            }
-            if (prio) Settings.PriorityBoosts = cur.ToArray();
-            else Settings.BoostBlacklist = cur.ToArray();
-            SyncFromSettings();
-        }
-
-        private void MovePrio(int dir)
-        {
-            if (Settings == null) return;
-            var cur = Settings.PriorityBoosts?.ToList() ?? new List<int>();
-            int sel = _prio.SelectedIndex;
-            int to = sel + dir;
-            if (sel < 0 || sel >= cur.Count || to < 0 || to >= cur.Count) return;
-            var tmp = cur[sel]; cur[sel] = cur[to]; cur[to] = tmp;
+            List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
+            foreach (int id in picked)
+                if (id > 0 && !cur.Contains(id)) cur.Add(id);
             Settings.PriorityBoosts = cur.ToArray();
             SyncFromSettings();
-            _prio.SelectedIndex = to;
+            Activity.Completed($"Added {picked.Length} item(s) to priority boosts");
+        }
+
+        private void RemoveSelectedPrio()
+        {
+            if (Settings == null) return;
+            List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
+            int[] indices = _prio.SelectedIndices.Cast<int>().OrderByDescending(i => i).ToArray();
+            if (indices.Length == 0) return;
+            int lowest = indices[indices.Length - 1];
+            foreach (int idx in indices)
+                if (idx >= 0 && idx < cur.Count) cur.RemoveAt(idx);
+            Settings.PriorityBoosts = cur.ToArray();
+            SyncFromSettings();
+            int reselect = Math.Min(lowest, _prio.Items.Count - 1);
+            if (reselect >= 0) ReselectRange(reselect, 1);
+        }
+
+        // Moves the selected block one step (toEnd = false) or all the way to an end (toEnd = true).
+        // dir < 0 is towards the top. The selection is preserved and kept visible — losing the selection
+        // after every click is what made the old single-step buttons unusable for a long list.
+        // Intentional: this moves the selection as ONE contiguous block anchored at sel[0]. A
+        // non-contiguous selection (e.g. rows 2 and 5) is coalesced next to each other rather than
+        // moved independently, and a selection whose last row is already at the target end is refused
+        // outright rather than partially moved. Not a bug — do not "fix" this into per-row movement.
+        private void MovePrioBlock(int dir, bool toEnd)
+        {
+            if (Settings == null) return;
+            List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
+            List<int> sel = _prio.SelectedIndices.Cast<int>().OrderBy(i => i).ToList();
+            if (sel.Count == 0 || cur.Count == 0) return;
+            if (dir < 0 && sel[0] == 0) return;
+            if (dir > 0 && sel[sel.Count - 1] == cur.Count - 1) return;
+
+            List<int> moved = sel.Select(i => cur[i]).ToList();
+            for (int i = sel.Count - 1; i >= 0; i--) cur.RemoveAt(sel[i]);
+
+            int insertAt;
+            if (toEnd) insertAt = dir < 0 ? 0 : cur.Count;
+            else insertAt = dir < 0 ? sel[0] - 1 : sel[0] + 1;
+            if (insertAt < 0) insertAt = 0;
+            if (insertAt > cur.Count) insertAt = cur.Count;
+
+            cur.InsertRange(insertAt, moved);
+            Settings.PriorityBoosts = cur.ToArray();
+            SyncFromSettings();
+            ReselectRange(insertAt, moved.Count);
+        }
+
+        private void ReselectRange(int start, int count)
+        {
+            _prio.ClearSelected();
+            for (int i = 0; i < count; i++)
+            {
+                int idx = start + i;
+                if (idx >= 0 && idx < _prio.Items.Count) _prio.SetSelected(idx, true);
+            }
+            if (start >= 0 && start < _prio.Items.Count) _prio.TopIndex = Math.Max(0, start - 2);
+        }
+
+        private void PrioKeyDown(object sender, KeyEventArgs e)
+        {
+            try
+            {
+                if (!e.Alt) return;
+                if (e.KeyCode == Keys.Up) { MovePrioBlock(-1, false); e.Handled = true; e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Down) { MovePrioBlock(1, false); e.Handled = true; e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Home) { MovePrioBlock(-1, true); e.Handled = true; e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.End) { MovePrioBlock(1, true); e.Handled = true; e.SuppressKeyPress = true; }
+            }
+            catch (Exception ex) { LogDebug($"Boosts key: {ex.Message}"); }
         }
 
         public void SyncFromSettings()
@@ -583,16 +619,43 @@ namespace NGUAdvisor
                     _prio.Items.Add($"{ItemNameNice(id)}  (#{id})");
                 _prio.EndUpdate();
 
-                _black.BeginUpdate();
-                _black.Items.Clear();
-                foreach (var id in Settings.BoostBlacklist ?? new int[0])
-                    _black.Items.Add($"{ItemNameNice(id)}  (#{id})");
-                _black.EndUpdate();
+                RefreshManualReadout();
 
             }
             finally { _syncing = false; }
             RefreshChains();
             if (Settings.AutoBoostPriority) RefreshReadout();
+        }
+
+        // The live "what will actually be boosted" list. Calls the SAME function the automation calls, so
+        // the panel and the behavior cannot drift apart. Cheap: it walks the priority list only.
+        private void RefreshManualReadout()
+        {
+            if (_manualReadout == null) return;
+            _manualReadout.BeginUpdate();
+            _manualReadout.Items.Clear();
+            try
+            {
+                if (Main.Character != null)
+                {
+                    ih[] converted = Main.Character.inventory.GetConvertedInventory().ToArray();
+                    ih[] slots = InventoryManager.GetBoostSlots(converted);
+                    foreach (ih s in slots)
+                        _manualReadout.Items.Add($"{ItemNameNice(s.id)}  (#{s.id})   lvl {s.level}/100");
+                    if (slots.Length == 0)
+                        _manualReadout.Items.Add("(nothing — add items above)");
+                }
+                else
+                {
+                    _manualReadout.Items.Add("(readout unavailable)");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Boost readout: {ex.Message}");
+                _manualReadout.Items.Add("(readout unavailable)");
+            }
+            _manualReadout.EndUpdate();
         }
 
         private static bool Flag(int[] arr, int i) => arr != null && i < arr.Length && arr[i] != 0;
