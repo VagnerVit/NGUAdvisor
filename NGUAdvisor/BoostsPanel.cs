@@ -44,6 +44,8 @@ namespace NGUAdvisor
         private ListBox _prio;
         private ListBox _manualReadout;
         private ComboBox _order;
+        private int _dragFrom = -1;
+        private int _dragInsert = -1;
 
         // Layout C (user-approved): two-line cards. Line 1 = full item name + right-aligned toggle
         // BUTTONS (measured text — never checkboxes: Mono randomly drops checkbox glyphs). Line 2 =
@@ -277,6 +279,19 @@ namespace NGUAdvisor
             _prio = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(PrioRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
             UiTheme.StyleList(_prio);
             _prio.KeyDown += PrioKeyDown;
+            if (Settings == null || !Settings.BoostDragReorderOff)
+            {
+                _prio.AllowDrop = true;
+                _prio.MouseDown += PrioMouseDown;
+                _prio.MouseMove += PrioMouseMove;
+                _prio.DragOver += PrioDragOver;
+                _prio.DragDrop += PrioDragDrop;
+                _prio.DragLeave += (s, e) =>
+                {
+                    try { _dragInsert = -1; _prio.Invalidate(); }
+                    catch (Exception ex) { LogDebug($"Boosts drag leave: {ex.Message}"); }
+                };
+            }
             _manualView.Controls.Add(_prio);
             y = _prio.Bottom + UiTheme.S(8);
 
@@ -583,6 +598,65 @@ namespace NGUAdvisor
                 else if (e.KeyCode == Keys.End) { MovePrioBlock(1, true); e.Handled = true; e.SuppressKeyPress = true; }
             }
             catch (Exception ex) { LogDebug($"Boosts key: {ex.Message}"); }
+        }
+
+        // Drag & drop is a LAYER over the buttons, never a replacement: WinForms DnD is the part of this
+        // panel that cannot be verified outside the running game, so every handler is guarded and the
+        // whole thing is skippable via Settings.BoostDragReorderOff. The list write goes through the same
+        // path the buttons use.
+        private void PrioMouseDown(object sender, MouseEventArgs e)
+        {
+            try { _dragFrom = _prio.IndexFromPoint(e.Location); }
+            catch (Exception ex) { LogDebug($"Boosts drag start: {ex.Message}"); _dragFrom = -1; }
+        }
+
+        private void PrioMouseMove(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (e.Button != MouseButtons.Left || _dragFrom < 0) return;
+                if (!_prio.SelectedIndices.Cast<int>().Contains(_dragFrom)) return;
+                _prio.DoDragDrop(_dragFrom, DragDropEffects.Move);
+            }
+            catch (Exception ex) { LogDebug($"Boosts drag move: {ex.Message}"); }
+        }
+
+        private void PrioDragOver(object sender, DragEventArgs e)
+        {
+            try
+            {
+                e.Effect = DragDropEffects.Move;
+                Point p = _prio.PointToClient(new Point(e.X, e.Y));
+                int idx = _prio.IndexFromPoint(p);
+                _dragInsert = idx < 0 ? _prio.Items.Count : idx;
+            }
+            catch (Exception ex) { LogDebug($"Boosts drag over: {ex.Message}"); }
+        }
+
+        private void PrioDragDrop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                if (Settings == null || _dragInsert < 0) return;
+                List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
+                List<int> sel = _prio.SelectedIndices.Cast<int>().OrderBy(i => i).ToList();
+                if (sel.Count == 0) return;
+
+                List<int> moved = sel.Select(i => cur[i]).ToList();
+                int target = _dragInsert;
+                // Removing the block shifts everything after it left; correct the insertion point first.
+                foreach (int i in sel) if (i < target) target--;
+                for (int i = sel.Count - 1; i >= 0; i--) cur.RemoveAt(sel[i]);
+                if (target < 0) target = 0;
+                if (target > cur.Count) target = cur.Count;
+
+                cur.InsertRange(target, moved);
+                Settings.PriorityBoosts = cur.ToArray();
+                SyncFromSettings();
+                ReselectRange(target, moved.Count);
+            }
+            catch (Exception ex) { LogDebug($"Boosts drag drop: {ex.Message}"); }
+            finally { _dragFrom = -1; _dragInsert = -1; }
         }
 
         public void SyncFromSettings()
