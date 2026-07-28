@@ -52,7 +52,8 @@ non-scrolling panel has no scrollbar to reach the overflow with.
 | `ProfilePanel` | profile list, switch/apply (via request), `PresetInstaller` output |
 | `AdventurePanel`, `TitansPanel` | zone routing, `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner) |
 | `GoldPanel`, `PitPanel` | gold snipe state, `MoneyPitManager.AdvisorPlan`/`PredictNext` |
-| `YggPanel`, `QuestsPanel`, `BloodPanel`, `BoostsPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |
+| `YggPanel`, `QuestsPanel`, `BloodPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |
+| `BoostsPanel` + `BoostPickerForm` | `InventoryManager.GetBoostSlots` (live readout), `InventoryAdvisor`, `TransformManager` |
 | `SystemIndexPanel`, `BasicSettingsPanel` | `SettingsIndex` (+ the search box), `SystemCatalog` |
 | `LogsPanel`, `LogSliver` | `LogTail` / in-memory feeds |
 | `ProfileEditorForm` + `*EditorPanel` (Resource/Gear/List/Misc/WanDiff) | `ProfileModel` + `ProfileValidator` + `PriorityCatalog` |

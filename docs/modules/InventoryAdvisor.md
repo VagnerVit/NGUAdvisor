@@ -20,8 +20,14 @@ carries that caveat). `Usage[id]` counts how many objective-optimal loadouts inc
 
 ## AutoBoostPriority
 
-Unequipped KEEP items that still need boosts (`GetNeededBoosts().Total() > 0`), ranked by
-objective `Usage`, then transform-chain climbers (highest owned tier below level 100). Equipped
-gear is boosted first by `InventoryManager` regardless of this list; fully-boosted items neither
-rank nor display. Written into `Settings.PriorityBoosts` by `AdvisorApply.ApplyBoostPriority`
-(10-min throttle — this is the expensive sweep).
+**Equipped gear first** (in slot order), then unequipped KEEP items that still need boosts
+(`GetNeededBoosts().Total() > 0`), ranked by objective `Usage`, then transform-chain climbers. Equipped
+items lead because since 2026-07-28 the priority list is the ONLY boost source — the old "equipped is
+boosted by the manager pass regardless" assumption is gone. Fully-boosted items neither rank nor
+display. Written into `Settings.PriorityBoosts` by `AdvisorApply.ApplyBoostPriority` (10-min throttle —
+this is the expensive sweep).
+
+Equipped gear here is ordered by `LoadoutManager.CurrentGearIds()` (head, boots, chest, legs, weapon,
+weapon 2, accessories), which differs from the one-time migration's weapon-first seed order (weapon,
+weapon 2, head, chest, legs, boots, accessories) — see `BoostSeed.SeedPriorityBoosts`. Both are stable;
+no spec pins a single permutation, so this is not a bug.
