@@ -125,6 +125,61 @@ namespace NGUAdvisor.Managers
             return result.FindAll(x => x.equipment.GetNeededBoosts().Total() > 0).ToArray();
         }
 
+        // Drops priority-list entries the player no longer owns (user request: trashing an item in game
+        // should take it off the boost list too). Returns the number removed, 0 when nothing changed.
+        //
+        // OWNERSHIP IS CHECKED WIDER THAN THE BOOST PATH ON PURPOSE. GetBoostSlots resolves through
+        // LoadoutManager.FindItemSlot, which searches equipped + inventory only — daycare is not in it.
+        // Pruning on that test would delete the shockwave/levelling set out of the user's list the moment
+        // it went into daycare, which is data loss, not tidying. So daycare and the MacGuffin slots count
+        // as owned here.
+        //
+        // SAFETY: if the inventory is not populated yet, EVERY id reads as unowned and the whole list
+        // would be wiped. That is the same trap the one-time seed hit, so the same guard applies — no
+        // inventory, no pruning.
+        public static int PruneUnownedPriorityBoosts()
+        {
+            try
+            {
+                int[] priority = Settings?.PriorityBoosts;
+                if (priority == null || priority.Length == 0) return 0;
+
+                var inv = Main.Character?.inventory;
+                if (inv?.inventory == null || inv.inventory.Count == 0) return 0;
+
+                var owned = new HashSet<int>();
+                void Own(Equipment e) { if (e != null && e.id != 0) owned.Add(e.id); }
+
+                Own(inv.weapon);
+                try { if (_ic.weapon2Unlocked()) Own(inv.weapon2); } catch (Exception ex) { LogDebug($"Prune weapon2: {ex.Message}"); }
+                Own(inv.head); Own(inv.chest); Own(inv.legs); Own(inv.boots);
+                if (inv.accs != null) foreach (var a in inv.accs) Own(a);
+                foreach (var e in inv.inventory) Own(e);
+                if (inv.daycare != null) foreach (var e in inv.daycare) Own(e);
+                try { if (inv.macguffins != null) foreach (var e in inv.macguffins) Own(e); }
+                catch (Exception ex) { LogDebug($"Prune macguffins: {ex.Message}"); }
+
+                var kept = new List<int>();
+                var dropped = new List<int>();
+                foreach (int id in priority)
+                {
+                    if (owned.Contains(id)) kept.Add(id);
+                    else dropped.Add(id);
+                }
+                if (dropped.Count == 0) return 0;
+
+                Settings.PriorityBoosts = kept.ToArray();
+                Log($"Boost priority: dropped {dropped.Count} item(s) you no longer own — "
+                    + string.Join(", ", dropped.Select(id => $"{Main.ItemNameNice(id)} (#{id})").ToArray()));
+                return dropped.Count;
+            }
+            catch (Exception e)
+            {
+                LogDebug($"PruneUnownedPriorityBoosts: {e.Message}");
+                return 0;
+            }
+        }
+
         public static void BoostInventory(ih[] boostSlots)
         {
             foreach (var item in boostSlots)

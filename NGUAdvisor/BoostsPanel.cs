@@ -301,7 +301,7 @@ namespace NGUAdvisor
             _manualView.Controls.Add(MkBtn("Bottom", bx, y, wBottom, () => MovePrioBlock(1, true)));
             y += UiTheme.SCtl(24) + UiTheme.S(4);
 
-            _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves the selection · Alt+Home/End sends it to the ends", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves the selection · Alt+Home/End sends it to the ends · Del removes it", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
             y += UiTheme.HeadPitch + UiTheme.S(6);
 
             _manualView.Controls.Add(new Label { Text = "WILL BOOST NOW (live, in order)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
@@ -591,6 +591,14 @@ namespace NGUAdvisor
         {
             try
             {
+                // Delete removes the selection — the keyboard equivalent of the Remove button.
+                if (e.KeyCode == Keys.Delete && !e.Alt)
+                {
+                    RemoveSelectedPrio();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    return;
+                }
                 if (!e.Alt) return;
                 if (e.KeyCode == Keys.Up) { MovePrioBlock(-1, false); e.Handled = true; e.SuppressKeyPress = true; }
                 else if (e.KeyCode == Keys.Down) { MovePrioBlock(1, false); e.Handled = true; e.SuppressKeyPress = true; }
@@ -634,21 +642,33 @@ namespace NGUAdvisor
                 // site therefore looked right and then silently dropped (user-reported 1.2.9: one Up
                 // click deselected the row, so you could not click Up again to move it two places).
                 // Snapshot by ITEM ID, not index: an external write may have reordered the list.
-                List<int> keepSelected = new List<int>();
-                foreach (int idx in _prio.SelectedIndices)
-                    if (idx >= 0 && idx < _prioIds.Count) keepSelected.Add(_prioIds[idx]);
-
-                _prio.BeginUpdate();
-                _prio.Items.Clear();
-                _prioIds.Clear();
-                foreach (var id in Settings.PriorityBoosts ?? new int[0])
+                // REBUILD ONLY ON A REAL CHANGE. This method runs on every settings write anywhere in the
+                // app, coalesced to once a second — and rebuilding an owner-drawn ListBox repaints all of
+                // it, while the readout below re-walks the whole list through FindItemSlot. Doing that
+                // every second made the page visibly judder (user-reported 1.2.10). Nothing below the
+                // equality check touches a control unless the list actually differs.
+                int[] want = Settings.PriorityBoosts ?? new int[0];
+                if (!SameIds(want, _prioIds))
                 {
-                    _prio.Items.Add($"{ItemNameNice(id)}  (#{id})");
-                    _prioIds.Add(id);
-                }
-                _prio.EndUpdate();
+                    List<int> keepSelected = new List<int>();
+                    foreach (int idx in _prio.SelectedIndices)
+                        if (idx >= 0 && idx < _prioIds.Count) keepSelected.Add(_prioIds[idx]);
 
-                if (keepSelected.Count > 0) SelectIds(keepSelected);
+                    _prio.BeginUpdate();
+                    try
+                    {
+                        _prio.Items.Clear();
+                        _prioIds.Clear();
+                        foreach (int id in want)
+                        {
+                            _prio.Items.Add($"{ItemNameNice(id)}  (#{id})");
+                            _prioIds.Add(id);
+                        }
+                        // Inside BeginUpdate: SetSelected repaints per row otherwise.
+                        if (keepSelected.Count > 0) SelectIds(keepSelected);
+                    }
+                    finally { _prio.EndUpdate(); }
+                }
 
                 RefreshManualReadout();
 
@@ -658,34 +678,65 @@ namespace NGUAdvisor
             if (Settings.AutoBoostPriority) RefreshReadout();
         }
 
+        private static bool SameIds(int[] a, List<int> b)
+        {
+            if (a == null) return b.Count == 0;
+            if (a.Length != b.Count) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i]) return false;
+            return true;
+        }
+
         // The live "what will actually be boosted" list. Calls the SAME function the automation calls, so
-        // the panel and the behavior cannot drift apart. Cheap: it walks the priority list only.
+        // the panel and the behavior cannot drift apart.
+        //
+        // GetBoostSlots resolves every priority id through FindItemSlot (a scan of equipped + inventory),
+        // so this is NOT free, and SyncFromSettings runs it on every settings write in the app. The lines
+        // are therefore built first and compared against what is displayed; the ListBox is only touched
+        // when the text actually differs. Levels change as boosts land, so this does refresh — just not
+        // on every unrelated save.
         private void RefreshManualReadout()
         {
             if (_manualReadout == null) return;
-            _manualReadout.BeginUpdate();
-            _manualReadout.Items.Clear();
+            List<string> lines = new List<string>();
             try
             {
                 if (Main.Character != null)
                 {
                     ih[] slots = InventoryManager.GetBoostSlots(new ih[0]);
                     foreach (ih s in slots)
-                        _manualReadout.Items.Add($"{ItemNameNice(s.id)}  (#{s.id})   lvl {s.level}/100");
+                        lines.Add($"{ItemNameNice(s.id)}  (#{s.id})   lvl {s.level}/100");
                     if (slots.Length == 0)
-                        _manualReadout.Items.Add("(nothing — add items above)");
+                        lines.Add("(nothing — add items above)");
                 }
                 else
                 {
-                    _manualReadout.Items.Add("(readout unavailable)");
+                    lines.Add("(readout unavailable)");
                 }
             }
             catch (Exception ex)
             {
                 LogDebug($"Boost readout: {ex.Message}");
-                _manualReadout.Items.Add("(readout unavailable)");
+                lines.Clear();
+                lines.Add("(readout unavailable)");
             }
-            _manualReadout.EndUpdate();
+
+            if (_manualReadout.Items.Count == lines.Count)
+            {
+                bool same = true;
+                for (int i = 0; i < lines.Count; i++)
+                    if (!string.Equals(_manualReadout.Items[i] as string, lines[i], StringComparison.Ordinal))
+                    { same = false; break; }
+                if (same) return;
+            }
+
+            _manualReadout.BeginUpdate();
+            try
+            {
+                _manualReadout.Items.Clear();
+                foreach (string line in lines) _manualReadout.Items.Add(line);
+            }
+            finally { _manualReadout.EndUpdate(); }
         }
 
         private static bool Flag(int[] arr, int i) => arr != null && i < arr.Length && arr[i] != 0;

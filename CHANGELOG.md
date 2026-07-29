@@ -2,6 +2,28 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.11] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0. Follow-up to 1.2.10 from
+in-game testing of the Boosts page.
+
+### Fixed
+
+- **The page no longer judders.** The priority list and the "will boost now" readout were rebuilt on
+  every settings write anywhere in the advisor, coalesced to once a second — and each rebuild repaints a
+  whole owner-drawn list, while the readout re-resolves every item through the inventory. Both now
+  compare against what is already displayed and touch nothing when it matches.
+- **Del removes the selected item**, the keyboard equivalent of Remove.
+- **Trashing an item in game takes it off the boost list.** The list is pruned of items you no longer own
+  (equipped, inventory, daycare and MacGuffin slots all count as owned — a set in daycare is not gone),
+  and every removal is logged. It never prunes while the inventory reads as empty, because at that moment
+  everything would look unowned.
+
+### Removed
+
+- Drag & drop reordering. It was built as a layer over the buttons and does not work in the game's Mono
+  runtime; the buttons and Alt+arrows are the reorder path.
+
 ## [1.2.10] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0. Boosting now follows one list
@@ -19,8 +41,6 @@ instead of three implicit sources, and the Boosts page gets a picker and proper 
 - Reordering: multi-select, Top/Up/Down/Bottom, Alt+↑/↓ and Alt+Home/End. **The selection stays put after
   a move**, so you can click Up repeatedly to walk an item several places — previously the row deselected
   itself and you had to re-pick it every time. The page also shows a live "will boost now" readout.
-- Drag & drop was built and then removed: it does not work in the game's Mono runtime. The buttons and
-  Alt+arrows are the reorder path.
 - Merging is now governed only by the transform-chain toggles.
 
 ## [1.2.8] - 2026-07-28

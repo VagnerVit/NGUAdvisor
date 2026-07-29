@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.10";
+        public const string Version = "1.2.11";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -64,6 +64,9 @@ namespace NGUAdvisor
         // -1 = unknown/unseeded. MUST NOT default to 0: statics reset on advisor reload, and a 0
         // baseline made SetResnipe read any real zone as "new zone fightable" — wiping the
         // completed snipe mid-run (user-reported). SetResnipe re-seeds from the current best zone.
+        // Throttle for the boost-list prune in AutomationRoutine.
+        private static DateTime _lastBoostPrune = DateTime.MinValue;
+
         private static int _furthestZone = -1;
 
         // Highest zone that already armed a "new zone fightable" re-snipe this run. Fightability is
@@ -1004,6 +1007,16 @@ namespace NGUAdvisor
                     var data = Character.importExport.getBase64Data();
                     using (var writer = new StreamWriter(customPath))
                         writer.WriteLine(data);
+                }
+
+                // Keep the boost priority list honest: an item trashed in game should leave the list too
+                // (user request). Deliberately NOT gated on ManageInventory — the list is what the panel
+                // shows, so it should be true even with automation off. Throttled because it walks the
+                // whole inventory; it writes settings only when something actually went away.
+                if ((DateTime.UtcNow - _lastBoostPrune).TotalSeconds >= 30)
+                {
+                    _lastBoostPrune = DateTime.UtcNow;
+                    InventoryManager.PruneUnownedPriorityBoosts();
                 }
 
                 ZoneHelpers.RefreshTitanSnapshots();
