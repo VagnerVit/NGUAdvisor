@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.13";
+        public const string Version = "1.2.14";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -991,7 +991,11 @@ namespace NGUAdvisor
                     InventoryManager.MergeInventory(converted);
                     InventoryManager.MergeBoosts(converted);
                     InventoryManager.MergeGuffs(converted);
-                    InventoryManager.BoostInventory(boostSlots);
+                    // CUBE ONLY (user request): send every boost to the Infinity Cube and skip the gear
+                    // list. Deliberately narrow — merges, filters and convertibles above keep running,
+                    // because turning those off with a switch labelled "cube only" would be a surprise.
+                    if (!Settings.BoostCubeOnly)
+                        InventoryManager.BoostInventory(boostSlots);
                     InventoryManager.BoostInfinityCube();
                     InventoryManager.ManageBoostConversion(boostSlots);
                     InventoryController.updateInventory();

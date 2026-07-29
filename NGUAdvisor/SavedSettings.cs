@@ -175,8 +175,10 @@ namespace NGUAdvisor
         // Boosts sub-tab v3: advisor-driven boost priority + per-transform-chain flags (index = chain).
         [SerializeField] private bool _autoBoostPriority;
         // Boosts v4 (spec 2026-07-28): the priority list is the ONLY boost source. _boostSeeded makes the
-        // one-time migration from equipped + locked idempotent.
+        // one-time migration from equipped + locked idempotent. _boostCubeOnly parks the gear list and
+        // sends every boost to the Infinity Cube instead (merges and filters keep running).
         [SerializeField] private bool _boostSeeded;
+        [SerializeField] private bool _boostCubeOnly;
         [SerializeField] private bool _advisorZones;
         // Advisor zone-routing strategies (Combat > ZONES): gear-capping farm + demand-gated boost farm.
         [SerializeField] private bool _advisorFarmGear;
@@ -541,6 +543,7 @@ namespace NGUAdvisor
             _wideLayout = other?.WideLayout ?? false;
             _autoBoostPriority = other?.AutoBoostPriority ?? false;
             _boostSeeded = other?.BoostSeeded ?? false;
+            _boostCubeOnly = other?.BoostCubeOnly ?? false;
             _advisorZones = other?.AdvisorZones ?? false;
             _advisorFarmGear = other?.AdvisorFarmGear ?? false;
             _advisorFarmBoost = other?.AdvisorFarmBoost ?? false;
@@ -2096,6 +2099,14 @@ namespace NGUAdvisor
         {
             get => _autoBoostPriority;
             set { if (value == _autoBoostPriority) return; _autoBoostPriority = value; SaveSettings(); }
+        }
+
+        // Boost the Infinity Cube INSTEAD of the priority list. The Cube dropdown next to it only says
+        // HOW the cube is fed once it gets boosts; this is what makes it get them exclusively.
+        public bool BoostCubeOnly
+        {
+            get => _boostCubeOnly;
+            set { if (value == _boostCubeOnly) return; _boostCubeOnly = value; SaveSettings(); }
         }
 
         // Set once by the boost-list migration (Main.Start). Never set it from the UI.

@@ -2,6 +2,18 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.14] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Added
+
+- **Cube only.** A tick box on the Boosts page sends every boost to the Infinity Cube and parks the
+  priority list. The Cube dropdown beside it only ever chose HOW the cube is fed once boosts reach it;
+  there was no way to say that it should get them instead of your gear. Merges, filters and convertibles
+  keep running — a switch labelled "cube only" turning those off would be a surprise. While it is on the
+  live readout says the list is parked rather than showing an empty list next to a full one.
+
 ## [1.2.13] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0. Number fields, third attempt —

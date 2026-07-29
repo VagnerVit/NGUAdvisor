@@ -38,6 +38,7 @@ namespace NGUAdvisor
         private SystemControlBar _controlBar;
         private ComboBox _cube;
         private ComboBox _guffin;
+        private ScaledCheckBox _cubeOnly;
         private Panel _advisorView;
         private Panel _manualView;
         private ListBox _readout;
@@ -236,8 +237,40 @@ namespace NGUAdvisor
             // Measured row layout — the old hand-placed "Cube" label overlapped its combo by 3px.
             UiLayout.Row(UiTheme.S(10), UiTheme.S(10), UiTheme.S(8), cubeLbl, _cube, gufLbl, _guffin, refresh);
 
+            // CUBE ONLY (user request). The Cube dropdown beside it only chooses HOW the cube is fed; this
+            // is what makes it get the boosts at all instead of the priority list. Its own row: the row
+            // above already reaches the page edge, and squeezing a checkbox into it would push the refresh
+            // button off. Merges, filters and convertibles are untouched by it — see Main.AutomationRoutine.
+            _cubeOnly = new ScaledCheckBox
+            {
+                Text = "Cube only (skip the priority list)",
+                AutoSize = true,
+                Font = UiTheme.Ui,
+                ForeColor = UiTheme.Ink,
+                BackColor = UiTheme.Ground,
+                Location = new Point(UiTheme.S(10), _cube.Bottom + UiTheme.S(6))
+            };
+            _cubeOnly.CheckedChanged += (s, e) =>
+            {
+                if (_syncing || Settings == null) return;
+                try
+                {
+                    Settings.BoostCubeOnly = _cubeOnly.Checked;
+                    Activity.Completed(_cubeOnly.Checked
+                        ? "Boosts go to the Infinity Cube only"
+                        : "Boosts follow the priority list again");
+                    RefreshManualReadout();
+                }
+                catch (Exception ex) { LogDebug($"Boosts cube-only: {ex.Message}"); }
+            };
+            _boostPage.Controls.Add(_cubeOnly);
+
+            // Both views hang off the checkbox row rather than a tuned S(44) — the row's height comes from
+            // the measured line, so a hardcoded offset would overlap it at a different scale.
+            int viewsY = _cubeOnly.Bottom + UiTheme.S(8);
+
             // ADVISOR view: computed order readout.
-            _advisorView = new Panel { Location = new Point(0, UiTheme.S(44)), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
+            _advisorView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
             _boostPage.Controls.Add(_advisorView);
             _advisorView.Controls.Add(new Label
             {
@@ -265,7 +298,7 @@ namespace NGUAdvisor
             // retired and equipped/locked are no longer boosted implicitly), plus a live readout of what
             // will actually be boosted, filled by the same GetBoostSlots the automation uses so the panel
             // cannot disagree with behavior.
-            _manualView = new Panel { Location = new Point(0, UiTheme.S(44)), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
+            _manualView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
             _boostPage.Controls.Add(_manualView);
 
             // ROWS, NOT OFFSETS (see the note this replaced): the lists are asked for a row count so the
@@ -627,6 +660,7 @@ namespace NGUAdvisor
 
                 int cube = Settings.CubePriority;
                 if (cube >= 0 && cube < _cube.Items.Count) _cube.SelectedIndex = cube;
+                if (_cubeOnly != null) _cubeOnly.Checked = Settings.BoostCubeOnly;
                 for (int i = 0; i < _guffin.Items.Count; i++)
                     if (((KeyValuePair<int, string>)_guffin.Items[i]).Key == Settings.FavoredMacguffin)
                     { _guffin.SelectedIndex = i; break; }
@@ -706,7 +740,13 @@ namespace NGUAdvisor
                     ih[] slots = InventoryManager.GetBoostSlots(new ih[0]);
                     foreach (ih s in slots)
                         lines.Add($"{ItemNameNice(s.id)}  (#{s.id})   lvl {s.level}/100");
-                    if (slots.Length == 0)
+                    if (Settings != null && Settings.BoostCubeOnly)
+                    {
+                        // Say WHY it is parked. An empty readout with a full list above it reads as a bug.
+                        lines.Clear();
+                        lines.Add("(cube only — the list is parked, boosts go to the Infinity Cube)");
+                    }
+                    else if (slots.Length == 0)
                         lines.Add("(nothing — add items above)");
                 }
                 else
