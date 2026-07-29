@@ -2,6 +2,26 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.12] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0. Number fields are the right
+height on a scaled display — for real this time.
+
+### Fixed
+
+- **Number fields fit their text.** The layout audit had ten standing findings across Loadouts, Blood,
+  Gold, Pit, Yggdrasil and Quests — every `NumericUpDown`'s inner edit box at 32px against a 38px line,
+  so digits sat visibly off-centre and descenders clipped. 1.2.7 claimed this fixed and it was not: the
+  control's height was set to the line plus a **guessed** 3px allowance, but Mono's chrome (border plus
+  internal padding) spends about 9px, so a 41px control had only a 32px client area — and the inner box
+  can never exceed that, however hard the advisor stretches it. The chrome is now MEASURED at startup
+  from a probe control, like every other metric in the interface, and the field is sized to the line plus
+  that. It is logged in the `UI metrics:` line so the next report can be diagnosed from the log alone.
+
+  Number fields are therefore ~6px taller than in 1.2.11. Rows that contain one derive their height from
+  it and follow automatically; if a fixed-height card somewhere no longer fits its row, the audit will now
+  say so instead of clipping in silence.
+
 ## [1.2.11] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0. Follow-up to 1.2.10 from

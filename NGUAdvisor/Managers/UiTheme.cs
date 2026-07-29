@@ -104,12 +104,33 @@ namespace NGUAdvisor.Managers
             LinePitch = lineH + 1;
             HeadPitch = headH + 2;
             TextH = lineH - 3;
+            // A NumericUpDown's usable height is its CLIENT area, and its chrome is a renderer constant we
+            // must not guess. NumH used to be LineH + S(2), i.e. a 3px allowance — but Mono's UpDownBase
+            // spends ~9px, so a 41px control had a 32px client area and its inner edit box could only ever
+            // be 32px against a 38px line. That was ten standing "UpDownTextBox h=32 < 38" audit findings
+            // across six pages (reported 2026-07-29), and no amount of stretching the inner box could fix
+            // it while the box it lives in was too small. Measure the chrome, then size the control so the
+            // CLIENT area fits the line.
+            NumChrome = 0;
+            try
+            {
+                using (var probe = new NumericUpDown { Font = Ui })
+                {
+                    probe.Height = LineH;
+                    NumChrome = Math.Max(0, probe.Height - probe.ClientSize.Height);
+                }
+            }
+            catch (Exception e) { info += $"; num chrome probe failed ({e.Message})"; }
+
             // InvariantCulture: this line is read back from debug.log when diagnosing layout, and a
             // comma-decimal locale wrote "scale 1,52" (project rule — pin culture on number paths).
             CalibrationInfo = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}",
-                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale);
+                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}, num chrome {7}",
+                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale, NumChrome);
         }
+
+        // Measured chrome of a NumericUpDown (border + internal padding): outer height minus client height.
+        public static readonly int NumChrome;
 
         // Second oracle for the rendered line height: what an AutoSize label actually sizes itself to
         // (the audit history was recorded against these, not against raw MeasureText).
@@ -197,8 +218,11 @@ namespace NGUAdvisor.Managers
 
         // NumericUpDown sizes itself from Font.Height as well (the live audit found its inner text box at
         // 32px against a 38px line). It has no DrawMode to take over, but unlike ComboBox it does honour
-        // an explicit Height, so stating one is the whole fix.
-        public static int NumH => LineH + S(2);
+        // an explicit Height — so the height must be the LINE PLUS THE MEASURED CHROME. Stating LineH + a
+        // guessed 3px left the client area 6px short of the line on Mono, which is what the inner edit box
+        // is limited to; see the NumChrome probe. Every row helper below derives from this, so they all
+        // move together.
+        public static int NumH => LineH + NumChrome;
 
         public static void StyleNum(NumericUpDown n)
         {
@@ -206,6 +230,12 @@ namespace NGUAdvisor.Managers
             try
             {
                 n.Height = NumH;
+                // Belt and braces on the height: NumChrome comes from a probe built with UiTheme's own
+                // font, and a panel may hand us a control with a different one. If this instance spends
+                // more chrome than the probe did, grow it until its CLIENT area fits the line — otherwise
+                // the inner box below is capped short no matter what we do to it.
+                int chrome = n.Height - n.ClientSize.Height;
+                if (n.ClientSize.Height < LineH && chrome > 0) n.Height = LineH + chrome;
                 // …and the INNER edit box, which is a separate control sized from Font.Height on its own.
                 // Setting the NumericUpDown's height alone left it at 32px against a 38px line (the audit
                 // reports it as 'UpDownTextBox', which is why that name appears in the log rather than the
@@ -215,7 +245,7 @@ namespace NGUAdvisor.Managers
                 n.Resize -= NumResized;
                 n.Resize += NumResized;
             }
-            catch { }
+            catch (Exception e) { Main.LogDebug($"StyleNum: {e.Message}"); }
         }
 
         private static void NumResized(object sender, EventArgs e) => StretchNumEdit(sender as NumericUpDown);
@@ -232,7 +262,7 @@ namespace NGUAdvisor.Managers
                     if (c.Height < h) { c.Top = 0; c.Height = h; }
                 }
             }
-            catch { }
+            catch (Exception e) { Main.LogDebug($"StretchNumEdit: {e.Message}"); }
         }
 
         // A row panel that CONTAINS a numeric is the tallest-child case again: NumH is the tallest thing
