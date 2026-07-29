@@ -3,18 +3,11 @@ using System.Collections.Generic;
 
 namespace NGUAdvisor.Managers
 {
-    // EXP purchase planner/balancer (guide ch4, verbatim: "Split EXP evenly into energy/magic
-    // (3:1 E:M base), using a pow:cap:bar ratio of 5:160k:4").
-    //
-    // RATIO SEMANTICS (user-verified vs Blaze's Ratioz tab — both are STAT-VALUE ratios, not EXP):
-    //   - The 3:1 E:M is the ratio of PURCHASED STAT VALUES. Magic units cost exactly 3x energy
-    //     (game code: pow 450 vs 150, cap 3-per-750 vs 1-per-250, bars 240 vs 80 EXP/unit), so an
-    //     EVEN 1:1 EXP split is what produces the 3:1 value ratio. Pools are therefore 50/50 in
-    //     EXP-space. (Getting this wrong as an EXP-split would drive values to 9:1 and waste EXP.)
-    //   - 5:160k:4 pow:cap:bars is also a UNIT ratio; in EXP-space a pool's shares become
-    //     power:cap:bars = 750 : 640 : 320 (identical for magic since all its costs scale 3x).
-    //   - Guide phase tweaks (post-T6v2: value ratio 2:1 -> EXP 2:3 toward magic; back to 3:1 after
-    //     T6v4 accs + BB) are NOT auto-detected yet; the base 3:1 is used throughout. Later: E:M:R3.
+    // EXP purchase planner/balancer. The TARGET ratios per guide phase live in ExpRatioTables (a
+    // Unity-free, unit-tested table); this class reads the live character, decides which phase it is
+    // in, and walks the purchased stats toward those targets. The two ratio conversions people get
+    // wrong (P:C:B is a unit ratio, E:M is a VALUE ratio, neither is an EXP split) are documented in
+    // the ExpRatioTables class note.
     //
     // WALK-TOWARD-RATIO MODEL (user request — replaces the old "catch the runaway leader" target):
     //   Each stat has a "level" k = ExpSpent / TargetShare (all levels equal == perfect ratio). The
@@ -36,6 +29,7 @@ namespace NGUAdvisor.Managers
             public double BalancePct;   // lowest level / highest level, 0..100 (100 == on-ratio)
             public string NextNames;    // stats the next walk chunk will feed, e.g. "Magic CAP, Magic BARS"
             public string NextShort;    // same, abbreviated for tight tiles, e.g. "M.Cap, M.Bar"
+            public string Phase;        // guide phase the targets came from, e.g. "3:1 E:M (5:160k:4)"
         }
 
         // Compact stat labels for narrow readouts (the GROWTH tile sub-line).
@@ -53,29 +47,25 @@ namespace NGUAdvisor.Managers
             return name;
         }
 
-        // EVEN EXP split (= 3:1 stat-value ratio, since magic units cost 3x). See header comment.
-        private const double PoolE = 0.5, PoolM = 0.5;
-
         // Levels within this fraction of the leader count as balanced (matches the advisor tolerance).
         private const double BalanceTolerance = 0.75;
 
-        // D4 (guide ch.4): post-CBlock2 / T6v2 the target VALUE ratio becomes 2:1, i.e. EXP 2:3
-        // toward magic (E 0.4 / M 0.6); reverts to even at T6v4. Detected via T6 titan version with
-        // 24HR-completions>=3 as the CBlock2-done proxy.
-        private static void Pools(Character c, out double pe, out double pm)
+        // Read the phase signals off the live character and let ExpRatioTables pick the targets.
+        // Each read is individually guarded: an unreadable signal must degrade to the table's
+        // conservative default, not throw the whole balancer away.
+        private static ExpRatioTables.Targets Targets(Character c, bool magicUnlocked)
         {
-            pe = PoolE; pm = PoolM;
-            try
-            {
-                int t6v = 1;
-                try { t6v = ZoneHelpers.TitanVersion(5); } catch { }
-                bool cblock2Done = false;
-                try { cblock2Done = c.challenges.hour24Challenge.curCompletions >= 3; } catch { }
-                if ((t6v >= 2 || cblock2Done) && t6v < 4) { pe = 0.4; pm = 0.6; }
-            }
-            catch { }
+            int chapter = 0;
+            try { var prog = ProgressionAnalyzer.Detect(); if (prog.Known) chapter = prog.Chapter; } catch { }
+            bool t5Beaten = false;
+            try { t5Beaten = ProgressionAnalyzer.TitanBeaten(4); } catch { }
+            int t6v = 1;
+            try { t6v = ZoneHelpers.TitanVersion(5); } catch { }
+            bool cblock2Done = false;
+            try { cblock2Done = c.challenges.hour24Challenge.curCompletions >= 3; } catch { }
+
+            return ExpRatioTables.For(chapter, t5Beaten, t6v, cblock2Done, magicUnlocked);
         }
-        private const double ShP = 750.0 / 1710, ShC = 640.0 / 1710, ShB = 320.0 / 1710;
 
         private struct Stat
         {
@@ -86,7 +76,7 @@ namespace NGUAdvisor.Managers
             public bool Buyable;       // false when the game gate blocks a buy right now (excluded from balance)
         }
 
-        private static Stat[] Snapshot(Character c)
+        private static Stat[] Snapshot(Character c, out string phase)
         {
             // magic RESOURCE + custom purchases are permanent (never re-lock on Evil) → all-time highestBoss.
             bool magicUnlocked = c.highestBoss >= 37;
@@ -97,18 +87,19 @@ namespace NGUAdvisor.Managers
             double mC = magicUnlocked ? c.magic.capMagic * 3.0 / 250.0 : 0;
             double mB = magicUnlocked ? c.magic.magicPerBar * 240.0 : 0;
 
-            Pools(c, out var poolE, out var poolM);
-            double pe = magicUnlocked ? poolE : 1.0, pm = magicUnlocked ? poolM : 0.0;
+            var tg = Targets(c, magicUnlocked);
+            phase = tg.Phase;
+            double pe = tg.PoolE, pm = tg.PoolM;
             // Cap buys are gated by the game until the cap crosses 100k; a gated stat can't be walked,
             // so it's excluded from the balance so it never pins the % at 0 forever.
             var stats = new[]
             {
-                new Stat { Name = "Energy POWER", ExpSpent = eP, TargetShare = pe * ShP, Index = 0, Buyable = true },
-                new Stat { Name = "Energy CAP", ExpSpent = eC, TargetShare = pe * ShC, Index = 1, Buyable = c.capEnergy >= 100000 },
-                new Stat { Name = "Energy BARS", ExpSpent = eB, TargetShare = pe * ShB, Index = 2, Buyable = true },
-                new Stat { Name = "Magic POWER", ExpSpent = mP, TargetShare = pm * ShP, Index = 3, Buyable = magicUnlocked },
-                new Stat { Name = "Magic CAP", ExpSpent = mC, TargetShare = pm * ShC, Index = 4, Buyable = magicUnlocked && c.magic.capMagic >= 100000 },
-                new Stat { Name = "Magic BARS", ExpSpent = mB, TargetShare = pm * ShB, Index = 5, Buyable = magicUnlocked },
+                new Stat { Name = "Energy POWER", ExpSpent = eP, TargetShare = pe * tg.ShareP, Index = 0, Buyable = true },
+                new Stat { Name = "Energy CAP", ExpSpent = eC, TargetShare = pe * tg.ShareC, Index = 1, Buyable = c.capEnergy >= 100000 },
+                new Stat { Name = "Energy BARS", ExpSpent = eB, TargetShare = pe * tg.ShareB, Index = 2, Buyable = true },
+                new Stat { Name = "Magic POWER", ExpSpent = mP, TargetShare = pm * tg.ShareP, Index = 3, Buyable = magicUnlocked },
+                new Stat { Name = "Magic CAP", ExpSpent = mC, TargetShare = pm * tg.ShareC, Index = 4, Buyable = magicUnlocked && c.magic.capMagic >= 100000 },
+                new Stat { Name = "Magic BARS", ExpSpent = mB, TargetShare = pm * tg.ShareB, Index = 5, Buyable = magicUnlocked },
             };
             return stats;
         }
@@ -123,7 +114,8 @@ namespace NGUAdvisor.Managers
                 var c = Main.Character;
                 if (c == null || c.highestBoss < 17) return v;   // custom purchases (permanent unlock) before boss 17
 
-                var stats = Snapshot(c);
+                var stats = Snapshot(c, out var phase);
+                v.Phase = phase;
                 double minL = double.MaxValue, maxL = 0;
                 foreach (var s in stats)
                 {
@@ -165,7 +157,7 @@ namespace NGUAdvisor.Managers
         {
             try
             {
-                var stats = Snapshot(c);
+                var stats = Snapshot(c, out _);
                 double totalSpent = 0, sumShare = 0;
                 foreach (var s in stats)
                 {
@@ -206,18 +198,32 @@ namespace NGUAdvisor.Managers
                 var c = Main.Character;
                 if (c == null || c.highestBoss < 17) return null;   // custom purchases: permanent unlock
                 WriteCustomPlan(c);
-                double budgetD = c.realExp * fraction;
-                if (budgetD > long.MaxValue) budgetD = long.MaxValue;
-                long budget = (long)budgetD;
-                if (budget < 100) return null;
 
-                var stats = Snapshot(c);
+                var stats = Snapshot(c, out _);
                 var elig = new List<Stat>();
                 foreach (var s in stats)
                     if (s.Buyable && s.TargetShare > 0) elig.Add(s);
                 if (elig.Count == 0) return null;
 
                 elig.Sort((a, b) => Level(a).CompareTo(Level(b)));   // ascending by level
+
+                // Budget is `fraction` of the bank, but never a DEAD ZONE. The old flat "under 100 EXP,
+                // skip" floor made small banks permanently unspendable: 959 EXP × 10% = 95, so the tick
+                // bought nothing, every minute, while EXP trickled in at +144/hr — and because nothing
+                // was ever spent the bank never crossed the floor either. Waiting buys nothing (a
+                // purchase is an instant, permanent stat), so the floor is the cheapest unit actually on
+                // offer, clamped to what's banked.
+                double cheapest = double.MaxValue;
+                foreach (var s in elig)
+                {
+                    double u = UnitCost(s.Name);
+                    if (u < cheapest) cheapest = u;
+                }
+                double budgetD = Math.Max(c.realExp * fraction, cheapest);
+                if (budgetD > c.realExp) budgetD = c.realExp;
+                if (budgetD > long.MaxValue) budgetD = long.MaxValue;
+                long budget = (long)budgetD;
+                if (budget < cheapest) return null;   // genuinely can't afford a single unit yet
 
                 // Waterfill: raise the floor across the lowest levels until the budget runs out.
                 double remaining = budget;
@@ -252,10 +258,38 @@ namespace NGUAdvisor.Managers
                     long spent = BuyStat(c, s.Name, amt);
                     if (spent > 0) { total += spent; fed.Add(s.Name); }
                 }
-                if (total <= 0) return null;
+                if (total <= 0)
+                {
+                    // The waterfill can slice a small budget into per-stat crumbs that each round down
+                    // to zero units. Spend it whole on the most-behind stat one unit is affordable for.
+                    foreach (var s in elig)
+                    {
+                        if (UnitCost(s.Name) > budget) continue;
+                        long one = BuyStat(c, s.Name, budget);
+                        if (one > 0) return $"{s.Name} for {Fmt(one)} EXP (walking toward ratio)";
+                    }
+                    return null;
+                }
                 return $"{string.Join(", ", fed.ToArray())} for {Fmt(total)} EXP (walking toward ratio)";
             }
             catch (Exception e) { Main.LogDebug($"ExpBalancer buy: {e.Message}"); return null; }
+        }
+
+        // Smallest EXP outlay that still moves a stat by the game's own rounding: power/bars are
+        // per-unit costs; cap is 250 units per 1 EXP (×3 for magic) and the game rounds to 250s, so
+        // 1 EXP (3 for magic) is the smallest cap buy that isn't rounded away. Mirrors BuyStat.
+        private static double UnitCost(string name)
+        {
+            switch (name)
+            {
+                case "Energy POWER": return 150;
+                case "Energy CAP": return 1;
+                case "Energy BARS": return 80;
+                case "Magic POWER": return 450;
+                case "Magic CAP": return 3;
+                case "Magic BARS": return 240;
+            }
+            return double.MaxValue;
         }
 
         // Replicates the game's buyCustom* math for one stat, spending at most maxExp. Returns EXP spent.

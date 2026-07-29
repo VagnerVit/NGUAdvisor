@@ -150,7 +150,7 @@ namespace NGUAdvisor.Managers
 
         // Versioned titans (T6..T12, index 5..11): beaten >= v1 when TitanVersion (which is version+1) >= 2.
         // T5 via boss5Kills. Low titans (T1..T4) are inferred from highestBoss in the chapter logic.
-        private static bool TitanBeaten(int idx)
+        public static bool TitanBeaten(int idx)
         {
             try
             {

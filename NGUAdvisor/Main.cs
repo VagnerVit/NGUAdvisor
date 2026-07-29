@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.20";
+        public const string Version = "1.2.21";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -1132,7 +1132,7 @@ namespace NGUAdvisor
                             if (buyHP)
                                 t += "/hp";
 
-                            if (buyHP)
+                            if (buyRegen)
                                 t += "/regen";
 
                             t = t.Substring(1);
@@ -1157,6 +1157,11 @@ namespace NGUAdvisor
 
                                 if (buyHP)
                                     aPurchase.CallMethod("buyCustomHP");
+
+                                // Regen was priced into `total` but never bought — the game spells this
+                                // one with a lowercase r (AdventurePurchases.buyCustomregen).
+                                if (buyRegen)
+                                    aPurchase.CallMethod("buyCustomregen");
                             }
                         }
                     }

@@ -74,6 +74,7 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `small-managers.md` | BeardManager, CookingManager, ChallengeDetector |
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |
 | `TitanTables.md` | TitanTables + NumberFormatter |
+| `ExpBalancer.md` | ExpBalancer + ExpRatioTables (guide EXP-ratio phase table) |
 | `GoldDropAdvisor.md` | GoldDropAdvisor + GoldDropTables (gold-kill payoff vs. the TM's banked drop) |
 | `reference-gear-optimizer.md` | `external/gear-optimizer/` (the JS oracle) |
 | `gear-optimizer-comparison.md` | native vs reference: validated ports, deliberate divergences, gaps |
@@ -95,10 +96,8 @@ If a module has no doc yet, write one when you finish working on it.
 ## Domain knowledge
 
 - **`docs/NGU-KNOWLEDGE.md`** — the source of truth for game strategy (chapter progression, ratios, spend orders, stage detection map). Read it before touching advisor heuristics.
-- **`external/`** — reference material (not part of the build):
-  - `external/ngu-guide/` — clone of [sayolove/ngu-guide](https://github.com/sayolove/ngu-guide); strategy content in `src/content/docs/en/` (chapters, mechanics, lists).
-  - `external/gear-optimizer/` — clone of [gmiclotte/gear-optimizer](https://github.com/gmiclotte/gear-optimizer); the reference implementation for gear scoring math: `src/Optimizer.js` (pareto filtering + knapsack), `src/NGU.js`, `src/Augment.js`, `src/Hack.js`, `src/Wish.js`, `src/util.js`, item stat data in `src/assets/ItemAux.js` / `Items.js`.
-  - `external/sheets/` — CSV/XLSX exports of the community Boost Almanac and PP/EXP-income spreadsheets.
-  - Live references: [guide](https://sayolove.github.io/ngu-guide/en/intro/), [Gear Optimizer](https://gmiclotte.github.io/gear-optimizer/#/), [wiki](https://ngu-idle.fandom.com/wiki/NGU_Idle_Wiki) (Fandom — no clonable repo).
+- **`external/`** — reference material (not part of the build): clones of the community guide, the
+  web Gear Optimizer (the oracle for gear scoring math), and spreadsheet exports. The inventory and
+  the live links live in the `ngu-references` skill — invoke it when you actually need them.
 
 Do not search inside `external/`, `bin/`, `obj/`, `dist/` unless the task is specifically about that reference material.

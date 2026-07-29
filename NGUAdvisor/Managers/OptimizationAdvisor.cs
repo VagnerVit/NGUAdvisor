@@ -371,12 +371,14 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
 
-            // EXP — next best EXP purchase toward the guide's spend ratios (3:1 E:M in EXP; per pool
-            // power:cap:bars 5:160K:4 units). ExpBalancer works in EXP-space with the game's unit costs
-            // (magic units cost 3x energy), so pool split and stat balance are decided together.
+            // EXP — next best EXP purchase toward the guide's spend ratios for the CURRENT phase (see
+            // ExpRatioTables). ExpBalancer works in EXP-space with the game's unit costs (magic units
+            // cost 3x energy), so the pool split and the stat balance are decided together.
             try
             {
-                if (prog.Known && prog.Chapter >= 3 && c.highestBoss >= 17)   // custom purchases: permanent unlock
+                // No chapter floor: ExpRatioTables covers ch.1-2 (energy-only, 1:37.5k:1) too, and
+                // AdvisorApply has been buying in those chapters all along — the row should say so.
+                if (prog.Known && c.highestBoss >= 17)   // custom purchases: permanent unlock
                 {
                     var xb = ExpBalancer.Analyze();
                     if (xb.Known && !xb.Balanced)
@@ -384,11 +386,11 @@ namespace NGUAdvisor.Managers
                         {
                             System = "EXP",
                             AutoKey = "exp",
-                            Text = $"Walking toward guide ratio — {xb.BalancePct:0}% balanced; next EXP → {xb.NextNames}",
+                            Text = $"Walking toward guide ratio {xb.Phase} — {xb.BalancePct:0}% balanced; next EXP → {xb.NextNames}",
                             Severity = 1
                         });
                     else if (xb.Known)
-                        list.Add(new Rec { System = "EXP", AutoKey = "exp", Text = "Purchases match the guide ratios (E:M values 3:1, pow:cap:bars 5:160K:4)", Optimal = true });
+                        list.Add(new Rec { System = "EXP", AutoKey = "exp", Text = $"Purchases match the guide ratio for this phase ({xb.Phase})", Optimal = true });
                 }
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }

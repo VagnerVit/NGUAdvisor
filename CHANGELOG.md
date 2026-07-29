@@ -2,6 +2,35 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.21] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Changed
+
+- **EXP purchases now follow the guide's ratio for the chapter you are actually in.** One fixed set of
+  numbers (an even E/M split, pow:cap:bars 5:160k:4) was used from the first rebirth to the last, so in
+  chapters 1-2 the advisor aimed half of every EXP at magic — which the guide does not want bought there
+  at all — and used the mid-game power:cap:bars ratio instead of the early `1:37.5k:1`. The targets now
+  come from a phase table transcribed from the guide: energy-only through chapter 2 and pre-T5 chapter 3,
+  then 5:1 E:M after T5, 3:1 from chapter 4 (2:1 between T6v2 and T6v4, as before), and `4:150k:1` from
+  chapter 7. The advisor row and the Growth EXP tile name the phase they are working toward, and the
+  magic custom-purchase boxes are left at zero in the phases that do not want them.
+- **A small EXP bank is no longer unspendable.** Two guards compounded into a dead zone: a flat "under
+  100 EXP, skip" floor meant a 959 EXP bank offered a 95 EXP tick budget and bought nothing, forever —
+  and because nothing was ever spent the bank never grew past the floor either. Even above it, the
+  waterfill could slice a budget into per-stat crumbs that each rounded down to zero units. The floor is
+  now the cheapest unit actually on offer, and if the walk buys nothing the whole budget goes to the
+  most-behind stat one unit is affordable for. Waiting was never an advantage: a purchase is an instant,
+  permanent stat.
+
+### Fixed
+
+- **Adventure regen was priced but never bought.** With `Buy Adventure (EXP)` on, the regen cost was
+  added to the EXP needed per purchase cycle — lowering how many cycles were affordable — while the buy
+  itself was skipped, because the loop never called it and the log line was gated on the HP flag. (The
+  game spells that method with a lowercase `r`.)
+
 ## [1.2.20] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.
