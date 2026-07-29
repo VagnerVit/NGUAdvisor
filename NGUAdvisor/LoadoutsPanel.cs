@@ -387,7 +387,10 @@ namespace NGUAdvisor
             // hardcoded 126 clipped "Use Current Gear") trail it, row ends 10px inside the host edge.
             if (_wSave == 0) { _wSave = MeasureBtn("Save"); _wUse = MeasureBtn("Use Current Gear"); }
             int idsW = _hostW - (UiTheme.S(40) + UiTheme.S(6) + _wSave + UiTheme.S(8) + _wUse + UiTheme.S(10));
-            m.Ids = new TextBox { Location = new Point(UiTheme.S(40), UiTheme.S(3)), Width = idsW, Font = UiTheme.Ui };
+            // Explicit height: a TextBox left to size itself takes Font.Height, and the row below is
+            // derived from where its children actually end — so an implicit height makes the row's own
+            // height depend on Mono's self-sizing rather than on the measured line.
+            m.Ids = new TextBox { Location = new Point(UiTheme.S(40), UiTheme.S(3)), Width = idsW, Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
             m.ManualRow.Controls.Add(m.Ids);
 
             m.Save = new Button { Text = "Save", Location = new Point(UiTheme.S(40) + idsW + UiTheme.S(6), UiTheme.S(2)), Size = new Size(_wSave, UiTheme.SCtl(23)), Font = UiTheme.Ui };
@@ -418,6 +421,15 @@ namespace NGUAdvisor
                 RefreshSnapshot(m);
             };
             m.ManualRow.Controls.Add(useCur);
+
+            // THE ROW MUST FIT ITS TALLEST CHILD. It was created at a scaled S(28) = 43px while the IDs box
+            // is floored at the measured line (38px) plus its 5px offset = 43, and Mono's self-sized box
+            // reached 44 — one pixel past a borderless Panel, clipped with no scrollbar to reach it
+            // (audit: "Loadouts/COOKING: PAST PARENT BOTTOM 'TextBox' bottom=44 parent=43"). Derive it from
+            // where the children actually end, the same rule the lists and cards follow.
+            int rowBottom = 0;
+            foreach (Control c in m.ManualRow.Controls) rowBottom = Math.Max(rowBottom, c.Bottom);
+            if (m.ManualRow.Height < rowBottom + UiTheme.S(3)) m.ManualRow.Height = rowBottom + UiTheme.S(3);
 
             int fullW = _hostW - UiTheme.S(22);
             int listH = UiTheme.ListH(7);   // the tuned S(180) at the 25px line height

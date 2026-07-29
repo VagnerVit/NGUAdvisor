@@ -114,7 +114,11 @@ namespace NGUAdvisor.Managers
             NumChrome = 0;
             try
             {
-                using (var probe = new NumericUpDown { Font = Ui })
+                // AutoSize = false FIRST or none of this means anything: UpDownBase.SetBoundsCore does
+                // `if (AutoSize) height = PreferredHeight`, so it silently reverts every height you assign
+                // and reports the chrome of the size it chose for itself (measured 4px that way, against a
+                // real 9px — which is why 1.2.12's "measure the chrome" fix changed nothing).
+                using (var probe = new NumericUpDown { Font = Ui, AutoSize = false })
                 {
                     probe.Height = LineH;
                     NumChrome = Math.Max(0, probe.Height - probe.ClientSize.Height);
@@ -229,11 +233,17 @@ namespace NGUAdvisor.Managers
             if (n == null) return;
             try
             {
+                // AUTOSIZE OFF FIRST — this is the whole fix, and it is not optional.
+                // UpDownBase.SetBoundsCore reads `if (AutoSize) height = PreferredHeight`, so while
+                // AutoSize is on the control silently discards every height assigned to it and keeps the
+                // one it derives from Font.Height — the 96-DPI value. That is why ten audit findings
+                // survived both 1.2.7 ("state an explicit Height") and 1.2.12 ("measure the chrome"): both
+                // were writing to a property the control threw away.
+                n.AutoSize = false;
                 n.Height = NumH;
-                // Belt and braces on the height: NumChrome comes from a probe built with UiTheme's own
-                // font, and a panel may hand us a control with a different one. If this instance spends
-                // more chrome than the probe did, grow it until its CLIENT area fits the line — otherwise
-                // the inner box below is capped short no matter what we do to it.
+                // Now that the height sticks, the chrome of THIS instance is measurable — a panel may hand
+                // us a different font than the probe used. Grow until the CLIENT area fits the line;
+                // the inner edit box below cannot exceed it.
                 int chrome = n.Height - n.ClientSize.Height;
                 if (n.ClientSize.Height < LineH && chrome > 0) n.Height = LineH + chrome;
                 // …and the INNER edit box, which is a separate control sized from Font.Height on its own.

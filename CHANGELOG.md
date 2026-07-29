@@ -2,6 +2,25 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.13] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0. Number fields, third attempt —
+this time against the actual cause.
+
+### Fixed
+
+- **Number fields fit their text.** `AutoSize` was the answer all along. `UpDownBase.SetBoundsCore` runs
+  `if (AutoSize) height = PreferredHeight`, so a `NumericUpDown` silently DISCARDS every height assigned
+  to it and keeps the one it derives from `Font.Height` — the 96-DPI value. Both earlier attempts were
+  writing to a property the control threw away: 1.2.7 stated an explicit height, 1.2.12 measured the
+  chrome and stated a bigger one. The log said so plainly — `num chrome 4` where the real chrome is 9,
+  because even the measuring probe had been resized behind its own back. `AutoSize` is now turned off
+  before the height is set, on the control and on the probe.
+- The IDs row on a Loadouts card no longer clips its text box by a pixel. The row was a scaled `S(28)`
+  = 43px holding a box floored at the measured line, which ends at 44; it is now derived from where its
+  children actually end, like the lists and cards already were. The box also states its height instead of
+  letting Mono choose one.
+
 ## [1.2.12] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0. Number fields are the right
