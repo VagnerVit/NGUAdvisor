@@ -368,6 +368,24 @@ namespace NGUAdvisor.Managers
             // (The fix is UiTheme.StyleCombo / StyleNum / SCtl depending on the control — see ui-infra.md.
             // A NumericUpDown reports through its inner UpDownTextBox, which is why that name shows up in
             // the log rather than the control the panel actually created.)
+            // EXCEPTION, AND WHY IT IS NOT A COVER-UP: a NumericUpDown's inner edit box is a single-line
+            // TextBox, and neither WinForms nor Mono lets one take a height — the font decides it. Proven,
+            // not assumed: UiTheme's startup probe stretches a box on a control it owns and reports the
+            // result as `num inner` in the metrics line; it comes back 32 against a 38px line. Four
+            // releases were spent sizing that box (1.2.7, 1.2.12, 1.2.13, 1.2.15) because this rule kept
+            // reporting it. The box is not clipping its digits — it renders them smaller than the line box
+            // — so the honest fix is to hold the OUTER control to the rule, where height is settable and
+            // where the click target and the spin arrows actually live, and to keep the inner box centred
+            // in it (UiTheme.StretchNumEdit). If a number field is hard to hit, that is UiTheme.NumH.
+            if (c is TextBoxBase && c.Parent is NumericUpDown numParent)
+            {
+                if (numParent.Height < UiTheme.LineH)
+                {
+                    Main.LogDebug($"UI AUDIT [{context}]: CONTROL TOO SHORT FOR TEXT '{Desc(numParent)}' h={numParent.Height} < {UiTheme.LineH}");
+                    return 1;
+                }
+                return 0;
+            }
             if ((c is Button || c is ComboBox || c is TextBoxBase || c is NumericUpDown)
                 && c.Height > 0 && c.Height < UiTheme.LineH && c.Font.Size >= 8.5f)
             {

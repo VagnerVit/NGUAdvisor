@@ -107,14 +107,17 @@ namespace NGUAdvisor.Managers
             // A NumericUpDown's usable height is its CLIENT area, so the control is sized to the line plus
             // its measured chrome rather than the guessed 3px allowance NumH used to carry.
             //
-            // WHAT THE LOG ACTUALLY SHOWED (2026-07-29, ten "UpDownTextBox h=32 < 38" findings on six
-            // pages, surviving three attempts): chrome measures 4 here, i.e. the OUTER height is accepted
-            // and the client area really is the full line. The room is there; the INNER edit box is simply
-            // not keeping the height we give it, because Mono re-runs UpDownBase's layout after us. So
-            // neither "state an explicit height" (1.2.7) nor "measure the chrome" (1.2.12) nor "turn
-            // AutoSize off" (1.2.13) could have fixed it — all three were sizing the wrong control. The
-            // re-apply on Layout in StyleNum is the part that addresses it; NumInner below records whether
-            // the stretch holds on a control we own, so the next round is not another guess.
+            // HOW THIS ENDED (2026-07-29). Ten "UpDownTextBox h=32 < 38" audit findings on six pages
+            // survived four releases (1.2.7 explicit height, 1.2.12 measured chrome, 1.2.13 AutoSize off,
+            // 1.2.15 re-apply on Layout). The probe below settled it: `num chrome 4` — the OUTER height is
+            // accepted and the client area is the full line — and `num inner 32` — the inner edit box does
+            // not keep a height even in isolation, because it is a single-line TextBox and the font owns its
+            // height in both WinForms and Mono. Nothing can size that box.
+            //
+            // The user's actual complaint was never clipped digits; it was "the fields are small and hard to
+            // click". That lives in the OUTER control, whose height is settable and whose spin arrows are
+            // half of it each — so NumH now carries an ergonomic allowance, the inner box is centred rather
+            // than fought with, and UiLayout.Audit holds the outer control to the rule instead of the box.
             NumChrome = 0;
             try
             {
@@ -240,7 +243,12 @@ namespace NGUAdvisor.Managers
         // guessed 3px left the client area 6px short of the line on Mono, which is what the inner edit box
         // is limited to; see the NumChrome probe. Every row helper below derives from this, so they all
         // move together.
-        public static int NumH => LineH + NumChrome;
+        // Line + measured chrome + a deliberate ERGONOMIC allowance. A NumericUpDown's spin arrows are half
+        // its height each, so on a 200% display a control sized exactly to the line gave two ~19px arrows —
+        // reported as "the fields are small and hard to click", which is the symptom that actually matters
+        // here (the inner edit box cannot take a height at all; see StretchNumEdit). Raising this raises
+        // the click target, and every row helper derives from it, so rows follow.
+        public static int NumH => LineH + NumChrome + S(8);
 
         public static void StyleNum(NumericUpDown n)
         {
@@ -290,7 +298,14 @@ namespace NGUAdvisor.Managers
                 {
                     if (!(c is TextBoxBase)) continue;
                     int h = n.ClientSize.Height;
-                    if (c.Height < h) { c.Top = 0; c.Height = h; }
+                    // Ask for the full client height first. A single-line TextBox refuses it — the font owns
+                    // its height in both WinForms and Mono — which is what `num inner` in the metrics line
+                    // records, and what four attempts at this bug were really fighting. So whatever height
+                    // it ends up with, CENTRE it: a box pinned to the top of a taller control is the
+                    // "digits sit off-centre" look, and centring is the part we can actually control.
+                    if (c.Height < h) c.Height = h;
+                    int top = (h - c.Height) / 2;
+                    c.Top = top > 0 ? top : 0;
                 }
             }
             catch (Exception e) { Main.LogDebug($"StretchNumEdit: {e.Message}"); }

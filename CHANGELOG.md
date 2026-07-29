@@ -2,6 +2,30 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.16] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **Number fields are easier to hit.** A `NumericUpDown`'s spin arrows are half its height each, so a
+  control sized exactly to the text line gave two ~19px arrows on a 200% display — the reported "fields
+  are small and hard to click". They now carry a deliberate allowance above the line; rows that hold one
+  derive their height from it and follow.
+- The digits inside a number field are centred instead of pinned to the top of the control.
+
+### Changed
+
+- **The layout audit stops crying wolf about number fields.** Four releases were spent trying to size the
+  inner edit box of a `NumericUpDown` (1.2.7, 1.2.12, 1.2.13, 1.2.15). It cannot be sized: it is a
+  single-line `TextBox`, and in both WinForms and Mono the font owns its height. The startup probe proves
+  it in the log — `num inner 32` against a 38px line, on a control the advisor builds and stretches
+  itself. The audit now holds the OUTER control to the rule, where the height is real and where the click
+  target lives, and says so where the rule is written so the next reader does not re-fight it.
+
+  This is a narrowing of the oracle, not a silencing: a genuinely short number field is still reported —
+  through the control a panel actually created, which is also the one a fix can change.
+
 ## [1.2.15] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.
