@@ -45,6 +45,10 @@ titans didn't count as reachable until one boss kill past their unlock.
 - Kill detection (timestamp → null) with an active gold loadout sets `TitanMoneyDone[i]` and
   banks the AK version (`TitanGoldVersionBanked`) so auto titan-gold can re-bank when a higher
   version becomes killable.
+- `ShouldUseGoldLoadout` also honors `GoldDropAdvisor.GoldSwapDenied(i)` — a titan whose gold set
+  costs the autokill must not look like a gold target, or the kill made in the TITAN set above would
+  be recorded as a bank that never happened. `GoldTargetLosingAutokill()` is the post-swap check
+  behind that deny (LockManager, GoldDropAdvisor.md).
 - The summary's three flags (`AnySpawningSoon`, `RunTitanLoadout`, `RunGoldLoadout`) are computed
   ONCE on set, not per read — they sit on the per-frame routing path (SnipeZone → LockManager).
 

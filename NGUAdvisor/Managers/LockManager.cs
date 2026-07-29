@@ -178,6 +178,21 @@ namespace NGUAdvisor.Managers
                     {
                         Log("Switching to Gold Drop configuration for titans");
                         LoadoutManager.ChangeGear(GearOptimizer.ResolveGoldGear());
+
+                        // The autokill thresholds are live-stat checks, and a gold set spends the very
+                        // stats they measure. If the swap costs us the kill, take the titan set back NOW
+                        // rather than waiting out the 10-minute snapshot watchdog: banking gold is only
+                        // free while the titan still auto-kills.
+                        int losing = ZoneHelpers.GoldTargetLosingAutokill();
+                        if (losing >= 0)
+                        {
+                            GoldDropAdvisor.DenyGoldSwap(losing);
+                            Log($"Gold gear loses Titan {losing + 1}'s autokill — keeping the titan set this spawn.");
+                            if (ZoneHelpers.ShouldRunTitanLoadout())
+                                LoadoutManager.ChangeGear(GearOptimizer.ResolveTitanGear());
+                            else
+                                LoadoutManager.RestoreGear();
+                        }
                     }
                     else if (ZoneHelpers.ShouldRunTitanLoadout())
                     {

@@ -74,6 +74,7 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `small-managers.md` | BeardManager, CookingManager, ChallengeDetector |
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |
 | `TitanTables.md` | TitanTables + NumberFormatter |
+| `GoldDropAdvisor.md` | GoldDropAdvisor + GoldDropTables (gold-kill payoff vs. the TM's banked drop) |
 | `reference-gear-optimizer.md` | `external/gear-optimizer/` (the JS oracle) |
 | `gear-optimizer-comparison.md` | native vs reference: validated ports, deliberate divergences, gaps |
 

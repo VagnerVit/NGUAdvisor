@@ -2,6 +2,38 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.20] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Changed
+
+- **The gold snipe now checks whether it can pay off before swapping gear.** The Time Machine runs on
+  the single highest gold drop of the rebirth and discards every smaller one, so once a titan has banked
+  a drop, re-fighting the best zone in Gold Drops gear buys nothing — it only costs the Power and
+  Toughness that gear is not carrying. The advisor predicts the drop of the zone's boss from the game's
+  own tables (base gold × the worst multiplier roll × the gold bonus the gold set would have) and skips
+  the snipe unless it beats what the machine already holds. The Gold panel shows `NO GAIN` with both
+  numbers instead of claiming the snipe is complete, and the "new zone fightable" and gold-starvation
+  triggers no longer re-arm a snipe that cannot win.
+- **A new re-snipe trigger, "gold drop improved":** the gold bonus keeps growing during a run (NGU
+  Gold, cube, new gear), so a snipe that was pointless earlier re-arms by itself once the predicted drop
+  clears the banked one by 25 %, with no new zone needed.
+- **Titan gold banking now repeats on every autokill cycle.** Previously one bank per titan per run
+  (re-banked only when its autokill version rose), which meant an auto-killed titan went down in loot
+  gear for the rest of the run and its drop was thrown away. The kill happens whether the advisor swaps
+  or not, so there is nothing to weigh against: the gold set goes on for every autokill of the highest
+  AK titan, and each cycle is another shot at a bigger drop as the gold bonus grows.
+- **Drops are predicted at the top of the game's multiplier roll, not the bottom.** The game rolls
+  4–5× on every gold drop, and the number being compared against — the Time Machine's banked drop — is
+  a realized roll. Predicting at 4× made an identical kill look 11 % worse than itself, so nothing could
+  beat its own previous drop (a titan predicted 14.5M against the 22.5M bank it had produced itself).
+  Over-predicting costs one gear swap; under-predicting costs the run's gold production.
+- **Safety around that swap:** autokill thresholds are live-stat checks and a gold set spends the very
+  stats they measure. After the gold set goes on, the autokill is re-tested; if it was lost, the titan
+  set goes straight back on (rather than waiting out the ten-minute watchdog) and that titan's gold swap
+  is skipped for the next thirty minutes.
+
 ## [1.2.19] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.

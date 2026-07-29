@@ -4,7 +4,7 @@ NGUAdvisor is an automation platform for the steam version of NGU Idle. It reads
 
 > **Fair-use / ToS note:** this is a third-party tool that injects into the Steam build of NGU Idle. Use it at your own risk.
 
-**Current release: v1.2.19** — see [CHANGELOG.md](CHANGELOG.md) for what changed.
+**Current release: v1.2.20** — see [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 # The interface
 
@@ -114,7 +114,7 @@ Pasting gear IDs into a loadout is safe: the paste is parsed and validated first
 
 # Instructions
 
-Releases can be found in the [releases section](https://github.com/Glowey-Glow/NGUAdvisor/releases) of the upstream repo. Do not download the "Source code" archive — download the zip with the release version in the name (`dist_1.2.19.zip`, for example). Extract it anywhere, launch NGU Idle, then run `Run NGU Advisor.bat` from the extracted folder.
+Releases can be found in the [releases section](https://github.com/Glowey-Glow/NGUAdvisor/releases) of the upstream repo. Do not download the "Source code" archive — download the zip with the release version in the name (`dist_1.2.20.zip`, for example). Extract it anywhere, launch NGU Idle, then run `Run NGU Advisor.bat` from the extracted folder.
 
 You'll know injection worked when the overlay appears in the upper-left corner of the game. Open the window with **F1** and start on **Advisors › Overview**.
 

@@ -40,7 +40,10 @@ again while its own lock is held and the condition has passed.
 
 - **Titan** (`TryTitanSwap`): gold-loadout variant when `ZoneHelpers.ShouldRunGoldLoadout()`
   (gold-kill snipe), else titan kill set via `GearOptimizer.ResolveTitanGear()` (which itself
-  overrides loot objectives on real fights — see GearOptimizer.md).
+  overrides loot objectives on real fights — see GearOptimizer.md). After the gold set goes on it is
+  re-tested against the AK thresholds (`ZoneHelpers.GoldTargetLosingAutokill()`, live stats): losing
+  the autokill puts the titan set straight back and denies that titan's gold swap for 30 minutes —
+  see GoldDropAdvisor.md.
 - **Gold** (`TryGoldDropSwap`): on restore with `ManageGoldLoadouts` sets
   `Settings.GoldSnipeComplete = true` — the one-shot gold snipe latch other modules read.
 - After `RestoreGear()` the restored set predates the lock and may be stale —

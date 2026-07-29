@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.19";
+        public const string Version = "1.2.20";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -1283,6 +1283,7 @@ namespace NGUAdvisor
                 {
                     ResetFurthestZone();   // one owner for the per-run snipe state, not two in lockstep
                     Settings.TitanMoneyDone = new bool[ZoneHelpers.TitanZones.Length];
+                    GoldDropAdvisor.ResetRun();
                     if (Settings.AdvisorGold || Settings.SnipeOnRebirth)
                     {
                         Log("Time Machine Gold is 0. Lets reset gold snipe zone.");
@@ -1322,7 +1323,15 @@ namespace NGUAdvisor
                         if (LockManager.HasGoldLock() || LockManager.CanSwap())
                         {
                             UpdateFurthestZone();
-                            if (_furthestZone >= 0)
+                            if (_furthestZone >= 0 && !GoldSnipePays(_furthestZone))
+                            {
+                                // Nothing to gain: the TM already runs on a bigger drop than this zone's
+                                // boss can produce (a banked titan drop, usually). Latch the snipe instead
+                                // of flipping to gold gear every frame — the triggers re-arm it once a new
+                                // zone, a rebirth or a grown gold bonus can actually beat the bank.
+                                Settings.GoldSnipeComplete = true;
+                            }
+                            else if (_furthestZone >= 0)
                             {
                                 CombatHelpers.IsCurrentlyGoldSniping = true;
                                 CombatManager.DoZone(_furthestZone);
@@ -1581,6 +1590,29 @@ namespace NGUAdvisor
                 AdviseZoneDropChance(_furthestZone);
         }
 
+        // Gold snipe payoff gate. The TM converts the HIGHEST gold drop of the run and nothing else
+        // (GoldDropAdvisor), so once a titan bank is in place the zone snipe can be a pure loss: gear off
+        // Power/Toughness for a drop the machine will discard. Logged once per (zone, bank) pair — this
+        // sits on the per-frame routing path.
+        private static int _goldPayZone = -1;
+        private static double _goldPayBank = -1;
+
+        private static bool GoldSnipePays(int zone)
+        {
+            double predicted, banked;
+            if (GoldDropAdvisor.ZoneSnipeBeatsBank(zone, out predicted, out banked))
+                return true;
+            GoldDropAdvisor.NoteSnipeSkipped(predicted, banked);
+            if (zone != _goldPayZone || banked != _goldPayBank)
+            {
+                _goldPayZone = zone;
+                _goldPayBank = banked;
+                string name = ZoneHelpers.ZoneList.TryGetValue(zone, out var zn) ? zn : $"Zone {zone}";
+                Log($"Gold snipe skipped: {name} pays ~{NumberFormatter.Abbrev(predicted)} gold, the TM already runs on {NumberFormatter.Abbrev(banked)}.");
+            }
+            return false;
+        }
+
         // RvL-style drop-chance advice, once per zone change: how much total drop chance the new farm
         // zone wants before its regular drops are capped (from the game's own loot tables), vs what we
         // have now (Character.lootFactor is the exact multiplier the drop rolls use).
@@ -1640,8 +1672,19 @@ namespace NGUAdvisor
                 else if (best != null && _furthestZone >= 0 && best.Zone > _furthestZone
                     && best.Zone > _lastNewZoneTrigger)
                 {
-                    trigger = "new zone fightable";
-                    newZone = best.Zone;
+                    // A higher zone is only a reason to re-snipe if its boss can out-drop what the TM
+                    // already runs on — after a titan bank most zone unlocks cannot (GoldDropAdvisor).
+                    // The zone is still recorded as triggered so this does not re-test every second.
+                    double predicted, banked;
+                    if (GoldDropAdvisor.ZoneSnipeBeatsBank(best.Zone, out predicted, out banked))
+                    {
+                        trigger = "new zone fightable";
+                        newZone = best.Zone;
+                    }
+                    else
+                    {
+                        _lastNewZoneTrigger = best.Zone;
+                    }
                 }
             }
 

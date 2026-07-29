@@ -359,6 +359,37 @@ namespace NGUAdvisor.Managers
             return best;
         }
 
+        // Why no gold gear on that autokill? Every input of the decision in one debug line, emitted only
+        // when the answer changes — "the titan was auto-killed in the wrong gear" is otherwise invisible
+        // after the fact: the deciding values (AK titan, done latch, predicted drop, TM bank) are all
+        // transient. Same idea as [DiggerDbg].
+        private static string _lastTitanGoldDbg;
+
+        private static void LogTitanGoldState(int best, int ver)
+        {
+            try
+            {
+                double predicted = 0, bank = GoldDropAdvisor.Banked();
+                bool worth = best >= 0 && GoldDropAdvisor.TitanKillWorthGoldGear(best, out predicted, out bank);
+                var done = Main.Settings.TitanMoneyDone;
+                bool isDone = done != null && best >= 0 && best < done.Length && done[best];
+                string line = $"[TitanGoldDbg] ak={(best >= 0 ? "T" + (best + 1) + " v" + ver : "none")}"
+                            + $" done={isDone} pred={NumberFormatter.Abbrev(predicted)} bank={NumberFormatter.Abbrev(bank)}"
+                            + $" worth={worth} gearx={GoldDropAdvisor.GoldGearFactor():0.##}"
+                            + $" spawning={ZoneHelpers.SpawningSoonRawCount()}/targeted={ZoneHelpers.SpawningSoonCount()}"
+                            + $" goldSwap={ZoneHelpers.ShouldRunGoldLoadout()} lock={LockManager.GetLockTypeName()}"
+                            // The SnipeZone gates too: it owns the per-run reset of TitanMoneyDone, and if it
+                            // returns early (paused / adventure locked) that reset silently never happens —
+                            // which leaves last run's "already banked" latch blocking this run's gold.
+                            + $" snipeComplete={Main.Settings.GoldSnipeComplete} adv={Main.Character.buttons.adventure.interactable}"
+                            + $" global={Main.Settings.GlobalEnabled} tmOn={Main.Character.buttons.brokenTimeMachine.interactable}";
+                if (line == _lastTitanGoldDbg) return;
+                _lastTitanGoldDbg = line;
+                Main.LogDebug(line);
+            }
+            catch (Exception e) { Main.LogDebug($"[TitanGoldDbg] failed: {e.Message}"); }
+        }
+
         private static void ApplyTitanGold()
         {
             if (!Main.Settings.ManageGoldLoadouts) return;
@@ -366,22 +397,34 @@ namespace NGUAdvisor.Managers
             _lastTitanGold = DateTime.UtcNow;
 
             int best = HighestAkTitan();
-            if (best < 0) return;
             int ver = 1;
-            try { ver = ZoneHelpers.TitanVersion(best); } catch { }
+            if (best >= 0)
+                try { ver = ZoneHelpers.TitanVersion(best); } catch { }
+            LogTitanGoldState(best, ver);
+            if (best < 0) return;
 
+            double predicted = 0, bank;
+            bool worth = GoldDropAdvisor.TitanKillWorthGoldGear(best, out predicted, out bank);
+
+            // The "already banked this run" latch does NOT survive here any more (user-reported: an
+            // auto-killed titan went down in loot gear because it had banked once already). The kill is
+            // free, so every AK cycle is another chance at a bigger drop as the gold bonus grows — the
+            // latch's real job is telling the kill-detection in ZoneHelpers that a bank was collected, and
+            // it gets re-armed for the next spawn right here.
             var done = Main.Settings.TitanMoneyDone;
-            var banked = Main.Settings.TitanGoldVersionBanked;
-            if (done != null && best < done.Length && done[best]
-                && banked != null && best < banked.Length && banked[best] > 0 && banked[best] < ver)
+            if (worth && done != null && best < done.Length && done[best])
             {
                 done[best] = false;
                 Main.Settings.TitanMoneyDone = done;
-                Main.Log($"Advisor: Titan {best + 1} AK version rose to v{ver} — re-banking gold on the next kill");
+                int akVer = 1;
+                var banked = Main.Settings.TitanGoldVersionBanked;
+                if (banked != null && best < banked.Length) akVer = banked[best];
+                string why = akVer > 0 && akVer < ver ? $"AK version rose to v{ver}" : "the kill is free";
+                Main.Log($"Advisor: re-banking gold on the next Titan {best + 1} kill ({why}; ~{NumberFormatter.Abbrev(predicted)} vs {NumberFormatter.Abbrev(bank)} banked)");
             }
 
             var targets = new bool[ZoneHelpers.TitanZones.Length];
-            targets[best] = done == null || best >= done.Length || !done[best];
+            targets[best] = worth;
             var cur = Main.Settings.TitanGoldTargets;
             bool differs = cur == null || cur.Length != targets.Length;
             if (!differs)
@@ -391,7 +434,7 @@ namespace NGUAdvisor.Managers
             {
                 Main.Settings.TitanGoldTargets = targets;
                 if (targets[best])
-                    Main.Log($"Advisor: targeting Titan {best + 1} (v{ver}) for the next gold bank");
+                    Main.Log($"Advisor: targeting Titan {best + 1} (v{ver}) for the next gold bank (~{NumberFormatter.Abbrev(predicted)})");
             }
         }
 
@@ -420,14 +463,34 @@ namespace NGUAdvisor.Managers
                     }
                 }
 
+                // Gold-drop growth trigger: the gold bonus keeps climbing during a run (NGU Gold, cube,
+                // better gear), so a snipe that was pointless against the bank can become worth it again
+                // without any new zone. Demands RebankMargin so this cannot flip on rounding noise.
+                var bestZone = ZoneStatHelper.GetBestZone();
+                if (Main.Settings.ManageGoldLoadouts && Main.Settings.GoldSnipeComplete && bestZone != null
+                    && c.machine.realBaseGold > 0
+                    && GoldDropAdvisor.BeatsBank(bestZone.Zone, true, GoldDropAdvisor.RebankMargin, out var pred, out var bank))
+                {
+                    Main.Settings.GoldSnipeComplete = false;
+                    Main.LastSnipeTrigger = "gold drop improved";
+                    Main.Log($"Re-snipe: gold drop improved (~{NumberFormatter.Abbrev(pred)} vs {NumberFormatter.Abbrev(bank)} banked)");
+                }
+
                 // Starvation trigger: advisor always; manual mode via its S3 toggle.
                 if (!Main.Settings.AdvisorGold && !Main.Settings.SnipeOnGoldStarved) return;
                 if (c.machine.realBaseGold > 0 && Main.Settings.GoldSnipeComplete
                     && OptimizationAdvisor.GoldStarvedForAugs(c, 1.0))
                 {
-                    Main.Settings.GoldSnipeComplete = false;
-                    Main.LastSnipeTrigger = "gold starvation";
-                    Main.Log("Re-snipe: gold starvation (augments unaffordable)");
+                    // Starving for augments is a reason to re-snipe only if a snipe can actually raise the
+                    // TM: with the bank already above every reachable zone the gold has to come from a
+                    // titan (or from spending less), never from re-fighting the zone in gold gear.
+                    double predicted, banked;
+                    if (bestZone == null || GoldDropAdvisor.ZoneSnipeBeatsBank(bestZone.Zone, out predicted, out banked))
+                    {
+                        Main.Settings.GoldSnipeComplete = false;
+                        Main.LastSnipeTrigger = "gold starvation";
+                        Main.Log("Re-snipe: gold starvation (augments unaffordable)");
+                    }
                 }
             }
             catch (Exception ex) { OnStepFailed("Gold", ex); return; }

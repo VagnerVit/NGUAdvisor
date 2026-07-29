@@ -202,7 +202,10 @@ namespace NGUAdvisor
             // itself (starvation regardless of its chip), which is why the manual strip gives way to this
             // note rather than pretending every chip is still authoritative.
             UiLayout.FitOrGrow(_advisorNote,
-                "Re-snipes on: new zone fightable · rebirth · gold starvation — challenge snipe mode auto-detected.");
+                // Length is load-bearing: the two-line budget ellipsized at ~126 chars (PrintWindow check
+                // — the audit calls it clean, Mono draws wider than the measurement). Keep it at the
+                // length of the sentence this replaced.
+                "Re-snipes on: new zone · rebirth · gold starvation · gold drop improved — challenge mode auto-detected.");
             Controls.Add(_advisorNote);
 
             BuildDrainLedger(W, Math.Max(content + UiTheme.S(100) + _manualStrip.Height, _advisorNote.Bottom) + UiTheme.S(10));
@@ -327,6 +330,7 @@ namespace NGUAdvisor
                 case "new zone fightable": return "NEW ZONE";
                 case "rebirth (TM empty)": return "REBIRTH";
                 case "gold starvation": return "GOLD STARVED";
+                case "gold drop improved": return "DROP IMPROVED";
                 case "timer": return "TIMER";
                 case "manual": return "MANUAL";
                 default: return "SNIPING";
@@ -368,6 +372,15 @@ namespace NGUAdvisor
                     int fz = Main.FurthestZone;
                     if (fz >= 0 && ZoneHelpers.ZoneList.TryGetValue(fz, out var zn)) zone = zn;
                     SetStage(0, true, zone, $"ACTIVE: {TriggerCaps(LastSnipeTrigger)}");
+                }
+                else if (GoldDropAdvisor.SnipeSkipped)
+                {
+                    // Latched without a kill: the TM only ever converts the run's highest drop, so a zone
+                    // that can't beat the banked one is not "complete", it is not worth the gear swap.
+                    // No armed-trigger list here: the sub-caption is a two-line box that already needs both
+                    // lines for "WAITING: 3 TRIGGERS ARMED" alone, and the two numbers are the point.
+                    SetStage(0, false, "NO GAIN",
+                        $"~{Fmt1(GoldDropAdvisor.SnipeSkipPredicted)} vs {Fmt1(GoldDropAdvisor.SnipeSkipBanked)} BANKED");
                 }
                 else
                 {

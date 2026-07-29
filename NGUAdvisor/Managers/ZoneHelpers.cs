@@ -212,9 +212,48 @@ namespace NGUAdvisor.Managers
 
         public static bool AnyTitansSpawningSoon() => _titanSnapshotSummary.AnySpawningSoon;
 
+        // Two counts, because they answer different questions and the gap between them IS the diagnosis:
+        // the summary list only holds titans that are ALSO a swap/gold target, so a titan that spawned and
+        // was auto-killed in whatever gear was on shows up as raw > 0, targeted == 0.
+        public static int SpawningSoonCount() => _titanSnapshotSummary.TitansSpawningSoon.Count;
+
+        public static int SpawningSoonRawCount()
+        {
+            int n = 0;
+            foreach (var kv in _titanDetails)
+                if (kv.Value.SpawnSoonTimestamp.HasValue) n++;
+            return n;
+        }
+
         public static bool ShouldRunGoldLoadout() => _titanSnapshotSummary.RunGoldLoadout;
 
         public static bool ShouldRunTitanLoadout() => _titanSnapshotSummary.RunTitanLoadout;
+
+        // Do the titans we swapped to gold gear FOR still auto-kill in it? AutokillAvailable reads live
+        // stats, so this is only meaningful once the gold set is equipped — a gold set trades away the
+        // Power/Toughness the AK thresholds are measured against, and a titan that stops auto-killing is
+        // a real fight in loot gear (the death loop ResolveTitanGear guards against on the titan side).
+        // Returns the first titan that lost its autokill, or -1 when every gold target still kills.
+        public static int GoldTargetLosingAutokill()
+        {
+            var spawning = _titanSnapshotSummary.TitansSpawningSoon;
+            for (int i = 0; i < spawning.Count; i++)
+            {
+                if (!spawning[i].ShouldUseGoldLoadout) continue;
+                try
+                {
+                    if (!AutokillAvailable(spawning[i].TitanIndex))
+                        return spawning[i].TitanIndex;
+                }
+                catch (Exception e)
+                {
+                    // An unreadable AK check is not evidence the kill is safe.
+                    LogDebug($"Gold-target AK check for titan {spawning[i].TitanIndex}: {e.Message}");
+                    return spawning[i].TitanIndex;
+                }
+            }
+            return -1;
+        }
 
         public static void RefreshTitanSnapshots()
         {
@@ -338,7 +377,8 @@ namespace NGUAdvisor.Managers
             // TitanSwapTargets / TitanGoldTargets and persists that.
             DateTime? spawnSoonTimestamp = IsTitanSpawningSoon(titanIndex) ? (DateTime?)DateTime.UtcNow : null;
             bool shouldUseTitanLoadout = Settings.ManageTitans && Settings.SwapTitanLoadouts && Settings.TitanSwapTargets[titanIndex];
-            bool shouldUseGoldLoadout = Settings.ManageGoldLoadouts && Settings.TitanGoldTargets[titanIndex] && !Settings.TitanMoneyDone[titanIndex];
+            bool shouldUseGoldLoadout = Settings.ManageGoldLoadouts && Settings.TitanGoldTargets[titanIndex] && !Settings.TitanMoneyDone[titanIndex]
+                && !GoldDropAdvisor.GoldSwapDenied(titanIndex);
 
             var titanSnapshot = new TitanSnapshot(titanIndex, spawnSoonTimestamp, shouldUseTitanLoadout, shouldUseGoldLoadout);
 

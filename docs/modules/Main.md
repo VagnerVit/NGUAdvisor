@@ -73,7 +73,9 @@ progression-related must use `ZoneHelpers.CurrentHighestBoss` instead.
   SetResnipe read any real zone as "new zone fightable" and wipe a completed snipe) and
   `_lastNewZoneTrigger` (each zone arms the re-snipe ONCE — fightability is measured in current
   gear but the snipe runs in gold gear, so a ratchet drop re-fired forever: user-reported infinite
-  swap loop).
+  swap loop). `GoldSnipePays` gates the swap on payoff — the TM only ever converts the run's highest
+  drop, so a snipe that can't beat the banked one latches `GoldSnipeComplete` instead of flipping
+  gear (GoldDropAdvisor.md); the same check qualifies the "new zone fightable" trigger.
 - `Unload()` — every step individually guarded (`Try(...)`); writers close LAST, and nothing may
   escape (a single throw used to abort a reload half-done, and the old catch called `LogDebug`
   AFTER closing DebugWriter).

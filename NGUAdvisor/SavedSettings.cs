@@ -1535,6 +1535,9 @@ namespace NGUAdvisor
             {
                 if (value == _goldSnipeComplete) return;
                 _goldSnipeComplete = value;
+                // Re-arming invalidates the "skipped, no gain vs the TM bank" note the Gold panel shows
+                // in place of COMPLETE (GoldDropAdvisor).
+                if (!value) Managers.GoldDropAdvisor.ClearSnipeSkip();
                 SaveSettings();
             }
         }

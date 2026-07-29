@@ -74,10 +74,14 @@ not a framework:
   Then Farm Gear Zones (permanent item-max bonuses) > boost farm > ITOPOD; Farm Best Boost
   falls back to ITOPOD when `BoostDemandExists` says nothing consumes boosts.
 - **Titan gold** (`ApplyTitanGold` + `HighestAkTitan` 30 s cache): auto-targets the HIGHEST
-  AK-able titan (its drop dwarfs all lower ones); re-banks when the AK version rises
-  (`TitanGoldVersionBanked`).
+  AK-able titan (its drop dwarfs all lower ones) **on every AK cycle** — the kill is free, so there is
+  no payoff gate and the `TitanMoneyDone` latch is re-armed here rather than blocking (see
+  GoldDropAdvisor.md, "Why titan gold has no gate"). `[TitanGoldDbg]` in `debug.log` records the whole
+  decision when it changes.
 - **Gold** (`ApplyGold`): auto-CBlock during challenges; gold-starvation re-snipe trigger
-  (clears `GoldSnipeComplete` when augs unaffordable despite TM holding gold).
+  (clears `GoldSnipeComplete` when augs unaffordable despite TM holding gold) — **both the
+  starvation trigger and the new "gold drop improved" trigger go through GoldDropAdvisor**, so a
+  snipe is never re-armed for a drop the Time Machine would discard (GoldDropAdvisor.md).
 - **Quests**: asserts the advisor strategy once (majors on, bank guard, abandon minors < 30 %,
   butter majors only, 50-item rule follows perk 94 ≥ 610).
 - **EXP buys**: one `ExpBalancer.BuyTick(0.10)` walk step per minute.

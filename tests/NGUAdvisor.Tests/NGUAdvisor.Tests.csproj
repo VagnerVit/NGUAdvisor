@@ -28,6 +28,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\NumberFormatter.cs" Link="Linked\NumberFormatter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostSeed.cs" Link="Linked\BoostSeed.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\GoldDropTables.cs" Link="Linked\GoldDropTables.cs" />
   </ItemGroup>
 
 </Project>
