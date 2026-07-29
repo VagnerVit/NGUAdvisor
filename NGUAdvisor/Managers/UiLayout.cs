@@ -34,11 +34,21 @@ namespace NGUAdvisor.Managers
 
         // Shared measured-ellipsis fit (the Mono blank-label law: a fixed label with overflowing
         // text renders NOTHING — every variable string goes through a Fit).
+        // FIT AGAINST A SLIGHTLY NARROWER BUDGET THAN ASKED. The renderer paints wider than
+        // TextRenderer measures (SystemControlBar.cs:166 documents the same shortfall), so a string that
+        // measures as fitting can still be cut by the label's own edge — and that cut happens inside the
+        // renderer, so NO ellipsis is added and the text just ends mid-word. Seen in the system index:
+        // "…butter and the abando". The cushion is font-relative because the shortfall scales with the
+        // glyphs, and it only ever costs a character or two of a string that was being truncated anyway.
+        // Deliberately here and NOT in MeasureText: this shortens text, while widening the measurement
+        // itself would move every AutoSize control in the app.
         public static string FitText(string text, Font font, int width)
         {
             if (string.IsNullOrEmpty(text)) return "";
-            if (MeasureText(text, font) <= width) return text;
-            while (text.Length > 1 && MeasureText(text + "…", font) > width)
+            int budget = width - Math.Max(2, font.Height / 4);
+            if (budget <= 0) budget = width;
+            if (MeasureText(text, font) <= budget) return text;
+            while (text.Length > 1 && MeasureText(text + "…", font) > budget)
                 text = text.Substring(0, text.Length - 1);
             return text + "…";
         }
@@ -313,6 +323,12 @@ namespace NGUAdvisor.Managers
         // the only visible symptom (the offending control is off-screen to the right, so no amount of
         // looking at the window finds it). This names the widest child and by how much it overruns, so
         // the cause is in the log rather than in a guess.
+        // RECURSES, and that is the fix rather than a refinement: this walked only the section's DIRECT
+        // children, while every panel in the app nests its content (Boosts is section -> _boostPage ->
+        // _manualView -> the labels). An overflowing label inside a nested panel therefore could not be
+        // seen by this check, so the one rule that catches horizontal clipping reported clean on the pages
+        // where it happens. Measured through EffectiveBounds, like every other rule here, because an
+        // AutoSize label's Width understates the Mono render.
         public static void AuditWidth(Control host, string context)
         {
             try
@@ -321,16 +337,24 @@ namespace NGUAdvisor.Managers
                 int limit = host.ClientSize.Width;
                 Control widest = null;
                 int right = 0;
-                foreach (Control c in host.Controls)
-                {
-                    if (!c.Visible) continue;
-                    int r = c.Right;
-                    if (r > right) { right = r; widest = c; }
-                }
+                WidestRight(host, 0, ref widest, ref right);
                 if (widest != null && right > limit)
                     Main.LogDebug($"UI AUDIT [{context}]: WIDER THAN VIEWPORT by {right - limit}px — '{Desc(widest)}' right={right} viewport={limit}");
             }
             catch (Exception e) { Main.LogDebug($"UI AUDIT [{context}] width check failed: {e.Message}"); }
+        }
+
+        // Child bounds are parent-relative, so the parent's Left accumulates on the way down — without it
+        // a deeply nested control reports a right edge far short of where it actually paints.
+        private static void WidestRight(Control node, int offsetX, ref Control widest, ref int right)
+        {
+            foreach (Control c in node.Controls)
+            {
+                if (!c.Visible) continue;
+                int r = offsetX + EffectiveBounds(c).Right;
+                if (r > right) { right = r; widest = c; }
+                WidestRight(c, offsetX + c.Left, ref widest, ref right);
+            }
         }
 
         // Once-per-context audit for lazily shown views (called from page/segment switchers).

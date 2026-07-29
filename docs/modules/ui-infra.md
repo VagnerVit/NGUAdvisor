@@ -203,6 +203,14 @@ only: a horizontal scrollbar's only visible symptom is the scrollbar itself — 
 is off-screen to the right, so no amount of looking at the window finds it. It names the widest
 child and the overrun.
 
+- **`AuditWidth` must recurse, accumulating the parent's `Left`.** Until 1.2.17 it walked only the
+  section's direct children, and every panel nests its content (Boosts is section → `_boostPage` →
+  `_manualView` → the labels), so the one rule that catches horizontal clipping could not see the
+  controls it exists for and reported clean on the pages where clipping happens. Child bounds are
+  parent-relative: without the accumulated offset a nested control reports a right edge far short of
+  where it paints. Measure through `EffectiveBounds`, like every other rule — an `AutoSize` label's
+  `Width` understates the Mono render.
+
 ## LogTail (`Managers/LogTail.cs`)
 
 Tails the on-disk logs for the LOGS section (Advisor / Loot / Session). In-memory mirrors exist for

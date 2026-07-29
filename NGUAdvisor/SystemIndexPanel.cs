@@ -51,7 +51,13 @@ namespace NGUAdvisor
         // in the same place. Hoisted out of SysCard rather than copied: same numbers, same rendered result,
         // one definition. (A nested type can read its enclosing type's privates, so both cards see these.)
         private static readonly int TitleX = UiTheme.S(10), TitleY = UiTheme.S(7);
-        private static readonly int ColX = UiTheme.S(100);   // where a system row's AUTOMATION caption begins; a reference's blurb
+        // 100 was "measured longest title + a small pad", and a small pad is not a pad: row titles are
+        // BOLD, Mono paints bold wider than TextRenderer reports, and YGGDRASIL / ADVENTURE / MONEY PIT
+        // overran this column by ~2px — enough to print AUTOMATION's "A" as "ʌ" (seen on screen 1.2.17).
+        // The auditor cannot catch this class at all: TEXT CLIPPED compares the control against the same
+        // measurement that is short. So the clearance is explicit and generous instead of tight, and it
+        // is paid for out of the status column, where every string already goes through FitText.
+        private static readonly int ColX = UiTheme.S(112);   // where a system row's AUTOMATION caption begins; a reference's blurb
         private static readonly int OpenW = UiLayout.BtnWidth("Open →") + UiTheme.S(6);
 
         // ONE empty state. 7.6C4C2 retired the apology this used to carry for Setting matches: a Setting is no
@@ -521,8 +527,8 @@ namespace NGUAdvisor
             // NOTHING at all. Loadouts and Pit put words in these chips (PER MODE, INDEPENDENT, ALL
             // ADVISOR) that ON/OFF never needed, which costs the status column ~30px — paid for below.
             // CapX moved out to SystemIndexPanel.ColX (7.6C4B) so RefCard can start its blurb on the same
-            // column. Same value (100 — it clears the longest row title, ADVENTURE at 77px, sitting at x=10),
-            // same arithmetic below, same pixels.
+            // column. See the clearance note at ColX for why it is not sized to the measured longest
+            // title: that is exactly what it used to be, and the bold titles overran it.
             private static readonly int CapX = ColX;
             private static readonly int LChipX = CapX + UiLayout.MeasureText(SystemControlBar.AutomationCap, UiTheme.ColHeader) + UiTheme.S(8);
             private static readonly int LChipW = Widest(SystemControlBar.On, SystemControlBar.Off, RowState.PerMode, RowState.Independent) + UiTheme.S(20);

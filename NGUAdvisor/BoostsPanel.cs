@@ -334,7 +334,12 @@ namespace NGUAdvisor
             _manualView.Controls.Add(MkBtn("Bottom", bx, y, wBottom, () => MovePrioBlock(1, true)));
             y += UiTheme.SCtl(24) + UiTheme.S(4);
 
-            _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves the selection · Alt+Home/End sends it to the ends · Del removes it", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            // SHORT ENOUGH TO SURVIVE THE COLUMN. The long form ("...moves the selection ... sends it to
+            // the ends ... Del removes it") measured as fitting and painted past the column edge, losing
+            // its last word — an AutoSize label, so FitText never sees it, and PAST PARENT EDGE judges it
+            // with the same measurement that is short (SystemControlBar.cs:166). Keep it comfortably
+            // inside the column instead of relying on a measurement that under-reports.
+            _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves · Alt+Home/End to the ends · Del removes", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
             y += UiTheme.HeadPitch + UiTheme.S(6);
 
             _manualView.Controls.Add(new Label { Text = "WILL BOOST NOW (live, in order)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
