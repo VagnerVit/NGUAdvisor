@@ -2,6 +2,46 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.19] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **The keyboard hint under the priority list keeps its last word.** It read `… · Del remov`, because the
+  text measured as fitting and then painted past the column edge — the renderer does the cutting, so no
+  ellipsis appears and the sentence simply stops. Shortened to sit comfortably inside the column.
+
+### Changed
+
+- Release packaging needs no environment variables. The injector binaries moved out of `dist/` (where
+  every cleanup destroyed them) into a git-ignored `tools/injector/`, sample profiles come from the
+  source tree, and `--inject` builds straight into the running game without producing a zip. See
+  BUILD.md.
+
+## [1.2.18] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **Long system names no longer collide with the AUTOMATION caption** in the system index — `YGGDRASIL`
+  painted over it and printed its `A` as `ʌ`. The column was positioned using a measured longest title
+  plus a small pad, and the pad was smaller than the amount the renderer exceeds the measurement by.
+- **Truncated text gets its ellipsis** where the renderer would otherwise clip it mid-word (a status line
+  ending `…and the abando`). Fitting now works against a slightly narrower budget than requested. The
+  measurement itself is deliberately unchanged: widening it would move every auto-sized control.
+
+## [1.2.17] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **The layout audit's horizontal-overflow check now recurses.** It inspected only a section's direct
+  children while every panel nests its content, so the one rule that catches content running past the
+  right edge could not see the controls it exists for, and reported clean on the pages where it happens.
+
 ## [1.2.16] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.
