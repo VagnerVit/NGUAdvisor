@@ -23,7 +23,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CSPROJ="$ROOT/NGUAdvisor/NGUAdvisor.csproj"
-REPO="Glowey-Glow/NGUAdvisor"
+# This fork, NOT the upstream it was taken from — releases of this tree belong here. Kept as a
+# constant rather than read from `git remote` so a clone with a differently-named remote still
+# prints a publishable command.
+REPO="VagnerVit/NGUAdvisor"
 
 # Flags. --inject skips zipping and injects the freshly built DLL into the running game: the
 # inner loop when iterating on UI, where a zip nobody opens is pure overhead.
