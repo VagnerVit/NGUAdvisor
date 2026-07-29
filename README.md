@@ -114,7 +114,7 @@ Pasting gear IDs into a loadout is safe: the paste is parsed and validated first
 
 # Instructions
 
-Releases can be found in the [releases section](https://github.com/Glowey-Glow/NGUAdvisor/releases) of this repo. Do not download the "Source code" archive — download the zip with the release version in the name (`dist_1.2.2.zip`, for example). Extract it anywhere, launch NGU Idle, then run `Run NGU Advisor.bat` from the extracted folder.
+Releases can be found in the [releases section](https://github.com/Glowey-Glow/NGUAdvisor/releases) of the upstream repo. Do not download the "Source code" archive — download the zip with the release version in the name (`dist_1.2.2.zip`, for example). Extract it anywhere, launch NGU Idle, then run `Run NGU Advisor.bat` from the extracted folder.
 
 You'll know injection worked when the overlay appears in the upper-left corner of the game. Open the window with **F1** and start on **Advisors › Overview**.
 
@@ -616,7 +616,7 @@ The stats for the zones can be manually overriden using the `zoneOverrides.json`
 
 # Acknowledgements
 
-NGU Advisor is a fork in the lineage of **NGUInjector** by [rvazarkar](https://github.com/rvazarkar/NGUInjector) and later work by [rus9384](https://github.com/rus9384). Licensed under Apache 2.0 — see [LICENSE](LICENSE).
+This repository is a fork of [Glowey-Glow/NGUAdvisor](https://github.com/Glowey-Glow/NGUAdvisor), which is itself a fork in the lineage of **NGUInjector** by [rvazarkar](https://github.com/rvazarkar/NGUInjector) and later work by [rus9384](https://github.com/rus9384). Licensed under Apache 2.0 — see [LICENSE](LICENSE).
 
 - [SharpMonoInjector](https://github.com/warbler/SharpMonoInjector) — the injection this is built on. None of this would be possible without it.
 - 4G for making NGU Idle.
