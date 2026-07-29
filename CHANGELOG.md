@@ -2,6 +2,23 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.15] - 2026-07-29
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **Number fields, fourth attempt — and this time the log says which control was wrong.** The audit's ten
+  `UpDownTextBox h=32 < 38` findings survived 1.2.7 (state an explicit height), 1.2.12 (measure the chrome)
+  and 1.2.13 (turn AutoSize off), because all three sized the OUTER control — and the outer control was
+  never the problem. The startup line proves it: `num chrome 4`, meaning the height was accepted and the
+  client area is the full line. The inner edit box simply does not keep the height it is given, because
+  Mono re-runs the control's own layout afterwards and there is no Resize to hang a re-apply on. The
+  stretch is now re-applied on `Layout`, which fires after that pass.
+- The startup `UI metrics:` line also reports `num inner`, the height the inner box keeps on a control the
+  advisor owns. If a report ever shows a short field again, that number says whether the stretch failed or
+  something else undid it — three of these rounds were spent inferring the mechanism from the audit alone.
+
 ## [1.2.14] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.

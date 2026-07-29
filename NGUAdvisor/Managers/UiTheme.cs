@@ -104,24 +104,33 @@ namespace NGUAdvisor.Managers
             LinePitch = lineH + 1;
             HeadPitch = headH + 2;
             TextH = lineH - 3;
-            // A NumericUpDown's usable height is its CLIENT area, and its chrome is a renderer constant we
-            // must not guess. NumH used to be LineH + S(2), i.e. a 3px allowance — but Mono's UpDownBase
-            // spends ~9px, so a 41px control had a 32px client area and its inner edit box could only ever
-            // be 32px against a 38px line. That was ten standing "UpDownTextBox h=32 < 38" audit findings
-            // across six pages (reported 2026-07-29), and no amount of stretching the inner box could fix
-            // it while the box it lives in was too small. Measure the chrome, then size the control so the
-            // CLIENT area fits the line.
+            // A NumericUpDown's usable height is its CLIENT area, so the control is sized to the line plus
+            // its measured chrome rather than the guessed 3px allowance NumH used to carry.
+            //
+            // WHAT THE LOG ACTUALLY SHOWED (2026-07-29, ten "UpDownTextBox h=32 < 38" findings on six
+            // pages, surviving three attempts): chrome measures 4 here, i.e. the OUTER height is accepted
+            // and the client area really is the full line. The room is there; the INNER edit box is simply
+            // not keeping the height we give it, because Mono re-runs UpDownBase's layout after us. So
+            // neither "state an explicit height" (1.2.7) nor "measure the chrome" (1.2.12) nor "turn
+            // AutoSize off" (1.2.13) could have fixed it — all three were sizing the wrong control. The
+            // re-apply on Layout in StyleNum is the part that addresses it; NumInner below records whether
+            // the stretch holds on a control we own, so the next round is not another guess.
             NumChrome = 0;
             try
             {
-                // AutoSize = false FIRST or none of this means anything: UpDownBase.SetBoundsCore does
-                // `if (AutoSize) height = PreferredHeight`, so it silently reverts every height you assign
-                // and reports the chrome of the size it chose for itself (measured 4px that way, against a
-                // real 9px — which is why 1.2.12's "measure the chrome" fix changed nothing).
+                // AutoSize off is kept as correct practice for a control whose height we state (WinForms
+                // UpDownBase can derive its own height from the font), not as the fix it was billed as.
                 using (var probe = new NumericUpDown { Font = Ui, AutoSize = false })
                 {
                     probe.Height = LineH;
                     NumChrome = Math.Max(0, probe.Height - probe.ClientSize.Height);
+                    // Prove the stretch on a control we own, and record the result. Two rounds of this bug
+                    // were diagnosed by guessing at the mechanism from the audit alone; NumInner says
+                    // whether the inner box can be made to keep a height at all, in isolation.
+                    probe.Height = LineH + NumChrome;
+                    StretchNumEdit(probe);
+                    foreach (Control c in probe.Controls)
+                        if (c is TextBoxBase) NumInner = c.Height;
                 }
             }
             catch (Exception e) { info += $"; num chrome probe failed ({e.Message})"; }
@@ -129,12 +138,17 @@ namespace NGUAdvisor.Managers
             // InvariantCulture: this line is read back from debug.log when diagnosing layout, and a
             // comma-decimal locale wrote "scale 1,52" (project rule — pin culture on number paths).
             CalibrationInfo = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}, num chrome {7}",
-                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale, NumChrome);
+                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}, num chrome {7}, num inner {8}",
+                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale, NumChrome, NumInner);
         }
 
         // Measured chrome of a NumericUpDown (border + internal padding): outer height minus client height.
         public static readonly int NumChrome;
+
+        // Height the probe's INNER edit box kept after being stretched. Diagnostic only: if this reads the
+        // line height but the audit still reports 32 on real controls, the stretch works and something is
+        // undoing it later; if it reads 32 here too, the control refuses the height outright.
+        public static readonly int NumInner;
 
         // Second oracle for the rendered line height: what an AutoSize label actually sizes itself to
         // (the audit history was recorded against these, not against raw MeasureText).
@@ -233,12 +247,9 @@ namespace NGUAdvisor.Managers
             if (n == null) return;
             try
             {
-                // AUTOSIZE OFF FIRST — this is the whole fix, and it is not optional.
-                // UpDownBase.SetBoundsCore reads `if (AutoSize) height = PreferredHeight`, so while
-                // AutoSize is on the control silently discards every height assigned to it and keeps the
-                // one it derives from Font.Height — the 96-DPI value. That is why ten audit findings
-                // survived both 1.2.7 ("state an explicit Height") and 1.2.12 ("measure the chrome"): both
-                // were writing to a property the control threw away.
+                // AutoSize off so the control does not re-derive its own height from the font. Necessary
+                // hygiene, NOT the fix for the short inner box — the log showed the outer height was being
+                // accepted all along (see the NumChrome note in the static constructor).
                 n.AutoSize = false;
                 n.Height = NumH;
                 // Now that the height sticks, the chrome of THIS instance is measurable — a panel may hand
@@ -252,13 +263,23 @@ namespace NGUAdvisor.Managers
                 // control a panel actually created). Re-applied on Resize because the control re-runs its
                 // own layout and would otherwise put the short box back.
                 StretchNumEdit(n);
+                // RESIZE IS NOT ENOUGH. Mono runs UpDownBase's own layout after ours and puts the inner
+                // box back at Font.Height, without a Resize to hang a re-apply on — which is why the box
+                // still measured 32 in 1.2.12 and 1.2.13 while the OUTER height was accepted (the probe's
+                // chrome came back 4, i.e. client 38, so the room was there and the box was not using it).
+                // Layout fires after that pass, and StretchNumEdit only writes when the height differs, so
+                // the re-entrant layout it triggers settles on the second pass instead of looping.
                 n.Resize -= NumResized;
                 n.Resize += NumResized;
+                n.Layout -= NumLaidOut;
+                n.Layout += NumLaidOut;
             }
             catch (Exception e) { Main.LogDebug($"StyleNum: {e.Message}"); }
         }
 
         private static void NumResized(object sender, EventArgs e) => StretchNumEdit(sender as NumericUpDown);
+
+        private static void NumLaidOut(object sender, LayoutEventArgs e) => StretchNumEdit(sender as NumericUpDown);
 
         private static void StretchNumEdit(NumericUpDown n)
         {
