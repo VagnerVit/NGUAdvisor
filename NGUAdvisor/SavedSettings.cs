@@ -175,11 +175,8 @@ namespace NGUAdvisor
         // Boosts sub-tab v3: advisor-driven boost priority + per-transform-chain flags (index = chain).
         [SerializeField] private bool _autoBoostPriority;
         // Boosts v4 (spec 2026-07-28): the priority list is the ONLY boost source. _boostSeeded makes the
-        // one-time migration from equipped + locked idempotent. _boostDragReorderOff is stored NEGATED on
-        // purpose: MassUpdate reads `other?.X ?? false` and JsonUtility turns a missing bool into false, so
-        // "absent means enabled" is only expressible as an off-switch.
+        // one-time migration from equipped + locked idempotent.
         [SerializeField] private bool _boostSeeded;
-        [SerializeField] private bool _boostDragReorderOff;
         [SerializeField] private bool _advisorZones;
         // Advisor zone-routing strategies (Combat > ZONES): gear-capping farm + demand-gated boost farm.
         [SerializeField] private bool _advisorFarmGear;
@@ -544,7 +541,6 @@ namespace NGUAdvisor
             _wideLayout = other?.WideLayout ?? false;
             _autoBoostPriority = other?.AutoBoostPriority ?? false;
             _boostSeeded = other?.BoostSeeded ?? false;
-            _boostDragReorderOff = other?.BoostDragReorderOff ?? false;
             _advisorZones = other?.AdvisorZones ?? false;
             _advisorFarmGear = other?.AdvisorFarmGear ?? false;
             _advisorFarmBoost = other?.AdvisorFarmBoost ?? false;
@@ -2107,15 +2103,6 @@ namespace NGUAdvisor
         {
             get => _boostSeeded;
             set { if (value == _boostSeeded) return; _boostSeeded = value; SaveSettings(); }
-        }
-
-        // Kill switch for drag-and-drop reordering of the priority list. WinForms drag & drop is the one
-        // part of the boosts UI that cannot be verified outside the running game; if Mono misbehaves, set
-        // this true in settings.json and the button/keyboard path keeps working.
-        public bool BoostDragReorderOff
-        {
-            get => _boostDragReorderOff;
-            set { if (value == _boostDragReorderOff) return; _boostDragReorderOff = value; SaveSettings(); }
         }
 
         // Adventure > ZONES source toggle: advisor points SnipeZone at the best boost farm (gold and

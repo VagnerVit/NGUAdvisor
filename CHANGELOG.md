@@ -2,7 +2,7 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
-## [1.2.9] - 2026-07-28
+## [1.2.10] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0. Boosting now follows one list
 instead of three implicit sources, and the Boosts page gets a picker and proper reordering.
@@ -16,8 +16,11 @@ instead of three implicit sources, and the Boosts page gets a picker and proper 
   log line and prune the list to taste.
 - New **Add from inventory** picker: search, multi-select, and see level, remaining boosts and where each
   item is. No more typing item IDs.
-- Reordering: multi-select, Top/Up/Down/Bottom, Alt+↑/↓ and Alt+Home/End, and drag & drop. The list keeps
-  your selection visible after a move, and shows a live "will boost now" readout.
+- Reordering: multi-select, Top/Up/Down/Bottom, Alt+↑/↓ and Alt+Home/End. **The selection stays put after
+  a move**, so you can click Up repeatedly to walk an item several places — previously the row deselected
+  itself and you had to re-pick it every time. The page also shows a live "will boost now" readout.
+- Drag & drop was built and then removed: it does not work in the game's Mono runtime. The buttons and
+  Alt+arrows are the reorder path.
 - Merging is now governed only by the transform-chain toggles.
 
 ## [1.2.8] - 2026-07-28

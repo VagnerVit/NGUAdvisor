@@ -33,7 +33,7 @@ over it.
 |---|---|
 | What drives boosting? | The priority list only. Equipped/locked auto-boosting is removed. |
 | Blacklist | Removed from the UI and from both code paths. |
-| Reordering | Drag & drop, built as a layer on top of buttons (user chose DnD knowing the Mono risk). |
+| Reordering | Buttons + keyboard, with the selection surviving a move. Drag & drop was built as a layer on top and then REMOVED — it does not work under the game's Mono (user-tested 1.2.9). |
 | Adding items | Modal "Add from inventory" picker (mockup variant A). |
 | Migration | One-time seed of the manual list from currently equipped **and locked-inventory** items. |
 
@@ -74,12 +74,10 @@ reverting this change.
   removing a persisted property churns `MassUpdate`/validation and would drop user data that an older
   DLL still understands. Mark it unused in code with a pointer to this spec.
 - **`bool BoostSeeded`** — makes the migration idempotent.
-- **`bool BoostDragReorderOff`** (default `false` = drag enabled) — kill switch for drag & drop. If
-  Mono's DnD misbehaves in the game, the user flips this in settings.json; buttons keep working. Named
-  and defaulted this way (not `BoostDragReorder` default `true`) because `MassUpdate` reads
-  `other?.X ?? false` and `JsonUtility` turns a missing bool into `false`, so a default-true flag could
-  never actually default to on. This exists because DnD is the one part of this design that cannot be
-  verified outside the running game.
+- ~~`bool BoostDragReorderOff`~~ — shipped in 1.2.9 as the drag kill switch, then REMOVED with drag
+  itself: with no reader left it was dead config. (It was stored negated because `MassUpdate` reads
+  `other?.X ?? false` and `JsonUtility` turns a missing bool into `false`, so a default-true flag can
+  never default to on — worth remembering the next time a flag needs to default to enabled.)
 
 ## 4. One-time migration
 
@@ -156,13 +154,23 @@ All dimensions go through `UiTheme.S/SText/SCtl/ListH` per the DPI contract in
 with contiguous-block moves. Keyboard: `Alt+↑/↓` move, `Alt+Home/End` to top/bottom. Selection is kept
 visible by adjusting `TopIndex` after a move.
 
-**Drag & drop (the layer on top):** `MouseDown` records the hit index, `DragOver` computes the
-insertion index and draws an insertion line, `DragDrop` moves the selected block. Enabled only when
-`BoostDragReorder`. Written so that any DnD failure leaves the button path intact.
+**Drag & drop: BUILT, THEN REMOVED (1.2.9 in-game test).** The gesture never produced a move under the
+game's Mono. It was written as a layer precisely so this outcome cost nothing — the buttons and keyboard
+were already the working path. Deleted rather than left dead or commented out; git holds it at commit
+`1e90502` if Mono's WinForms ever gains working drag support.
 
 **Live preview:** the MANUAL view gains the same "will boost now" readout the ADVISOR view has, filled
 by calling **the same `GetBoostSlots`** the automation uses, so the panel cannot disagree with
 behavior. Removing an item visibly removes it from what gets boosted.
+
+**Selection must survive a REBUILD, not just a move (fixed after the 1.2.9 test).** Writing
+`PriorityBoosts` calls `SaveSettings`, which asks `Main` for a coalesced form refresh; that refresh calls
+`SettingsForm.UpdateFromSettings` up to a second later, which calls this panel's `SyncFromSettings`
+again and clears the ListBox a SECOND time. Restoring the selection only at the click site therefore
+looked correct and then silently dropped — the user reported one `Up` click deselecting the row, so a
+second `Up` was impossible without re-picking it. The panel now keeps `_prioIds` parallel to the rendered
+items and re-selects by ITEM ID inside `SyncFromSettings`, so the selection survives any rebuild, whoever
+triggered it. Id-based, not index-based: an external write may have reordered the list.
 
 ## 7. Advisor mode fix (not optional)
 
@@ -186,9 +194,9 @@ Game-coupled paths cannot be unit-tested; verification is explicit and manual:
 1. `dotnet test` — 53 existing tests stay green, plus new tests for `SeedPriorityBoosts`. (Shipped: 59.)
 2. In game: `debug.log` shows zero `UI AUDIT` lines and a sane `UI metrics:` line.
 3. Manual pass: seed happens once and is logged; picker adds/filters/sorts; already-listed items are
-   unselectable; buttons and keyboard reorder; DnD reorder; `BoostDragReorderOff=true` disables DnD
-   only; removing an item drops it from the live readout; a maxed chain copy under "Keep max" is still
-   not boosted.
+   unselectable; buttons and keyboard reorder AND the selection stays put across repeated clicks;
+   removing an item drops it from the live readout; a maxed chain copy under "Keep max" is still not
+   boosted.
 4. **Modal freeze check (added during execution, user decision).** `BoostPickerForm` uses `ShowDialog`,
    which is the first modal window in this app — `SettingsForm` and `ProfileEditorForm` both use
    `Show()`. A modal runs its own nested WinForms message loop on the Unity main thread, so while the

@@ -44,8 +44,9 @@ namespace NGUAdvisor
         private ListBox _prio;
         private ListBox _manualReadout;
         private ComboBox _order;
-        private int _dragFrom = -1;
-        private int _dragInsert = -1;
+        // The ids currently rendered in _prio, parallel to its Items, so a selection can be restored by
+        // ITEM rather than by index after the list is rebuilt.
+        private readonly List<int> _prioIds = new List<int>();
 
         // Layout C (user-approved): two-line cards. Line 1 = full item name + right-aligned toggle
         // BUTTONS (measured text — never checkboxes: Mono randomly drops checkbox glyphs). Line 2 =
@@ -279,37 +280,10 @@ namespace NGUAdvisor
             _prio = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(PrioRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
             UiTheme.StyleList(_prio);
             _prio.KeyDown += PrioKeyDown;
-            if (Settings == null || !Settings.BoostDragReorderOff)
-            {
-                _prio.AllowDrop = true;
-                _prio.MouseDown += PrioMouseDown;
-                _prio.MouseMove += PrioMouseMove;
-                _prio.DragOver += PrioDragOver;
-                _prio.DragDrop += PrioDragDrop;
-                _prio.DragLeave += (s, e) =>
-                {
-                    try { _dragInsert = -1; _prio.Invalidate(); }
-                    catch (Exception ex) { LogDebug($"Boosts drag leave: {ex.Message}"); }
-                };
-                // Insertion-line feedback (spec 2026-07-28 §3): appended AFTER UiTheme.StyleList's own
-                // DrawItem so it paints over the styled row, same technique as BoostPickerForm's greying.
-                // Top of the target row, or the bottom of the last row when dropping at the list's end.
-                _prio.DrawItem += (s, e) =>
-                {
-                    try
-                    {
-                        if (_dragInsert < 0) return;
-                        int count = _prio.Items.Count;
-                        if (count == 0) return;
-                        bool atEnd = _dragInsert >= count;
-                        Rectangle bounds = _prio.GetItemRectangle(atEnd ? count - 1 : _dragInsert);
-                        int lineY = atEnd ? bounds.Bottom - 1 : bounds.Top;
-                        using (Pen pen = new Pen(UiTheme.Accent, UiTheme.S(2)))
-                            e.Graphics.DrawLine(pen, bounds.Left, lineY, bounds.Right, lineY);
-                    }
-                    catch (Exception ex) { LogDebug($"Boosts drag paint: {ex.Message}"); }
-                };
-            }
+            // NO DRAG AND DROP HERE. It was implemented and it does not work under the game's Mono
+            // (user-tested 1.2.9): the gesture never produced a move. Removed rather than left dead —
+            // git holds it at commit 1e90502 if Mono ever grows up. The buttons and Alt+arrows are the
+            // reorder path, and they are the reason drag was built as a layer on top of them.
             _manualView.Controls.Add(_prio);
             y = _prio.Bottom + UiTheme.S(8);
 
@@ -559,8 +533,10 @@ namespace NGUAdvisor
                 if (idx >= 0 && idx < cur.Count) cur.RemoveAt(idx);
             Settings.PriorityBoosts = cur.ToArray();
             SyncFromSettings();
-            int reselect = Math.Min(lowest, _prio.Items.Count - 1);
-            if (reselect >= 0) ReselectRange(reselect, 1);
+            // Keep the cursor where the user was working: the row that now occupies the lowest removed
+            // position. By id, so the coalesced form refresh does not drop it (see SyncFromSettings).
+            int reselect = Math.Min(lowest, _prioIds.Count - 1);
+            if (reselect >= 0) SelectIds(new List<int> { _prioIds[reselect] });
         }
 
         // Moves the selected block one step (toEnd = false) or all the way to an end (toEnd = true).
@@ -591,18 +567,24 @@ namespace NGUAdvisor
             cur.InsertRange(insertAt, moved);
             Settings.PriorityBoosts = cur.ToArray();
             SyncFromSettings();
-            ReselectRange(insertAt, moved.Count);
+            // Reselect the ITEMS that moved, not the range of indices they landed on: SyncFromSettings
+            // will run again on the coalesced form refresh, and only an id-based selection survives it.
+            SelectIds(moved);
         }
 
-        private void ReselectRange(int start, int count)
+        // Selects exactly the rows holding these item ids and scrolls the first of them into view.
+        // Runs under _syncing where the caller is SyncFromSettings, so it raises no handler side effects.
+        private void SelectIds(List<int> ids)
         {
             _prio.ClearSelected();
-            for (int i = 0; i < count; i++)
+            int first = -1;
+            for (int i = 0; i < _prioIds.Count; i++)
             {
-                int idx = start + i;
-                if (idx >= 0 && idx < _prio.Items.Count) _prio.SetSelected(idx, true);
+                if (!ids.Contains(_prioIds[i])) continue;
+                _prio.SetSelected(i, true);
+                if (first < 0) first = i;
             }
-            if (start >= 0 && start < _prio.Items.Count) _prio.TopIndex = Math.Max(0, start - 2);
+            if (first >= 0) _prio.TopIndex = Math.Max(0, first - 2);
         }
 
         private void PrioKeyDown(object sender, KeyEventArgs e)
@@ -616,66 +598,6 @@ namespace NGUAdvisor
                 else if (e.KeyCode == Keys.End) { MovePrioBlock(1, true); e.Handled = true; e.SuppressKeyPress = true; }
             }
             catch (Exception ex) { LogDebug($"Boosts key: {ex.Message}"); }
-        }
-
-        // Drag & drop is a LAYER over the buttons, never a replacement: WinForms DnD is the part of this
-        // panel that cannot be verified outside the running game, so every handler is guarded and the
-        // whole thing is skippable via Settings.BoostDragReorderOff. The list write goes through the same
-        // path the buttons use.
-        private void PrioMouseDown(object sender, MouseEventArgs e)
-        {
-            try { _dragFrom = _prio.IndexFromPoint(e.Location); }
-            catch (Exception ex) { LogDebug($"Boosts drag start: {ex.Message}"); _dragFrom = -1; }
-        }
-
-        private void PrioMouseMove(object sender, MouseEventArgs e)
-        {
-            try
-            {
-                if (e.Button != MouseButtons.Left || _dragFrom < 0) return;
-                if (!_prio.SelectedIndices.Cast<int>().Contains(_dragFrom)) return;
-                _prio.DoDragDrop(_dragFrom, DragDropEffects.Move);
-            }
-            catch (Exception ex) { LogDebug($"Boosts drag move: {ex.Message}"); }
-        }
-
-        private void PrioDragOver(object sender, DragEventArgs e)
-        {
-            try
-            {
-                e.Effect = DragDropEffects.Move;
-                Point p = _prio.PointToClient(new Point(e.X, e.Y));
-                int idx = _prio.IndexFromPoint(p);
-                _dragInsert = idx < 0 ? _prio.Items.Count : idx;
-                _prio.Invalidate();
-            }
-            catch (Exception ex) { LogDebug($"Boosts drag over: {ex.Message}"); }
-        }
-
-        private void PrioDragDrop(object sender, DragEventArgs e)
-        {
-            try
-            {
-                if (Settings == null || _dragInsert < 0) return;
-                List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
-                List<int> sel = _prio.SelectedIndices.Cast<int>().OrderBy(i => i).ToList();
-                if (sel.Count == 0) return;
-
-                List<int> moved = sel.Select(i => cur[i]).ToList();
-                int target = _dragInsert;
-                // Removing the block shifts everything after it left; correct the insertion point first.
-                foreach (int i in sel) if (i < target) target--;
-                for (int i = sel.Count - 1; i >= 0; i--) cur.RemoveAt(sel[i]);
-                if (target < 0) target = 0;
-                if (target > cur.Count) target = cur.Count;
-
-                cur.InsertRange(target, moved);
-                Settings.PriorityBoosts = cur.ToArray();
-                SyncFromSettings();
-                ReselectRange(target, moved.Count);
-            }
-            catch (Exception ex) { LogDebug($"Boosts drag drop: {ex.Message}"); }
-            finally { _dragFrom = -1; _dragInsert = -1; }
         }
 
         public void SyncFromSettings()
@@ -706,11 +628,27 @@ namespace NGUAdvisor
                     if (OrderPerms[i][0] == cur[0] && OrderPerms[i][1] == cur[1])
                     { _order.SelectedIndex = i; break; }
 
+                // SELECTION SURVIVES THE REBUILD. Writing PriorityBoosts calls SaveSettings, which asks
+                // Main for a coalesced form refresh — and that refresh calls this method again up to a
+                // second later, clearing Items a SECOND time. Restoring the selection only at the click
+                // site therefore looked right and then silently dropped (user-reported 1.2.9: one Up
+                // click deselected the row, so you could not click Up again to move it two places).
+                // Snapshot by ITEM ID, not index: an external write may have reordered the list.
+                List<int> keepSelected = new List<int>();
+                foreach (int idx in _prio.SelectedIndices)
+                    if (idx >= 0 && idx < _prioIds.Count) keepSelected.Add(_prioIds[idx]);
+
                 _prio.BeginUpdate();
                 _prio.Items.Clear();
+                _prioIds.Clear();
                 foreach (var id in Settings.PriorityBoosts ?? new int[0])
+                {
                     _prio.Items.Add($"{ItemNameNice(id)}  (#{id})");
+                    _prioIds.Add(id);
+                }
                 _prio.EndUpdate();
+
+                if (keepSelected.Count > 0) SelectIds(keepSelected);
 
                 RefreshManualReadout();
 
