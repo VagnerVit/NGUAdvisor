@@ -25,11 +25,43 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CSPROJ="$ROOT/NGUAdvisor/NGUAdvisor.csproj"
 REPO="Glowey-Glow/NGUAdvisor"
 
-# Injector tools + sample profiles live in the maintainer's runtime folder (a sibling of this
-# repo by default). Override with env vars if your layout differs.
+# Flags. --inject skips zipping and injects the freshly built DLL into the running game: the
+# inner loop when iterating on UI, where a zip nobody opens is pure overhead.
+DO_ZIP=1
+DO_INJECT=0
+ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --inject) DO_INJECT=1; DO_ZIP=0 ;;
+    --no-zip) DO_ZIP=0 ;;
+    *) ARGS+=("$a") ;;
+  esac
+done
+set -- ${ARGS[@]+"${ARGS[@]}"}
+
+# Sample profiles ship FROM THE SOURCE TREE — they are ours and they are versioned, so there is
+# nothing to locate and nothing to keep in sync by hand.
+PROFILES="${NGU_PROFILES:-$ROOT/NGUAdvisor/SampleProfiles}"
+
+# Injector tools are third-party binaries that are NOT in this tree (see .gitignore / BUILD.md).
+# Resolution order, first hit wins, so a normal run needs no environment at all:
+#   1. NGU_TOOLS               explicit override
+#   2. $ROOT/tools/injector    the stable local home — deliberately NOT under dist/, which gets
+#                              cleaned out; keeping them in dist/ meant every cleanup broke the
+#                              packager and the next release had to hunt for smi.exe
+#   3. $RUNTIME/injector       the historical sibling-folder layout
+#   4. newest dist/*/injector  last resort: recover from a previously packaged release
 RUNTIME="${NGU_RUNTIME:-$ROOT/../NGU}"
-TOOLS="${NGU_TOOLS:-$RUNTIME/injector}"
-PROFILES="${NGU_PROFILES:-$RUNTIME/sampleprofiles}"
+if [ -n "${NGU_TOOLS:-}" ]; then
+  TOOLS="$NGU_TOOLS"
+elif [ -f "$ROOT/tools/injector/smi.exe" ]; then
+  TOOLS="$ROOT/tools/injector"
+elif [ -f "$RUNTIME/injector/smi.exe" ]; then
+  TOOLS="$RUNTIME/injector"
+else
+  TOOLS="$(ls -td "$ROOT/dist/"*/injector 2>/dev/null | head -1 || true)"
+  TOOLS="${TOOLS:-$RUNTIME/injector}"
+fi
 
 # Version: first arg, else the Version const in Main.cs.
 VERSION="${1:-$(grep -oE 'Version = "[^"]+"' "$ROOT/NGUAdvisor/Main.cs" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')}"
@@ -41,11 +73,14 @@ ZIP="$OUT/dist_$VERSION.zip"
 
 echo "==> NGU Advisor release packager"
 echo "    version : $VERSION"
-echo "    runtime : $RUNTIME"
+echo "    tools   : $TOOLS"
+echo "    profiles: $PROFILES"
+if [ "$DO_INJECT" = 1 ]; then echo "    mode    : build + inject (no zip)"; fi
 
 # --- sanity: required tools present -----------------------------------------
 for f in "$TOOLS/smi.exe" "$TOOLS/SharpMonoInjector.dll"; do
-  [ -f "$f" ] || { echo "ERROR: missing injector tool: $f (set NGU_TOOLS)"; exit 1; }
+  [ -f "$f" ] || { echo "ERROR: missing injector tool: $f
+       Put smi.exe and SharpMonoInjector.dll in $ROOT/tools/injector (see BUILD.md), or set NGU_TOOLS."; exit 1; }
 done
 [ -d "$PROFILES" ] || { echo "ERROR: missing sample profiles: $PROFILES (set NGU_PROFILES)"; exit 1; }
 
@@ -58,7 +93,10 @@ echo "    built: $(basename "$DLL")"
 
 # --- stage -------------------------------------------------------------------
 echo "==> Staging $STAGE ..."
-rm -rf "$STAGE" "$ZIP"
+# Only remove the zip when this run is going to produce one: --inject / --no-zip must not delete a
+# perfectly good release archive as a side effect of staging.
+rm -rf "$STAGE"
+if [ "$DO_ZIP" = 1 ]; then rm -f "$ZIP"; fi
 mkdir -p "$STAGE/injector"
 
 # single direct-inject launcher (CRLF line endings for cmd.exe)
@@ -75,17 +113,37 @@ if find "$STAGE" \( -iname '*Bootstrap*' -o -iname 'Assembly-CSharp.dll' -o -ina
   exit 1
 fi
 
-# --- zip (Windows-friendly) --------------------------------------------------
-echo "==> Zipping..."
-STAGE_WIN="$(cygpath -w "$STAGE")"
-ZIP_WIN="$(cygpath -w "$ZIP")"
-powershell.exe -NoProfile -Command "Compress-Archive -Path '$STAGE_WIN' -DestinationPath '$ZIP_WIN' -CompressionLevel Optimal -Force"
+# --- inject into the running game (inner loop) -------------------------------
+# The staged folder is already a complete runnable release, so injection runs from it rather than
+# duplicating the smi.exe invocation that "Run NGU Advisor.bat" holds.
+if [ "$DO_INJECT" = 1 ]; then
+  if ! tasklist //FI "IMAGENAME eq NGUIdle.exe" 2>/dev/null | grep -qi NGUIdle.exe; then
+    echo "ERROR: NGUIdle.exe is not running — start the game first."; exit 1
+  fi
+  echo "==> Injecting into NGUIdle ..."
+  ( cd "$STAGE" && ./injector/smi.exe inject -p NGUIdle -a ./injector/NGUAdvisor.dll -n NGUAdvisor -c Loader -m Init )
+  echo ""
+  echo "==> Injected v$VERSION from $STAGE"
+  echo "    log: %UserProfile%\\AppData\\LocalLow\\NGUAdvisor\\logs\\debug.log"
+  exit 0
+fi
 
-echo ""
-echo "==> Done: $ZIP  ($(du -h "$ZIP" | cut -f1))"
-echo ""
-echo "Publish a NEW release:"
-echo "  gh release create v$VERSION \"$ZIP\" --repo $REPO --title \"NGU Advisor v$VERSION\" --notes-file <notes.md>"
-echo ""
-echo "Or refresh an EXISTING release's asset:"
-echo "  gh release upload v$VERSION \"$ZIP\" --repo $REPO --clobber"
+# --- zip (Windows-friendly) --------------------------------------------------
+if [ "$DO_ZIP" = 1 ]; then
+  echo "==> Zipping..."
+  STAGE_WIN="$(cygpath -w "$STAGE")"
+  ZIP_WIN="$(cygpath -w "$ZIP")"
+  powershell.exe -NoProfile -Command "Compress-Archive -Path '$STAGE_WIN' -DestinationPath '$ZIP_WIN' -CompressionLevel Optimal -Force"
+
+  echo ""
+  echo "==> Done: $ZIP  ($(du -h "$ZIP" | cut -f1))"
+  echo ""
+  echo "Publish a NEW release:"
+  echo "  gh release create v$VERSION \"$ZIP\" --repo $REPO --title \"NGU Advisor v$VERSION\" --notes-file <notes.md>"
+  echo ""
+  echo "Or refresh an EXISTING release's asset:"
+  echo "  gh release upload v$VERSION \"$ZIP\" --repo $REPO --clobber"
+else
+  echo ""
+  echo "==> Staged (no zip): $STAGE"
+fi

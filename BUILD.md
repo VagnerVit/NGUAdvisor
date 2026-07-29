@@ -66,5 +66,27 @@ Copy the built `NGUAdvisor.r<timestamp>.dll` over `injector/NGUAdvisor.dll` in y
 folder, keeping the existing `smi.exe` and `SharpMonoInjector.dll`. Then run `Run NGU Advisor.bat`
 with NGU Idle open — it injects `NGUAdvisor.dll` directly (`NGUAdvisor.Loader.Init`).
 
+### `package-release.sh` (maintainer machine)
+
+```
+./package-release.sh              # build + stage + zip  -> dist/dist_<version>.zip
+./package-release.sh --inject     # build + stage + inject into the running game (no zip)
+./package-release.sh --no-zip     # build + stage only
+./package-release.sh 1.2.3        # explicit version (default: the Version const in Main.cs)
+```
+
+No environment variables are needed. Sample profiles come from `NGUAdvisor/SampleProfiles` in this
+tree, and the injector tools are looked up in this order: `$NGU_TOOLS`, `tools/injector`,
+`../NGU/injector`, then the newest `dist/*/injector`.
+
+**`tools/injector/` must hold `smi.exe` and `SharpMonoInjector.dll`.** They are third-party
+binaries ([SharpMonoInjector](https://github.com/warbler/SharpMonoInjector)) and are git-ignored,
+so a fresh clone needs them placed there once. They deliberately do NOT live under `dist/` —
+that folder gets cleaned out between releases, and every cleanup used to break the packager.
+
+`--inject` is the inner loop for UI work: it skips the zip and injects the freshly staged build.
+It refuses to run if `NGUIdle.exe` is not running. It does not check whether the advisor is
+**already** injected — injecting twice loads a second copy, so restart the game between runs.
+
 ## Reverting the build system
 The original legacy (VS-style) project is preserved as `NGUAdvisor/NGUAdvisor.csproj.legacy`.

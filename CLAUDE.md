@@ -22,7 +22,7 @@ dotnet build "NGUAdvisor/NGUAdvisor.csproj" -c Release
 
 ### Deploy / release
 
-Copy the built DLL over `injector/NGUAdvisor.dll` in a runnable folder and run `Run NGU Advisor.bat` with NGU Idle open (injects via `smi.exe`, entry point `NGUAdvisor.Loader.Init`). Release zips are produced by `package-release.sh` (maintainer machine only).
+Copy the built DLL over `injector/NGUAdvisor.dll` in a runnable folder and run `Run NGU Advisor.bat` with NGU Idle open (injects via `smi.exe`, entry point `NGUAdvisor.Loader.Init`). Release zips are produced by `package-release.sh` (maintainer machine only) — `./package-release.sh` to zip, `--inject` to build and inject into the running game without zipping, `--no-zip` to stage only. It needs no environment variables; injector tools live in the git-ignored `tools/injector/`. See BUILD.md.
 
 ## Tests
 

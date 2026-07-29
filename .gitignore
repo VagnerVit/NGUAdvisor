@@ -368,3 +368,7 @@ dist_*.zip
 
 # brainstorming visual companion (mockups, session state)
 /.superpowers/
+
+# Third-party injector binaries (SharpMonoInjector) kept locally for the packager.
+# Not committed: they are not ours to redistribute from this tree. See BUILD.md.
+/tools/injector/
