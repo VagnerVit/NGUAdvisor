@@ -54,6 +54,14 @@ Contract (`ResourceBreakpoint`):
 `ParseBreakpointArray` deliberately takes **no rebirthTime parameter** — the rebirth deadline is a
 property of the RUN, not of a parsed breakpoint.
 
+**Basic Training ignores the game's `syncTraining` toggle.** `ALLBT`/`CAPALLBT` always expands to all
+12 slots and `BasicTrainingBP` calls the `addEnergy(long)` overload, which does not mirror. The
+parameterless `addEnergy()` would honour sync: it clamps the input to `idleEnergy / 2` and copies the
+amount into `allDefenseController.trains[id]`. Since `training.attackCaps[i]` and `defenseCaps[i]`
+drift apart as levels reduce them independently, the mirrored amount is simply wrong for the
+receiving slot — user-reported: Charge (cap 46) received the 21 that Piercing Attack needed, and the
+defense tree stayed permanently under-fed. Expanding to 6 slots under sync was the old behaviour.
+
 ## Non-resource systems
 
 - **GearBreakpoints** — either a static `ID` list or an `Objective` (+`ForceRespawn`); exposes

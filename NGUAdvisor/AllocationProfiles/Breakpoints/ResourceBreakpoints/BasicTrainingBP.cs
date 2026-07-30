@@ -27,19 +27,23 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         protected override bool TargetMet() => false;
 
+        // The parameterless addEnergy() honours the game's syncTraining toggle, which mirrors this
+        // slot's amount into the opposite tree and halves the input on top of that. Attack and
+        // defense caps drift apart with levels, so the mirrored amount is wrong for the receiving
+        // slot. The addEnergy(long) overload skips the mirror; every slot is allocated explicitly.
         public override bool Allocate()
         {
+            int slot = Index % 6;
+
             if (Index <= 5)
             {
-                var cap = _character.training.attackCaps[Index % 6];
-                SetInput(Math.Min(cap, MaxAllocation));
-                _character.allOffenseController.trains[Index % 6].addEnergy();
+                long cap = _character.training.attackCaps[slot];
+                _character.allOffenseController.trains[slot].addEnergy(Math.Min(cap, MaxAllocation));
             }
             else
             {
-                var cap = _character.training.defenseCaps[Index % 6];
-                SetInput(Math.Min(cap, MaxAllocation));
-                _character.allDefenseController.trains[Index % 6].addEnergy();
+                long cap = _character.training.defenseCaps[slot];
+                _character.allDefenseController.trains[slot].addEnergy(Math.Min(cap, MaxAllocation));
             }
 
             return true;

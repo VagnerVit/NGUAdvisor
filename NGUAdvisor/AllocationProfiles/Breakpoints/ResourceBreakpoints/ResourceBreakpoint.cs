@@ -222,8 +222,11 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
                 }
                 else if (temp.StartsWith("ALLBT") || temp.StartsWith("CAPALLBT"))
                 {
-                    var top = _character.settings.syncTraining ? 6 : 12;
-                    for (var i = 0; i < top; i++)
+                    // All 12 slots, even with the game's syncTraining on: the sync mirrors the
+                    // ATTACK amount into the defense slot, and the two cap tables diverge as levels
+                    // grow (user-reported: Charge capped at 46 got the 21 that Piercing Attack
+                    // needed). BasicTrainingBP allocates sync-free, so each slot gets its own cap.
+                    for (var i = 0; i < 12; i++)
                     {
                         yield return new BasicTrainingBP
                         {

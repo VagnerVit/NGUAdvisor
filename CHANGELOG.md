@@ -2,6 +2,21 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.22] - 2026-07-30
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **Basic Training left the defense tree starved when the game's "sync training" option was on.** With
+  sync enabled, `ALLBT`/`CAPALLBT` only allocated the six attack skills and let the game mirror each
+  amount into the matching defense skill. But the mirror copies the *attack* number, and the two cap
+  tables shrink independently as levels accumulate — so a Charge that caps at 46 Energy received the 21
+  that Piercing Attack needed, and every defense skill trained below capped speed for the whole rebirth
+  (the sync path also silently halves the input). The advisor now allocates all twelve skills itself,
+  each from its own cap, using the game's non-mirroring energy call. The in-game toggle is untouched and
+  still works for manual clicks.
+
 ## [1.2.21] - 2026-07-29
 
 Existing settings and profile files remain compatible with version 1.1.0.
