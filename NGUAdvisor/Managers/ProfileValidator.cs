@@ -46,6 +46,106 @@ namespace NGUAdvisor.Managers
             return Result.Success;
         }
 
+        private static readonly string[] AugmentNames =
+        {
+            "Safety Scissors", "Milk Infusion", "Cannon Implant", "Shoulder Mounted Minigun",
+            "Energy Buster", "Advanced Exoskeleton", "Laser Sword"
+        };
+
+        // Advice, never a failure: a breakpoint that funds more than one augment is legal JSON that
+        // throws energy away. Augment boosts stack ADDITIVELY and each one is convex in the energy it
+        // receives, so a shared budget always pays more concentrated in a single augment (the maths is
+        // in docs/AUGMENTS.md). Callers surface these alongside the parse result and never block on them.
+        //
+        // Note the token indexing this has to respect: AUG-<n> runs over a FLAT 0-13, even = an augment,
+        // odd = that augment's upgrade. `AUG-8, AUG-9` is therefore ONE augment's two halves, not two
+        // augments, and must not warn — which is exactly the reading that makes a correct profile look
+        // wrong at a glance.
+        public static List<string> Warnings(string json)
+        {
+            var warnings = new List<string>();
+            if (string.IsNullOrEmpty(json))
+                return warnings;
+
+            ProfileModel model = null;
+            try { model = ProfileModel.Load(json); } catch { }
+            if (model == null)
+                return warnings;
+
+            foreach (var bp in model.Energy)
+            {
+                var funded = new List<string>();
+                foreach (var token in bp.Priorities)
+                {
+                    string name = FundedAugment(token);
+                    if (name != null && !funded.Contains(name))
+                        funded.Add(name);
+                }
+
+                if (funded.Count > 1)
+                    warnings.Add($"Energy breakpoint at {FormatTime(bp.TimeSeconds)} funds {funded.Count} " +
+                        $"augments ({string.Join(", ", funded.ToArray())}). Augment boosts stack additively, so " +
+                        "splitting energy between them is close to pure waste — fund one augment (both halves of " +
+                        "its pair) and spend the rest elsewhere. BESTAUG picks that augment for you.");
+            }
+
+            return warnings;
+        }
+
+        // The augment a single priority token funds out of the SHARED energy pool, or null when it funds
+        // none (or names one we cannot resolve, e.g. a typo'd index — that is the structural validator's
+        // business, not this).
+        //
+        // CAP tokens are deliberately not counted: a CAPAUG takes min(need, idle) and stays out of the
+        // equal-share divisor, so it is a bounded reservation rather than a split of the budget, and it is
+        // how a profile legitimately forces a specific augment — CBlock2.0-LSC pairs `CAPAUG-12:80` (the
+        // Laser Sword the challenge requires) with `BESTAUG` for everything left over. Warning there would
+        // be nagging about the only way to write that run.
+        private static string FundedAugment(string token)
+        {
+            if (string.IsNullOrEmpty(token))
+                return null;
+
+            string t = token.ToUpperInvariant();
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                t = t.Substring(0, colon);
+
+            string index = null;
+            int dash = t.IndexOf('-');
+            if (dash >= 0)
+            {
+                index = t.Substring(dash + 1);
+                t = t.Substring(0, dash);
+            }
+
+            // BESTAUG is checked first: it is its own token family and funds an augment it chooses live.
+            if (t == "BESTAUG")
+                return "BESTAUG";
+            if (t != "AUG")
+                return null;
+
+            int flat = 0;
+            if (index != null && !int.TryParse(index, out flat))
+                return null;
+            if (flat < 0 || flat / 2 >= AugmentNames.Length)
+                return null;
+
+            return AugmentNames[flat / 2];
+        }
+
+        private static string FormatTime(int seconds)
+        {
+            if (seconds < 0)
+                seconds = 0;
+            int h = seconds / 3600;
+            int m = seconds % 3600 / 60;
+            int s = seconds % 60;
+            return s > 0
+                ? $"{h}:{m:00}:{s:00}"
+                : $"{h}:{m:00}";
+        }
+
         private static Result Fail(string json, int pos, string message)
         {
             LineCol(json, pos, out var line, out var col);

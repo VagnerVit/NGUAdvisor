@@ -17,9 +17,15 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
     {
         private bool _useUpgrades;
 
-        // How far ahead the projection looks. An hour is long enough that a slow, steep aug can show
-        // its value and short enough that the linear cost model below stays honest.
-        private const double MaxHorizon = 3600.0;
+        // How far ahead the projection looks when the profile says nothing about the phase length. An
+        // hour is long enough that a slow, steep aug can show its value and short enough that the
+        // linear cost model below stays honest.
+        private const double DefaultHorizon = 3600.0;
+
+        // Hard ceiling on the projection. Boost grows as time^(1 + tier/2), so the horizon must track
+        // the real phase (Ch.5 runs augments 0:30-3:00) instead of a fixed hour — but beyond a few
+        // hours the linear cost model drifts too far to trust, so an open-ended phase is clamped.
+        private const double MaxHorizon = 3.0 * 3600.0;
 
         protected override bool Unlocked() => _character.buttons.augmentation.interactable && !_character.challenges.noAugsChallenge.inChallenge;
 
@@ -34,29 +40,46 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return AllocatePairs() > 0;
         }
 
-        // Seconds of run to project over, capped at MaxHorizon and by the rebirth when the profile
-        // schedules one. The deadline is read from the LIVE profile (Main.Profile, as BloodPlanner and
-        // WandoosAdvisor do): the breakpoint parser never populated a RebirthTime on BESTAUG, so the
-        // property this used to read was always 0 and its guard — the one the rewrite claimed replaced
-        // the old `time > 300` cutoff — could never fire. Cf. BR.cs, whose copy is unwired the same way.
+        // Seconds of run to project over: whichever comes first of the end of the augment phase and the
+        // scheduled rebirth, clamped to MaxHorizon. Both are read from the LIVE profile (Main.Profile,
+        // as BloodPlanner and WandoosAdvisor do): the breakpoint parser never populated a RebirthTime on
+        // BESTAUG, so the property this used to read was always 0 and its guard — the one the rewrite
+        // claimed replaced the old `time > 300` cutoff — could never fire. Cf. BR.cs, unwired the same way.
         //
-        // toRebirth means the horizon ENDS at the rebirth, which is what makes a level still in flight
-        // there worth nothing (see LevelsInHorizon). Past the deadline the rebirth can still be blocked
-        // — NUMBER/BOSSNUM targets are floors, not deadlines, and locks or the No-Rebirth challenge can
-        // hold it — so the run continues and we keep funding on the full horizon rather than going dark.
-        private double Horizon(out bool toRebirth)
+        // hardStop means funding really ENDS at the horizon, which is what makes a level still in flight
+        // there worth nothing (see LevelsInHorizon): the rebirth wipes it, and the phase end freezes it
+        // with no later breakpoint to finish it. Past the rebirth deadline the rebirth can still be
+        // blocked — NUMBER/BOSSNUM targets are floors, not deadlines, and locks or the No-Rebirth
+        // challenge can hold it — so the run continues on the full horizon rather than going dark.
+        private double Horizon(out bool hardStop)
         {
-            toRebirth = false;
-            if (!Main.Settings.AutoRebirth) return MaxHorizon;
+            hardStop = false;
+            double horizon = DefaultHorizon;
 
-            double target = -1;
-            try { target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1; } catch { }
-            if (target <= 0) return MaxHorizon;
+            double phase = -1;
+            try { phase = Main.Profile != null ? Main.Profile.AugmentPhaseSecondsLeft() : -1; } catch { }
+            if (phase > 0)
+            {
+                horizon = Math.Min(MaxHorizon, phase);
+                hardStop = phase <= MaxHorizon;
+            }
 
-            double left = target - _character.rebirthTime.totalseconds;
-            if (left <= 0 || left >= MaxHorizon) return MaxHorizon;
-            toRebirth = true;
-            return left;
+            if (Main.Settings.AutoRebirth)
+            {
+                double target = -1;
+                try { target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1; } catch { }
+                if (target > 0)
+                {
+                    double left = target - _character.rebirthTime.totalseconds;
+                    if (left > 0 && left < horizon)
+                    {
+                        horizon = left;
+                        hardStop = true;
+                    }
+                }
+            }
+
+            return horizon;
         }
 
         // Levels this half gains in `horizon` seconds. The level in flight lands after `secLeft` (its
@@ -64,11 +87,12 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         // linear in the level (getAugProgressPerTick divides by level+1). With c = secPerLevel/(level+1)
         // the time for n more levels is c * (n*(level+1) + n(n+1)/2); invert for n.
         //
-        // completedOnly FLOORS the result. The game pays stat boost per COMPLETED level (augLevel is an
-        // integer; augProgress only carries within a run), so at the rebirth a level still in flight is
-        // wiped and worth nothing — funding it is the waste the old cutoff crudely bounded. Mid-run the
-        // fraction is real: the progress is banked and the next pass resumes it, so it is priced as-is.
-        private static double LevelsInHorizon(double secPerLevel, double secLeft, double level, double horizon, bool completedOnly)
+        // Fractions are kept here and floored by the caller once the gold ceiling has been applied: the
+        // game pays stat boost per COMPLETED level (augLevel is an integer; augProgress only carries
+        // within a run), so at a hard stop a level still in flight is wiped and worth nothing — funding
+        // it is the waste the old cutoff crudely bounded. Mid-phase the fraction is real: the progress is
+        // banked and the next pass resumes it, so it is priced as-is.
+        private static double LevelsInHorizon(double secPerLevel, double secLeft, double level, double horizon)
         {
             if (secPerLevel <= 0 || horizon <= 0) return 0;
             if (secLeft <= 0 || secLeft > secPerLevel) secLeft = secPerLevel;   // no/odd progress data
@@ -85,8 +109,36 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
                 double t = horizon - secLeft;
                 n = 1.0 + (-b + Math.Sqrt(b * b + 8.0 * t / c)) / 2.0;
             }
-            if (completedOnly) n = Math.Floor(n);
             return n > 0 ? n : 0;
+        }
+
+        // Levels this half can PAY for out of `budget`. The energy clock above is only half the price:
+        // the game also charges gold per level — base x (L+1) for an augment, base x (L+1)^2 for an
+        // upgrade — so the aug half integrates to base x L^2/2 while the upgrade half integrates to
+        // base x U^3/3. That cubic is why the upgrade half, not the augment, is what gold actually stops,
+        // and why an aug that looks fast can still be the wrong pick. Levelling a whole horizon without
+        // this ceiling is what the old one-second-of-gold gate tried and failed to bound.
+        //
+        // The base is derived from the LIVE next-level cost, so every discount in the chain (the No Augs
+        // challenge's -50% above all) is included by construction rather than reimplemented.
+        private static double LevelsAffordable(double nextLevelCost, double level, double budget, bool squared)
+        {
+            if (nextLevelCost <= 0) return double.MaxValue;
+            if (budget <= 0) return 0;
+
+            // Midpoint form of the sum, exact for the linear case and within a fraction of a level for
+            // the quadratic one.
+            double m = level + 0.5;
+            if (squared)
+            {
+                double b = nextLevelCost / ((level + 1.0) * (level + 1.0));
+                double n = Math.Pow(m * m * m + 3.0 * budget / b, 1.0 / 3.0) - m;
+                return n > 0 ? n : 0;
+            }
+
+            double a = nextLevelCost / (level + 1.0);
+            double lin = -m + Math.Sqrt(m * m + 2.0 * budget / a);
+            return lin > 0 ? lin : 0;
         }
 
         // Which halves of the pair can still take energy. An aug is a candidate if EITHER half is live:
@@ -117,11 +169,68 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         private long Share(float ratio) => ratio <= 0 ? 0 : Math.Max(1, (long)(MaxAllocation * ratio));
 
+        // One half of a pair, priced at a given energy share.
+        private struct Half
+        {
+            public bool Live;
+            public double Level;
+            public float Progress;
+            public double Seconds;    // seconds for a whole level at this share
+            public double Left;       // seconds left on the level in flight
+            public double ByEnergy;   // levels the clock buys inside the horizon
+            public double ByGold;     // levels the gold share pays for
+            public double Levels;     // what actually lands
+        }
+
+        private Half Price(AugmentController aug, bool upgrade, bool live, float ratio,
+            double horizon, double goldShare, bool hardStop)
+        {
+            Half half = new Half();
+            half.Live = live;
+            if (!live || ratio <= 0f)
+                return half;
+
+            long share = Share(ratio);
+            half.Level = upgrade
+                ? _character.augments.augs[aug.id].upgradeLevel
+                : _character.augments.augs[aug.id].augLevel;
+            half.Progress = upgrade ? aug.UpgradeProgress() : aug.AugProgress();
+            // TimeLeftEnergy is just TimeLeftEnergyMax x (1 - progress), so derive it instead of paying
+            // the game's rate call a second time per half.
+            half.Seconds = Math.Max(0.01, upgrade
+                ? aug.UpgradeTimeLeftEnergyMax(share)
+                : aug.AugTimeLeftEnergyMax(share));
+            half.Left = half.Seconds * (1.0 - half.Progress);
+            half.ByEnergy = LevelsInHorizon(half.Seconds, half.Left, half.Level, horizon);
+            half.ByGold = LevelsAffordable(upgrade ? (double)aug.getUpgradeCost() : (double)aug.getAugCost(),
+                half.Level, goldShare, upgrade);
+            half.Levels = Gained(half.ByEnergy, half.ByGold, hardStop);
+            return half;
+        }
+
+        // Fraction of its energy share a half can actually convert. A gold-starved half fills its bar and
+        // then waits for gold (the reference optimizer models the same wait, Augment.js:113-136) — the
+        // energy behind that wait becomes nothing. Levels grow as sqrt(energy), so a half held to n_G of
+        // the n_E levels its share would clock needs only (n_G/n_E)^2 of that share.
+        private static float Usable(Half half)
+        {
+            if (!half.Live || half.ByEnergy <= 0 || half.ByGold >= half.ByEnergy)
+                return 1f;
+            double f = half.ByGold / half.ByEnergy;
+            return (float)(f * f);
+        }
+
         private float AllocatePairs()
         {
-            double horizon = Horizon(out bool toRebirth);
+            double horizon = Horizon(out bool hardStop);
 
             double gold = _character.realGold;
+            // Net GPS (after digger drain), as DiggerManager and MoneyPitManager read it: what the run
+            // will actually have banked by the end of the horizon is what the levels get paid from.
+            double gps = 0;
+            try { gps = _character.goldPerSecond(); } catch { }
+            double budget = gold + Math.Max(0.0, gps) * horizon;
+
             var bestAugment = -1;
             var bestValue = 0.0;
             bool bestAugLive = false, bestUpgLive = false;
@@ -137,26 +246,47 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
                 double tier = aug.augTierBonus();
                 Split(tier, augLive, upgLive, out float augRatio, out float upgRatio);
 
-                // Full-level cost, and what is left of the level in flight. TimeLeftEnergy is just
-                // TimeLeftEnergyMax x (1 - progress), so derive it instead of paying the game's rate
-                // call a second time per half.
-                float augProgress = aug.AugProgress();
-                float upgProgress = aug.UpgradeProgress();
-                double augSec = augLive ? Math.Max(0.01, aug.AugTimeLeftEnergyMax(Share(augRatio))) : 0;
-                double upgSec = upgLive ? Math.Max(0.01, aug.UpgradeTimeLeftEnergyMax(Share(upgRatio))) : 0;
-                double augLeft = augSec * (1.0 - augProgress);
-                double upgLeft = upgSec * (1.0 - upgProgress);
+                // The gold budget is split by the ELASTICITY shares and then left alone. Only energy is
+                // rebalanced below; letting the gold split follow the corrected energy split would feed
+                // the correction back into its own input and chase its tail.
+                double augBudget = budget * augRatio;
+                double upgBudget = budget * upgRatio;
+
+                Half augHalf = Price(aug, false, augLive, augRatio, horizon, augBudget, hardStop);
+                Half upgHalf = Price(aug, true, upgLive, upgRatio, horizon, upgBudget, hardStop);
+
+                // Hand the share a gold-starved half cannot convert to the half that still can — in
+                // practice the aug half, because the upgrade's cost integrates cubically (see
+                // LevelsAffordable) and it is the one gold stops first. If both halves are capped the
+                // surplus changes no hands and stays idle for the other priorities in the breakpoint.
+                // Single pass: the corrected share moves each half's clock, but re-pricing a second time
+                // shifts the result by a fraction of a level.
+                float augUsable = Usable(augHalf);
+                float upgUsable = Usable(upgHalf);
+                if (augLive && upgLive && (augUsable < 1f || upgUsable < 1f))
+                {
+                    float freed = augRatio * (1f - augUsable) + upgRatio * (1f - upgUsable);
+                    augRatio *= augUsable;
+                    upgRatio *= upgUsable;
+                    if (augUsable >= 1f)
+                        augRatio += freed;
+                    else if (upgUsable >= 1f)
+                        upgRatio += freed;
+
+                    augHalf = Price(aug, false, augLive, augRatio, horizon, augBudget, hardStop);
+                    upgHalf = Price(aug, true, upgLive, upgRatio, horizon, upgBudget, hardStop);
+                }
 
                 // Gold gate on the half we would actually start. A level already in progress, or one
                 // about to land, is worth waiting on; a cold one we cannot pay for is not.
-                double time = Math.Max(augSec, upgSec);
+                double time = Math.Max(augHalf.Seconds, upgHalf.Seconds);
                 double cost = Math.Max(1, 1.0 / time) * (upgLive ? (double)aug.getUpgradeCost() : (double)aug.getAugCost());
-                float progress = upgLive ? upgProgress : augProgress;
-                double timeRemaining = upgLive ? upgLeft : augLeft;
+                float progress = upgLive ? upgHalf.Progress : augHalf.Progress;
+                double timeRemaining = upgLive ? upgHalf.Left : augHalf.Left;
                 if (cost > gold && (progress == 0f || timeRemaining < 10))
                     continue;
 
-                double value = ProjectedGain(aug, augLive, upgLive, augSec, augLeft, upgSec, upgLeft, tier, horizon, toRebirth);
+                double value = ProjectedGain(aug, augHalf, upgHalf, tier);
                 if (value > bestValue)
                 {
                     bestAugment = i;
@@ -174,14 +304,16 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             var best = _character.augmentsController.augments[bestAugment];
             var totalAllocated = 0f;
             var index = bestAugment * 2;
-            if (bestAugLive)
+            // A share rebalanced to zero means gold cannot convert a single level there — skip the half
+            // instead of feeding it energy that would sit on a waiting bar.
+            if (bestAugLive && bestAugRatio > 0f)
             {
                 long alloc = CalculateAugCap(index, Share(bestAugRatio));
                 SetInput(alloc);
                 best.addEnergyAug();
                 totalAllocated += alloc;
             }
-            if (bestUpgLive)
+            if (bestUpgLive && bestUpgRatio > 0f)
             {
                 long alloc = CalculateAugCap(index + 1, Share(bestUpgRatio));
                 SetInput(alloc);
@@ -191,17 +323,25 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return totalAllocated;
         }
 
+        // Levels actually banked: whichever of the energy clock and the gold budget runs out first, and
+        // only whole levels when funding stops at the horizon.
+        private static double Gained(double byEnergy, double byGold, bool hardStop)
+        {
+            double n = Math.Min(byEnergy, byGold);
+            if (hardStop) n = Math.Floor(n);
+            return n > 0 ? n : 0;
+        }
+
         // Stat boost this pair would hold at the end of the horizon, minus what it holds now. The boost
         // formula is the game's own (AugmentController.getTotalStatBoost):
         //     baseBoost x (upgradeLevel^2 + 1) x augLevel^augTierBonus
-        private double ProjectedGain(AugmentController aug, bool augLive, bool upgLive,
-            double augSec, double augLeft, double upgSec, double upgLeft, double tier, double horizon, bool toRebirth)
+        private double ProjectedGain(AugmentController aug, Half augHalf, Half upgHalf, double tier)
         {
             double augLv = _character.augments.augs[aug.id].augLevel;
             double upgLv = _character.augments.augs[aug.id].upgradeLevel;
 
-            double newAug = augLive ? augLv + LevelsInHorizon(augSec, augLeft, augLv, horizon, toRebirth) : augLv;
-            double newUpg = upgLive ? upgLv + LevelsInHorizon(upgSec, upgLeft, upgLv, horizon, toRebirth) : upgLv;
+            double newAug = augLv + augHalf.Levels;
+            double newUpg = upgLv + upgHalf.Levels;
 
             double projected = (double)aug.baseBoost * (Math.Pow(newUpg, 2.0) + 1.0) * Math.Pow(newAug, tier);
             return projected - aug.getTotalStatBoost();

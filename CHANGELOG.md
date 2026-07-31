@@ -2,6 +2,58 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.24] - 2026-07-31
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Changed
+
+- **`BESTAUG` now prices an augment over the phase you actually run it for, and against the gold you
+  will actually have.** It projected a fixed one hour ahead, which underrates the steep high-tier
+  augments during a long augment phase (boost grows faster than linearly with run time) and overrates
+  them in a short run; the horizon now ends where augment funding ends — at the next energy breakpoint
+  that funds no augment, or at the scheduled rebirth. The projection also stops at what gold can pay
+  for, using the run's net gold per second and the game's own level costs, instead of the old check
+  that only asked whether one second of the current level was affordable. In practice that stops the
+  advisor from committing a whole phase to an augment whose upgrade half runs dry after a few levels.
+- **`BESTAUG` no longer feeds energy to a half that has run out of gold.** The energy split between an
+  augment and its upgrade followed the boost formula alone, which is right while both halves can pay
+  their way — but an upgrade level costs gold in proportion to the square of its level, so the upgrade
+  half runs dry long before the augment does, and everything after that point is a full bar waiting for
+  gold with the energy behind it doing nothing. The split now shrinks a starved half to the share its
+  gold can actually convert and hands the rest to the other half, which is where the last few percent of
+  an augment phase were being lost.
+
+### Added
+
+- **Profiles now warn when one energy breakpoint funds several augments.** Augment multipliers add
+  together rather than multiply, so energy split between two augments buys less than the same energy
+  concentrated in one — but nothing said so, and the profile still loaded and ran. Loading a profile (or
+  opening it in the Profile Editor) now names the breakpoint and the augments involved. It is advice, not
+  an error: nothing is blocked. Reserving a specific augment with a `CAPAUG` token is not flagged, since
+  that is how a run that must level a particular augment — a Laser Sword challenge, say — is written.
+- **The Normal long-rebirth preset no longer parks spare energy in Wandoos.** A trailing `WAN` lane
+  never releases its share, and on a measured ch.3 run it held 62.5% of the energy cap for the entire
+  3h55m rebirth — for a bonus that applies to Fight Boss attack/defense only (so it cannot help kill
+  the titan the preset exists to kill) and that is wiped on rebirth anyway. Advanced Training now leads,
+  because titans are killed with adventure stats, and the tail goes into the Adventure/Power NGUs so a
+  long run leaves permanent progress behind. Challenge blocks where Wandoos genuinely is the power
+  source, such as `CBlock2-Normal`, still lead with it.
+
+## [1.2.23] - 2026-07-31
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **"Keep Max Lvl" froze a maxed copy of every tier in a transform chain, not just the one worth
+  keeping.** With Climb and Keep Max both on, the first at-100 copy of each tier became the protected
+  copy — so a Forest Pendant sat in the inventory reading TRANSFORMABLE forever while the chain was
+  already two tiers further along, with 100 levels of merges stranded inside it. Every later merge
+  then piled up around that frozen copy instead of climbing. Keep Max now protects only the highest
+  tier you actually own, which is the only one whose stats you can wear; lower tiers climb freely.
+  Turning Climb off still freezes the whole chain, as before.
+
 ## [1.2.22] - 2026-07-30
 
 Existing settings and profile files remain compatible with version 1.1.0.

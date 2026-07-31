@@ -12,6 +12,35 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
         public EnergyBreakpoints(JSONNode bps) :
             base(bps, (bp) => ResourceBreakpoint.ParseBreakpointArray(bp["Priorities"], ResourceType.Energy).ToArray()) { }
 
+        // Seconds until the augment phase ends: the earliest LATER breakpoint on the ACTIVE timeline
+        // (challenge-tagged when one is selected, exactly as GetCurrentBreakpoint chooses) that funds
+        // no augment at all. -1 when the phase runs to the end of the run.
+        //
+        // BestAug needs this because augment boost grows as time^(1 + tier/2) — a fixed one-hour
+        // horizon underprices the steep augs in Ch.5's 2.5h phase and overprices them in a 30m run.
+        // Past the phase end a level still in flight can never complete (nothing funds it again before
+        // the rebirth wipes the levels), so the phase end is as hard a stop as the rebirth itself.
+        public double AugmentPhaseSecondsLeft()
+        {
+            if (breakpoints == null)
+                return -1;
+
+            double t = _character.rebirthTime.totalseconds;
+            string cur = Managers.ChallengeDetector.Current();
+            bool tagged = cur != null && breakpoints.Any(b => b.challenge == cur && t > b.time);
+
+            foreach (var b in breakpoints.Where(b => tagged ? b.challenge == cur : b.challenge == null)
+                                         .OrderBy(b => b.time))
+            {
+                if (b.time <= t)
+                    continue;
+                if (!b.priorities.Any(p => p is AugmentBP))
+                    return b.time - t;
+            }
+
+            return -1;
+        }
+
         protected override bool PerformSwap(Breakpoint bp)
         {
             var temp = bp.priorities.Where(x => x.IsValid()).ToList();

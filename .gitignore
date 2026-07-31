@@ -372,3 +372,7 @@ dist_*.zip
 # Third-party injector binaries (SharpMonoInjector) kept locally for the packager.
 # Not committed: they are not ours to redistribute from this tree. See BUILD.md.
 /tools/injector/
+
+# Per-machine Claude Code settings (permissions, local MCP toggles). Shared
+# config belongs in .claude/settings.json; skills under .claude/skills/ are committed.
+/.claude/settings.local.json

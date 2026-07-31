@@ -31,7 +31,11 @@ KEEP MAX LVL, FILTER LOWER):
 - **Auto-climb OFF → HoldAll**: every at-100 copy is boost-frozen; sub-100 spares still merge.
 - **Keep-max ON + climb ON → KeepOne**: exactly ONE at-100 copy stays frozen (equipped preferred,
   else lowest inventory slot); further at-100 copies get boosted and transform — the chain climbs
-  while the kept copy keeps its stats.
+  while the kept copy keeps its stats. **KeepOne applies to the HIGHEST OWNED tier only**
+  (`Read(i).OwnedTier`). Holding it on every tier was a bug: an at-100 Forest Pendant (#53) stayed
+  frozen reading TRANSFORMABLE while the chain was already at Ascended x2, stranding 100 levels of
+  merges at the bottom. A maxed copy is worth keeping for the stats of the tier you wear, never for
+  an obsolete one. HoldAll still covers every tier — climb OFF means no transform anywhere.
 - **FILTER LOWER** writes the game's own loot-filter list for tiers below the highest owned.
 
 `ChainItem(id)` is the membership test `InventoryAdvisor` uses to exempt chain tiers from TRASH.

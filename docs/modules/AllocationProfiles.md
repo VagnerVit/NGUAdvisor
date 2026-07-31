@@ -39,6 +39,11 @@ an EMPTY wrapper + "Resave to reload" (never a half-parsed profile).
 One class per token family: `NGUBP`, `AdvancedTrainingBP`, `AugmentBP`, `BestAug`, `BasicTrainingBP`,
 `TimeMachineBP`, `WandoosBP`, `RitualBP`, `BR`, `HackBP`, `CapCalc`.
 
+`BestAug`'s ranking model — boost formula, the `e_i : 2` energy split, the gold ceiling and why the
+horizon must track the augment phase rather than a fixed hour — is derived in `docs/AUGMENTS.md`.
+`EnergyBreakpoints.AugmentPhaseSecondsLeft()` supplies that horizon: the earliest later breakpoint on
+the active (challenge-aware) timeline whose priorities contain no `AugmentBP`.
+
 Contract (`ResourceBreakpoint`):
 - `IsValid()` = `CorrectResourceType() && Unlocked() && !TargetMet()` — an invalid priority DROPS
   OUT and its share redistributes (this is how LevelPlanner's target caps steer allocation, and how
@@ -61,6 +66,32 @@ amount into `allDefenseController.trains[id]`. Since `training.attackCaps[i]` an
 drift apart as levels reduce them independently, the mirrored amount is simply wrong for the
 receiving slot — user-reported: Charge (cap 46) received the 21 that Piercing Attack needed, and the
 defense tree stayed permanently under-fed. Expanding to 6 slots under sync was the old behaviour.
+
+**`WAN`/`CAPWAN` is a leftovers BLACK HOLE, not a leftovers sink — never park it in a long-run
+profile.** Three properties compound. (1) `WandoosBP.TargetMet()` is hardcoded `false`, so the lane
+never drops out and never redistributes its share. (2) `num = ceil(baseEnergyTime /
+totalWandoosEnergySpeed)` is the allocation that reaches the game's 1-level-per-tick cap; whenever
+that exceeds the token's ceiling, `ceil(num / MaxAllocation)` makes the lane request its ENTIRE
+ceiling every pass. That is the normal case, not the edge case: any Evil+ run (`baseTime` >= 1e21)
+and every Normal character whose cap is below `baseTime / speed`. An uncapped `CAPWAN` then means
+"take all idle energy", and a trailing `WAN` means "take everything the CAP tokens left". (3) The
+payoff is the narrowest in the game — Wandoos multiplies **Fight Boss** A/D only (never adventure
+stats, so it cannot help a titan kill) and its dump levels are **wiped at rebirth**.
+
+Measured on a ch.3 Normal save (cap 5 571 250, `totalWandoosEnergySpeed` ~3.0, so BB would need
+3.3e8 = 59x cap): `Normal-LRB`'s trailing `WAN` held **62.5 % of the cap for the whole 3 h 55 m run**
+and returned 6 449 levels = 28.4x A/D. Boss requirements in that range grow ~10x per boss
+(`bossAttack` 1.98e72 at boss 74 vs 1.98e77 at boss 79), so the whole run's Wandoos investment was
+worth **~1.45 bosses** — against ~6.2 bosses from that single rebirth's Number multiplier — and it
+died at the rebirth, while every NGU sat at the level it had held for 507 h of playtime.
+
+Two rules follow. Because the bonus is `L^0.8` of the levels standing at the END of the run and
+leveling is linear in allocation, only total end-of-run levels matter: Wandoos belongs in a LATE
+breakpoint, never in the bootup hour (0 -> 100 % speed over the first hour, so those levels cost the
+most). And the direct dump earns a lane only where the guide names it — NoAug/NoTM/NoRB challenges,
+CBlock4, the final Sadistic LRB — not as the default resting place for spare E/M. `Normal-LRB` was
+fixed accordingly (AT first, NGU tail, no Wandoos); `CBlock2-Normal` still leads with `CAPWAN:50` by
+design, because a NoTM/NoAug-flavoured block is exactly the case where Wandoos IS the power source.
 
 ## Non-resource systems
 

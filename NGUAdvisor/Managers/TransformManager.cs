@@ -146,7 +146,22 @@ namespace NGUAdvisor.Managers
                     if (climb && !keep) continue;   // fully free chain
                     var mode = climb ? HoldMode.KeepOne : HoldMode.HoldAll;
                     var tiers = Chains[i].Tiers;
-                    for (int t = 0; t < tiers.Length - 1; t++)   // top tier can't transform anyway
+
+                    // KeepOne holds the HIGHEST OWNED tier only (user-reported: an at-100 Forest
+                    // Pendant sat in the inventory reading TRANSFORMABLE forever while the chain was
+                    // already three tiers further along). Keeping a maxed copy is about the stats of
+                    // the tier you actually wear — a maxed copy of an obsolete tier is worth nothing
+                    // and freezing it strands 100 levels of merges at the bottom of the chain.
+                    // HoldAll (climb OFF) still freezes every tier: there the user wants no transform.
+                    int firstTier = 0, lastTier = tiers.Length - 2;   // top tier can't transform anyway
+                    if (mode == HoldMode.KeepOne)
+                    {
+                        int owned = Read(i).OwnedTier;
+                        if (owned < 0 || owned > lastTier) continue;
+                        firstTier = lastTier = owned;
+                    }
+
+                    for (int t = firstTier; t <= lastTier; t++)
                     {
                         bool gated = Chains[i].SadisticGate && t == tiers.Length - 2
                             && c.settings.rebirthDifficulty < difficulty.sadistic;

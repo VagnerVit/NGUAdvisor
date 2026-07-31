@@ -11,6 +11,9 @@ External references:
 - PP/EXP income (Google Sheet): id `1v9yA1Cv8W7OS1Vo_3LU3rHVBsPXaFRzP4T7Di2ZT3YY` (gid 1550539240)
 - Wiki: https://ngu-idle.fandom.com/wiki/NGU_Idle_Wiki
 
+Deep dives that expand a single line of this file:
+- `AUGMENTS.md` — augment boost/cost math, tier crossovers, energy split, what `BestAug` prices
+
 > Note: these Google Sheets are not machine-fetchable here; mine them opportunistically for exact boost
 > values and rebirth-length breakpoints during implementation.
 
@@ -28,7 +31,8 @@ table at the bottom; refine with titan-version reads if needed).
 - 30-minute rebirths as often as possible (farm boss EXP, cut skill costs). Extend to 1h after Boss 58.
 - Basic Training: Attack (auto-syncs Block); progress all tiers to max speed (~25 min) to unlock Advanced Training.
 - Energy spend order: Total ESpeed 25 → Base EBars 4 → Total ESpeed 50 → Base ECap 300k; then ratio **1 : 37.5k : 1** (Power:Cap:Bars).
-- Augments unlock Boss 17: buy the most expensive augment finishable in 30 min.
+- Augments unlock Boss 17: buy the most expensive augment finishable in 30 min (only `base_i` matters
+  at these level counts; the crossovers move as gold grows — see `AUGMENTS.md`).
 - Adventure sets: Tutorial → Sewers (B7) → Forest (B17) → Cave of Many Things (B37) → The Sky (B48) → HSB (B58).
 - Time Machine unlocks Boss 30 (wear Gold Drops gear in furthest zone to set gold, don't level yet).
 - Blood Magic Boss 37 (Poke Yourself / Blood Number Boost).

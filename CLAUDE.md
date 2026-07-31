@@ -96,6 +96,7 @@ If a module has no doc yet, write one when you finish working on it.
 ## Domain knowledge
 
 - **`docs/NGU-KNOWLEDGE.md`** — the source of truth for game strategy (chapter progression, ratios, spend orders, stage detection map). Read it before touching advisor heuristics.
+- **`docs/AUGMENTS.md`** — the augment efficiency math (boost/cost formulas, tier crossovers, energy split, gold vs. energy limits). Read before touching `BestAug`/`AugmentBP`.
 - **`external/`** — reference material (not part of the build): clones of the community guide, the
   web Gear Optimizer (the oracle for gear scoring math), and spreadsheet exports. The inventory and
   the live links live in the `ngu-references` skill — invoke it when you actually need them.

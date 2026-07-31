@@ -41,8 +41,16 @@ preserved verbatim into `Extras` regardless of type — including named alternat
 (`BaseBreakpoints` challenge-aware selection). `TimeSeconds` exposes `Hours/Minutes/Seconds` for
 the editor; the JSON accepts both a plain number and the `{h,m,s}` object form.
 
-`ProfileValidator` checks token grammar/index ranges before a save so the editor can refuse invalid
-input rather than writing a profile the runtime will reject.
+`ProfileValidator.Validate` is a strict near-RFC-8259 JSON parse with a line/column, run before a save
+and on load so the editor can refuse a malformed profile rather than letting SimpleJSON's very lenient
+parse misread it silently. It reports the FIRST structural problem; it does not check token grammar.
+
+`ProfileValidator.Warnings` is a separate, semantic pass that returns **advice and never blocks**: today
+it flags an energy breakpoint funding more than one augment out of the shared pool (augment boosts stack
+additively — `docs/AUGMENTS.md`). It skips CAP tokens, which are bounded reservations rather than splits,
+and it treats `AUG-8`/`AUG-9` as one augment because the index is flat over 0-13 (even = augment, odd =
+upgrade). Surfaced by `CustomAllocation.ReloadAllocation` (log) and `ProfileEditorForm.Load` (status
+line). Covered by `ProfileValidatorWarningTests`.
 
 ---
 

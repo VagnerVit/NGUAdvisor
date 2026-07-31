@@ -25,6 +25,7 @@
   <ItemGroup>
     <Compile Include="..\..\NGUAdvisor\SimpleJson.cs" Link="Linked\SimpleJson.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ProfileModel.cs" Link="Linked\ProfileModel.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\ProfileValidator.cs" Link="Linked\ProfileValidator.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NumberFormatter.cs" Link="Linked\NumberFormatter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostSeed.cs" Link="Linked\BoostSeed.cs" />

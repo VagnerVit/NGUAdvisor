@@ -33,9 +33,12 @@ namespace NGUAdvisor.AllocationProfiles
             {
                 try
                 {
-                    _wrapper = new BreakpointWrapper(JSON.Parse(File.ReadAllText(_allocationPath))["Breakpoints"]);
+                    string raw = File.ReadAllText(_allocationPath);
+                    _wrapper = new BreakpointWrapper(JSON.Parse(raw)["Breakpoints"]);
 
                     Log(_wrapper.BuildAllocationString(_profileName));
+                    foreach (string warning in ProfileValidator.Warnings(raw))
+                        Log($"Profile advice: {warning}");
 
                     DoAllocations();
                 }
@@ -213,6 +216,10 @@ namespace NGUAdvisor.AllocationProfiles
                     best = rb.RebirthTime;
             return best;
         }
+
+        // Seconds of augment funding left on the energy timeline (see EnergyBreakpoints), -1 when the
+        // phase is open-ended.
+        public double AugmentPhaseSecondsLeft() => _wrapper?.energy?.AugmentPhaseSecondsLeft() ?? -1;
 
         public bool DoRebirth()
         {

@@ -158,7 +158,19 @@ namespace NGUAdvisor
                 UpdateSaveText();
                 UpdateHeader();
                 if (Visible) AuditGear();   // a Reload rebuilds the cards; re-audit the fresh tree
-                SetStatus($"Loaded E:{_model.Energy.Count} M:{_model.Magic.Count} R3:{_model.R3.Count} Gear:{_model.Gear.Count} Diggers:{_model.Diggers.Count} Beards:{_model.Beards.Count} breakpoints. Other systems preserved.", false);
+                // Advice, not an error: the profile loads either way, so it shows in the status line and
+                // in the log rather than blocking anything.
+                var advice = ProfileValidator.Warnings(raw);
+                if (advice.Count > 0)
+                {
+                    foreach (var warning in advice)
+                        Main.Log($"Profile advice: {warning}");
+                    SetStatus(advice.Count == 1 ? advice[0] : $"{advice[0]} (+{advice.Count - 1} more in the log)", false);
+                }
+                else
+                {
+                    SetStatus($"Loaded E:{_model.Energy.Count} M:{_model.Magic.Count} R3:{_model.R3.Count} Gear:{_model.Gear.Count} Diggers:{_model.Diggers.Count} Beards:{_model.Beards.Count} breakpoints. Other systems preserved.", false);
+                }
             }
             catch (Exception e)
             {
