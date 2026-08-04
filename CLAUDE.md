@@ -97,6 +97,7 @@ If a module has no doc yet, write one when you finish working on it.
 
 - **`docs/NGU-KNOWLEDGE.md`** — the source of truth for game strategy (chapter progression, ratios, spend orders, stage detection map). Read it before touching advisor heuristics.
 - **`docs/AUGMENTS.md`** — the augment efficiency math (boost/cost formulas, tier crossovers, energy split, gold vs. energy limits). Read before touching `BestAug`/`AugmentBP`.
+- **`docs/ITEM-IDS.md`** — item id → name lookup for reading the id-keyed drop tables. **Ids 1–39 are BOOSTS, not gear** (13 value tiers × Power/Toughness/Special) — the `Normal = true` rolls in `GearFarmAdvisor.Table` are boost drops, filtered out of gear verdicts at runtime. Gear starts at id 40. Regenerate with `build/gen-item-ids.sh`.
 - **`external/`** — reference material (not part of the build): clones of the community guide, the
   web Gear Optimizer (the oracle for gear scoring math), and spreadsheet exports. The inventory and
   the live links live in the `ngu-references` skill — invoke it when you actually need them.
