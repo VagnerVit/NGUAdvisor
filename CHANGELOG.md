@@ -2,6 +2,8 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [Unreleased]
+
 ## [1.2.26] - 2026-08-06
 
 Existing settings and profile files remain compatible with version 1.1.0.
