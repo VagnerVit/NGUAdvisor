@@ -42,7 +42,10 @@ order:
   caster (`BloodPlanner.BloodMatters()` — ask the owning planner, never string-match another
   module's output; the old AutoTokens string-match was wrong three ways, see inline comment);
   DC(0)/PP(8) picked by VENUE (titan window/gear hunt → DC in + PP benched; ITOPOD → PP in + DC
-  benched — ITOPOD rolls are FLAT, no DC scaling); **Adv(3) always leads — applied last**.
+  benched — ITOPOD rolls are FLAT, no DC scaling); Adv(3) always leads; **an active gear hunt
+  outranks even Adv — DC(0) first, applied last** (user-caught: at one digger slot the Adventure
+  lead pushed DC out of `Take(slots)`, so the hunt farmed with zero drop chance). Titan window
+  does NOT outrank Adv — only the hunt does.
 - **Titan window = 60 s** — sized to the machinery, not the event: digger applier ticks every
   30 s, titan gear lock engages < 20 s before spawn; 60 s guarantees exactly one swap pass lands
   ahead of the lock (user-reported: diggers swapped ~8 min early and lingered).

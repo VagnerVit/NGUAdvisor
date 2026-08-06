@@ -68,8 +68,12 @@ receiving slot — user-reported: Charge (cap 46) received the 21 that Piercing 
 defense tree stayed permanently under-fed. Expanding to 6 slots under sync was the old behaviour.
 
 **`WAN`/`CAPWAN` is a leftovers BLACK HOLE, not a leftovers sink — never park it in a long-run
-profile.** Three properties compound. (1) `WandoosBP.TargetMet()` is hardcoded `false`, so the lane
-never drops out and never redistributes its share. (2) `num = ceil(baseEnergyTime /
+profile.** Three properties compound. (1) `WandoosBP.TargetMet()` **was** hardcoded `false`, so the
+lane never dropped out and never redistributed its share — it now asks
+`WandoosAdvisor.DumpWorthwhile()` whether the lane can buy one boss (10× A/D) over the run, which
+retires it on every Evil+ run and on any Normal run whose cap is far below `baseTime / speed`. The
+other two properties are unchanged, so the warning below still governs where you may write the
+token. (2) `num = ceil(baseEnergyTime /
 totalWandoosEnergySpeed)` is the allocation that reaches the game's 1-level-per-tick cap; whenever
 that exceeds the token's ceiling, `ceil(num / MaxAllocation)` makes the lane request its ENTIRE
 ceiling every pass. That is the normal case, not the edge case: any Evil+ run (`baseTime` >= 1e21)
@@ -92,6 +96,14 @@ most). And the direct dump earns a lane only where the guide names it — NoAug/
 CBlock4, the final Sadistic LRB — not as the default resting place for spare E/M. `Normal-LRB` was
 fixed accordingly (AT first, NGU tail, no Wandoos); `CBlock2-Normal` still leads with `CAPWAN:50` by
 design, because a NoTM/NoAug-flavoured block is exactly the case where Wandoos IS the power source.
+
+**AutoProfile got the same fix only later** (user-reported: "why do I have so much on Wandoos
+*again*"). The rules above had been applied to `Normal-LRB` but not to `ChallengeOverlay.AutoTokens`,
+which emitted `CAPWAN:60` in NGU MARATHON and `CAPWAN:40` in every other segment — so with
+`AutoProfile` on, Wandoos still took 40–60 % of both caps every pass. Segment ceilings are now
+`CAPWAN:30` throughout, and the `DumpWorthwhile` gate above decides whether the lane runs at all.
+The `Templates` (NONGU/NOTM/NOAUG) and `Fallback` token lists keep their original ceilings on
+purpose — those are exactly the Wandoos-is-the-power-source cases.
 
 ## Non-resource systems
 

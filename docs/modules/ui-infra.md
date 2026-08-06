@@ -113,6 +113,7 @@ accent-weak selection, Ink text) because the ask was size, not restyling.
 | `StyleList(l)` | `ListBox` | `OwnerDrawFixed` + `ItemHeight = LinePitch`; honours `SelectionMode.None` |
 | `StyleNum(n)` | `NumericUpDown` | no `DrawMode` exists, but it *does* honour an explicit `Height` — so state it |
 | `ListH(rows)` | list heights | **specify lists in ROWS.** A pixel height silently means a different row count at every scale |
+| `OwnerDrawTabs(tc)` | `TabControl` | owner-draws the strip AND states `SizeMode.Fixed` + `ItemSize`: height from `SCtl`, width from the widest caption measured in **`Bold`** (the selected tab draws bold, so `Ui` would ellipsize whichever tab is active). **Call it after the pages exist** — the width is derived from them. A TabControl sizes its own strip from `Font.Height` like the controls above, so the captions paint at the real DPI into a band built for a third of it and the strip shows a horizontal slice of its own labels |
 
 `ScaledCheckBox` (`Managers/ScaledCheckBox.cs`) exists for the same reason and is the one case that
 needs a subclass: `CheckBox` exposes no `DrawMode`, and its glyph is a fixed ~13px system metric that

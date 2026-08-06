@@ -64,3 +64,21 @@ mandatory for Mono).
 
 Paste flows (gear IDs) parse+validate first, show the result for confirmation, change nothing on
 invalid/empty input, and offer a single-level undo.
+
+## The Profile Editor's DPI debt (fixed 1.2.24) — and why it audits every tab
+
+The editor had the FIRST half of the DPI contract and none of the second: 223 `UiTheme.S()` calls but
+zero `SText`/`SCtl`, no `ScaledCheckBox`, no `OwnerDrawTabs`, no `FitOrGrow`/`BtnWidth`. Raw pixels
+scaled; nothing that holds text took a floor. On a 200 %-scaling display (measured `line 38, head 33,
+scale 1.52`) that produced clipped button captions, a tab strip showing a horizontal slice of its own
+labels, and — the one no eye would name — a **54px NumericUpDown inside a 46px time chip**, because
+`StyleNum` states `UiTheme.NumH` while the chip was still `S(30)`.
+
+So the standing rules for this window: every container that holds a numeric derives from
+`UiTheme.NumH` (chip → header → card), every row places its children **centred**, never at a tuned
+`S(4)` top, and button widths come from `UiLayout.BtnWidth` rather than a literal.
+
+`AuditTabs()` runs `UiLayout.Audit` over **all eight tabs**, not just Gear. While only the Gear panel
+was audited the reported issue count was a floor — the ✕/↑/↓ row buttons and the numeric rows exist on
+every tab, so a clipped caption on Energy or Misc had nothing reporting it. The 137 issues that showed
+up in `debug.log` were one tab's worth.

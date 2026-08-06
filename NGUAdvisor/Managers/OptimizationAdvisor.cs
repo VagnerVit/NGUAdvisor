@@ -51,6 +51,24 @@ namespace NGUAdvisor.Managers
             return _cache;
         }
 
+        // Wandoos is the PRIMARY power source when the usual sources are unavailable: inside a challenge
+        // block (challenges reset augs/number and you build power in one run), No-Rebirth (the Number
+        // multiplier is dead), No-Augs, or gold too low to maintain augments. In those contexts AT
+        // Wandoos (AT-3 = Wandoos-Energy, AT-4 = Wandoos-Magic) is what to level for power — and the
+        // direct Wandoos dump earns its allocation lane no matter how slow it looks, which is why
+        // WandoosBP asks this before retiring itself.
+        public static bool WandoosIsPowerSource()
+        {
+            try
+            {
+                var c = Main.Character;
+                if (c == null) return false;
+                bool inBlock = SafeCurrentChallenge() != null || SafeAnyChallengesValid();
+                return inBlock || GoldStarvedForAugs(c);
+            }
+            catch { return false; }
+        }
+
         private static List<Rec> Compute()
         {
             var list = new List<Rec>();
@@ -60,14 +78,10 @@ namespace NGUAdvisor.Managers
             var prog = ProgressionAnalyzer.Detect();
             string mode = Mode(prog);
 
-            // Wandoos is the PRIMARY power source when the usual sources are unavailable: inside a challenge
-            // block (challenges reset augs/number and you build power in one run), No-Rebirth (the Number
-            // multiplier is dead), No-Augs, or gold too low to maintain augments. In those contexts AT
-            // Wandoos (AT-3 = Wandoos-Energy, AT-4 = Wandoos-Magic) is what to level for power.
             string ch = SafeCurrentChallenge();
             bool inBlock = ch != null || SafeAnyChallengesValid();
             bool goldStarved = !inBlock && GoldStarvedForAugs(c);
-            bool wandoosIsPower = inBlock || goldStarved;
+            bool wandoosIsPower = WandoosIsPowerSource();
             string wReason = ch == "NORB" ? "No Rebirth: no Number mult"
                 : ch == "NOAUG" ? "No Augs"
                 : inBlock ? "challenge block"
@@ -914,9 +928,14 @@ namespace NGUAdvisor.Managers
                     if (order.Contains(0) && order.Contains(8)) { order.Remove(0); order.Add(0); }
                 }
 
-                // LAW: the Adventure digger always leads — applied last so nothing outranks it.
+                // LAW: the Adventure digger always leads.
                 order.Remove(3);
                 order.Insert(0, 3);
+
+                // LAW: an active gear hunt outranks even Adventure — the hunt exists to farm drops.
+                // At one digger slot the Adventure lead pushed the DC digger out of Take(slots)
+                // entirely, so the hunt ran with no drop chance at all (user-caught).
+                if (hunting && order.Contains(0)) { order.Remove(0); order.Insert(0, 0); }
 
                 // Membership: unlocked, and (Hybrid) restricted to the profile pool — no law-introduced
                 // filler leaks in. Leveling priority is the law-ranked order that survives the filter.

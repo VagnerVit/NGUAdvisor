@@ -195,15 +195,18 @@ namespace NGUAdvisor.Managers
                 {
                     if (kvp.Key > maxReach) break;
                     var st = kvp.Value;
-                    if (st.FightType((float)zoneAtk, (float)refDef) == 2) continue;
+                    double oneShot = ZoneStatHelper.OneShotPower(kvp.Key);
+                    if (st.FightType((float)zoneAtk, (float)refDef, oneShot) == 2) continue;
 
-                    // Idle-farmable via one-shot power (attack alone beats OPower) or the I pair. The
-                    // x1.0001 on every threshold mirrors FightType's strict '>' — without it a need of
-                    // exactly 1.0 solves at t=0 and the "crossing" is one the zone tables don't grant.
-                    double tOne = Solve(power, tough, st.OPower * 1.0001 / zoneAtk, 0, window);
+                    // Idle-farmable via one-shot power (attack alone one-shots the zone) or the I pair.
+                    // The x1.0001 on every threshold mirrors FightType's strict '>' — without it a need
+                    // of exactly 1.0 solves at t=0 and the "crossing" is one the zone tables don't grant.
+                    // A zone whose one-shot power we cannot measure only unlocks via the I pair.
+                    double oneShotNeed = oneShot > 0 ? oneShot * 1.0001 / zoneAtk : double.PositiveInfinity;
+                    double tOne = Solve(power, tough, oneShotNeed, 0, window);
                     double tPair = Solve(power, tough, st.IPower * 1.0001 / zoneAtk, st.IToughness * 1.0001 / refDef, window);
                     double t = Math.Min(tOne, tPair);
-                    double need = Math.Min(st.OPower * 1.0001 / zoneAtk,
+                    double need = Math.Min(oneShotNeed,
                         Math.Max(st.IPower * 1.0001 / zoneAtk, st.IToughness * 1.0001 / refDef));
                     string name = ZoneHelpers.ZoneList.TryGetValue(kvp.Key, out var zn) ? zn : $"zone {kvp.Key}";
                     Consider(t, $"{name} idle-farm ({ExpBalancer.Fmt(st.IPower)}/{ExpBalancer.Fmt(st.IToughness)})", (need - 1) * 100);

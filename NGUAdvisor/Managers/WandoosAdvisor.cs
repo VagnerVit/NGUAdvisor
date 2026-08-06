@@ -59,10 +59,7 @@ namespace NGUAdvisor.Managers
                 var c = Main.Character;
                 if (c == null) return v;
 
-                bool evil = (int)c.settings.rebirthDifficulty >= 1;
-                double[] baseTimes = evil
-                    ? new[] { 1e21, 1e27, 1e33 }
-                    : new[] { 1e9, 1e12, 1e15 };
+                double[] baseTimes = BaseTimes(c);
 
                 bool[] unlocked = { true, false, false };
                 try { unlocked[1] = c.inventory.itemList.jakeComplete; } catch { }
@@ -127,6 +124,72 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception e) { Main.LogDebug($"WandoosAdvisor: {e.Message}"); }
             return v;
+        }
+
+        private static double[] BaseTimes(Character c)
+        {
+            bool evil = (int)c.settings.rebirthDifficulty >= 1;
+            return evil ? new[] { 1e21, 1e27, 1e33 } : new[] { 1e9, 1e12, 1e15 };
+        }
+
+        // Whole-run length, not the remainder: the run-level question below has ONE answer per run.
+        // Same 10m-4h clamp and 120m no-target default as RunHorizonMinutes().
+        private static double RunSeconds()
+        {
+            try
+            {
+                double target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1;
+                if (target > 0) return Math.Min(Math.Max(target, 600.0), 14400.0);
+            }
+            catch { }
+            return 7200.0;
+        }
+
+        // Is a Wandoos dump lane holding `alloc` of ONE resource worth the allocation it occupies?
+        // Bosses gained = log10(A/D multiplier) — boss requirements grow ~10x per boss (bossAttack
+        // 1.98e72 at boss 74 vs 1.98e77 at boss 79) — so the 10x default asks for ONE boss, the
+        // smallest unit of progress the whole A/D lever exists to buy.
+        //
+        // Judged over the WHOLE run and from level 0, NOT marginally over what is already banked.
+        // Both follow from the dump being wiped at every rebirth: the real question is "should this
+        // run carry a Wandoos lane at all?". A marginal read retires the lane ~30 s after the
+        // rebirth on any concave bonus (at 1805 levels/run the break-even sits at 8 banked levels),
+        // however well the lane pays across the run — measured, not assumed.
+        //
+        // Why this can't be a fixed allocation/rate threshold: levels-per-10x differs by three
+        // orders of magnitude across the OSs (98 needs ~1678 energy levels, MEH ~45, XL ~2), so a
+        // constant tuned on 98 would silently retire a perfectly good MEH/XL dump.
+        //
+        // Unknowable inputs answer TRUE — never retire a lane on a failed read.
+        public static bool DumpWorthwhile(bool energy, long alloc, double minMultiplier = 10.0)
+        {
+            try
+            {
+                var c = Main.Character;
+                if (c == null || alloc <= 0) return true;
+
+                int os = (int)c.wandoos98.os;
+                if (os < 0 || os > 2) os = 0;
+
+                // Same full-boot projection Compare() uses: the live speed right after a rebirth is
+                // ~0, which would make every lane look worthless exactly when the levels are
+                // cheapest. Under-booted reads are unstable, so keep the lane.
+                double boot = 1.0;
+                try { boot = c.wandoos98Controller.bootupSpeedFactor(); } catch { }
+                if (boot < 0.02) return true;
+
+                double speed = (energy ? c.totalWandoosEnergySpeed() : c.totalWandoosMagicSpeed()) / boot;
+                double rate = Math.Min(alloc * speed / BaseTimes(c)[os], 1.0) * 50.0;
+                double levels = rate * RunSeconds();
+
+                double bonus = energy ? BonusFor(os, levels, 0.0) : BonusFor(os, 0.0, levels);
+                return bonus >= minMultiplier;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"WandoosAdvisor.DumpWorthwhile: {e.Message}");
+                return true;
+            }
         }
 
         // The game's Wandoos98Controller.wandoosBonus(), with levels as inputs.

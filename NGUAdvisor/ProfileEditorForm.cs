@@ -73,7 +73,7 @@ namespace NGUAdvisor
             _header = new Label
             {
                 Dock = DockStyle.Top,
-                Height = UiTheme.S(28),
+                Height = UiTheme.SText(28),
                 TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
                 Padding = new Padding(UiTheme.S(10), 0, 0, 0),
                 BackColor = UiTheme.Surface,
@@ -83,9 +83,13 @@ namespace NGUAdvisor
 
             _tabs = new TabControl { Dock = DockStyle.Fill };
 
-            var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = UiTheme.S(44), FlowDirection = FlowDirection.LeftToRight, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(8), UiTheme.S(8), 0, 0) };
-            _saveBtn = new Button { Text = "Update Profile", Width = UiTheme.S(140), Height = UiTheme.S(28) };
-            var reloadBtn = new Button { Text = "Reload Profile", Width = UiTheme.S(130), Height = UiTheme.S(28) };
+            // The bar is DERIVED from the buttons it holds - flooring a button height and scaling its
+            // container alongside it is what clips silently (see ui-infra.md, SLines corollary).
+            int btnH = UiTheme.SCtl(28);
+            var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = btnH + UiTheme.S(16), FlowDirection = FlowDirection.LeftToRight, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(8), UiTheme.S(8), 0, 0) };
+            // "Save Profile" and "Update Profile" swap into the same button, so size it for the longer one.
+            _saveBtn = new Button { Text = "Update Profile", Width = UiLayout.BtnWidth("Update Profile"), Height = btnH };
+            var reloadBtn = new Button { Text = "Reload Profile", Width = UiLayout.BtnWidth("Reload Profile"), Height = btnH };
             UiTheme.StylePrimary(_saveBtn);
             UiTheme.StyleFlat(reloadBtn);
             _saveBtn.Click += (s, e) => Save();
@@ -100,7 +104,7 @@ namespace NGUAdvisor
             _status = new Label
             {
                 Dock = DockStyle.Bottom,
-                Height = UiTheme.S(24),
+                Height = UiTheme.SText(24),
                 TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
                 Padding = new Padding(UiTheme.S(10), 0, 0, 0),
                 BackColor = UiTheme.Surface,
@@ -113,7 +117,7 @@ namespace NGUAdvisor
             Controls.Add(_header);
 
             // Audit at Shown, like SettingsForm: before that the controls have no real rendered sizes.
-            Shown += (s, e) => AuditGear();
+            Shown += (s, e) => AuditTabs();
         }
 
         public void LoadProfile(string profilesDir, string profileName)
@@ -157,7 +161,7 @@ namespace NGUAdvisor
                 _dirty = false;
                 UpdateSaveText();
                 UpdateHeader();
-                if (Visible) AuditGear();   // a Reload rebuilds the cards; re-audit the fresh tree
+                if (Visible) AuditTabs();   // a Reload rebuilds the cards; re-audit the fresh tree
                 // Advice, not an error: the profile loads either way, so it shows in the status line and
                 // in the log rather than blocking anything.
                 var advice = ProfileValidator.Warnings(raw);
@@ -193,6 +197,7 @@ namespace NGUAdvisor
             AddMiscTab();
 
             UiTheme.ThemeInputs(_tabs); // dark-mode the input controls in the just-built panels
+            UiTheme.OwnerDrawTabs(_tabs); // after the pages exist - the strip is sized from the captions
         }
 
         private void AddMiscTab()
@@ -222,17 +227,23 @@ namespace NGUAdvisor
             panel.Changed += (s, e) => MarkDirty();
             page.Controls.Add(panel);
             _tabs.TabPages.Add(page);
-            _gearPanel = panel;
         }
 
-        // This window never ran the layout auditor — only SettingsForm did — so "UI AUDIT [Gear]" did not
-        // exist to be checked. One diagnostic call, no behaviour: Audit() only measures and logs.
-        private GearEditorPanel _gearPanel;
-
-        private void AuditGear()
+        // This window never ran the layout auditor — only SettingsForm did — so "UI AUDIT" did not exist for
+        // it to be checked. Diagnostic only: Audit() measures and logs, it never moves a control.
+        //
+        // It audits EVERY tab, not just Gear. While only the Gear panel was audited, the log's issue count
+        // was a floor: the ✕/↑/↓ row buttons and the numeric rows exist on all eight tabs, so a clipped
+        // caption on Energy or Misc had nothing reporting it.
+        private void AuditTabs()
         {
-            try { if (_gearPanel != null) UiLayout.Audit(_gearPanel, "Gear"); }
-            catch (Exception e) { Main.LogDebug($"Gear audit: {e.Message}"); }
+            try
+            {
+                foreach (TabPage page in _tabs.TabPages)
+                    foreach (Control child in page.Controls)
+                        UiLayout.Audit(child, page.Text);
+            }
+            catch (Exception e) { Main.LogDebug($"Profile editor audit: {e.Message}"); }
         }
 
         private void AddListTab(string title, System.Collections.Generic.List<ProfileModel.ListBreakpoint> data,

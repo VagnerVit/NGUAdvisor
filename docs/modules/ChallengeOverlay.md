@@ -42,6 +42,13 @@ Machine, so early-Evil runs skip TM HOUR and open on RECOVERY/MARATHON until it 
 "Augments", TM HOUR "Time Machine", **AT HOUR "Advanced Training"** (user-compared vs the GO site:
 "Adventure" here wore Power/Toughness gear instead of AT-speed), NGU MARATHON "NGUs".
 
+**Wandoos ceiling is `CAPWAN:30` in EVERY segment** (was `:60` in NGU MARATHON, `:40` elsewhere —
+user-reported: with `AutoProfile` on, Wandoos held 40–60 % of both caps every pass, the black hole
+AllocationProfiles.md §WAN documents and `Normal-LRB` had already been fixed for). `WandoosBP` also
+retires its own lane now (`WandoosAdvisor.DumpWorthwhile`), so `:30` is a ceiling, not a floor. The
+`Templates` (NONGU/NOTM/NOAUG) and `Fallback` lists deliberately KEEP their original `:40`/`:60` —
+those are the cases where Wandoos genuinely is the power source.
+
 ## NGU candidates (D2)
 
 `ChapterNguIds`: ch.1 none (pre-NGU), ch.2 E{0,1}/M{0,3}, ch.3 E{4,6}/M{0}, **ch.4+ EVERY NGU**

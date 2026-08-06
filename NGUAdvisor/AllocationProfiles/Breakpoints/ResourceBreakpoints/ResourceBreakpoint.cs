@@ -70,6 +70,20 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             MaxAllocation = Math.Min(capMax, GetIdleResourceAmount());
         }
 
+        // The largest allocation this token could ever receive: its own ceiling, WITHOUT the
+        // equal-share divisor and WITHOUT clamping to the live idle pool. IsValid() (and so
+        // TargetMet()) runs before UpdateMaxAllocation(), when MaxAllocation still holds last
+        // pass's number — a TargetMet() that wants to judge a lane by its size must ask this
+        // instead. Deliberately an OVER-estimate: a lane is retired only when even its best case
+        // fails to earn its place.
+        protected long CeilingAllocation()
+        {
+            long capMax = GetMaxResourceAmount();
+            if (CapPercent.HasValue)
+                capMax = (long)Math.Ceiling(capMax * CapPercent.Value);
+            return capMax;
+        }
+
         public bool IsValid() => CorrectResourceType() && Unlocked() && !TargetMet();
 
         protected abstract bool Unlocked();

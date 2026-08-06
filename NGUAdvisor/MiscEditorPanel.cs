@@ -17,7 +17,10 @@ namespace NGUAdvisor
     {
         private static readonly int OuterPad = UiTheme.S(8);
         private static readonly int SectionGap = UiTheme.S(18);
-        private static readonly int HeaderH = UiTheme.S(24);
+        private static readonly int HeaderH = UiTheme.SText(24);
+        // The time chip holds NumericUpDowns, so it is derived from NumH and the card header from the chip.
+        internal static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
+        internal static readonly int CardHeaderH = ChipH + UiTheme.S(8);
 
         private readonly ProfileModel _model;
         private readonly Panel _scroll, _content;
@@ -63,7 +66,7 @@ namespace NGUAdvisor
         private int Width2 => Math.Max(UiTheme.S(440), _scroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - OuterPad * 2);
 
         private Label Head(string t, Color c) => new Label { Text = t, AutoSize = true, ForeColor = c, Font = UiTheme.Bold };
-        private Button Add() { var b = new Button { Text = "+ Add time breakpoint", Height = UiTheme.S(26), Width = UiTheme.S(170), Font = UiTheme.Ui }; UiTheme.StyleFlat(b); return b; }
+        private Button Add() { var b = new Button { Text = "+ Add time breakpoint", Height = UiTheme.SCtl(26), Width = UiLayout.BtnWidth("+ Add time breakpoint"), Font = UiTheme.Ui }; UiTheme.StyleFlat(b); return b; }
 
         private void AddConsumCard(ProfileModel.StringListBreakpoint bp)
         {
@@ -114,19 +117,21 @@ namespace NGUAdvisor
         private void OnChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
         // shared time chip helpers
-        internal static Label Sep(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+        internal static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
         internal static NumericUpDown Nud(int x, int max)
         {
-            NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Location = new Point(x, UiTheme.S(4)), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
-            UiTheme.StyleNum(n);
+            NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+            UiTheme.StyleNum(n);   // states the height, so centre AFTER it
+            n.Location = new Point(x, (ChipH - n.Height) / 2);
             return n;
         }
 
         internal static Panel TimeChip(NumericUpDown h, NumericUpDown m, NumericUpDown s)
         {
-            var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), UiTheme.S(30)), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
-            chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
-            chip.Controls.Add(Sep("h", UiTheme.S(90))); chip.Controls.Add(Sep("m", UiTheme.S(154))); chip.Controls.Add(Sep("s", UiTheme.S(218)));
+            var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), ChipH), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
+            int chipTextY = (ChipH - UiTheme.LineH) / 2;
+            chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), (ChipH - UiTheme.HeadH) / 2), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
+            chip.Controls.Add(Sep("h", UiTheme.S(90), chipTextY)); chip.Controls.Add(Sep("m", UiTheme.S(154), chipTextY)); chip.Controls.Add(Sep("s", UiTheme.S(218), chipTextY));
             chip.Controls.Add(h); chip.Controls.Add(m); chip.Controls.Add(s);
             return chip;
         }
@@ -155,11 +160,12 @@ namespace NGUAdvisor
                 var strip = new Panel { Dock = DockStyle.Left, Width = UiTheme.S(6), BackColor = UiTheme.Energy };
                 var body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(12), UiTheme.S(10), UiTheme.S(12), UiTheme.S(10)) };
 
-                var header = new Panel { Dock = DockStyle.Top, Height = UiTheme.S(40), BackColor = UiTheme.Surface };
+                var header = new Panel { Dock = DockStyle.Top, Height = CardHeaderH, BackColor = UiTheme.Surface };
                 _h = Nud(UiTheme.S(42), 9999); _m = Nud(UiTheme.S(106), 59); _s = Nud(UiTheme.S(170), 59);
                 header.Controls.Add(TimeChip(_h, _m, _s));
-                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(11)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
-                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiTheme.S(150), Height = UiTheme.S(26), Top = UiTheme.S(4), Font = UiTheme.Ui };
+                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(4) + (ChipH - UiTheme.LineH) / 2), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
+                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiLayout.BtnWidth("🗑  Delete breakpoint"), Height = UiTheme.SCtl(26), Font = UiTheme.Ui };
+                _del.Top = (CardHeaderH - _del.Height) / 2;
                 UiTheme.StyleFlat(_del); _del.ForeColor = UiTheme.Danger;
                 _del.Click += (s, e) => DeleteRequested?.Invoke(this, EventArgs.Empty);
                 header.Controls.Add(_del);
@@ -179,7 +185,7 @@ namespace NGUAdvisor
                 foreach (var kv in SystemCatalog.Consumables)
                 {
                     int x = UiTheme.S(6) + col * colW;
-                    var chk = new CheckBox { Text = $"{kv.Value}", AutoSize = true, Location = new Point(x, rowY + UiTheme.S(4)), Font = UiTheme.Ui, BackColor = UiTheme.Surface };
+                    var chk = new ScaledCheckBox { Text = $"{kv.Value}", AutoSize = true, Location = new Point(x, rowY + UiTheme.S(4)), BackColor = UiTheme.Surface };
                     var amt = new NumericUpDown { Minimum = 1, Maximum = 9999, Width = UiTheme.S(50), Location = new Point(x + UiTheme.S(150), rowY + UiTheme.S(2)), Font = UiTheme.Ui, Enabled = false, TextAlign = HorizontalAlignment.Right };
                     UiTheme.StyleNum(amt);
                     if (have.TryGetValue(kv.Key, out var a2)) { chk.Checked = true; amt.Value = Math.Min(9999, Math.Max(1, a2)); amt.Enabled = true; }
@@ -201,7 +207,7 @@ namespace NGUAdvisor
                 _h.Value = Math.Min(_h.Maximum, bp.Hours); _m.Value = bp.Minutes; _s.Value = bp.Seconds;
                 _loading = false;
 
-                Height = UiTheme.S(20) + UiTheme.S(40) + _gridRows * rowH + UiTheme.S(6);
+                Height = UiTheme.S(20) + CardHeaderH + _gridRows * rowH + UiTheme.S(6);
                 _h.ValueChanged += TimeChanged; _m.ValueChanged += TimeChanged; _s.ValueChanged += TimeChanged;
             }
 
@@ -302,7 +308,7 @@ namespace NGUAdvisor
                 _takesTarget = SystemCatalog.TypeTakesTarget(type);
                 Height = RowHeight; BackColor = UiTheme.Surface;
 
-                _on = new CheckBox { Text = label, AutoSize = true, Location = new Point(0, UiTheme.S(6)), Font = UiTheme.Ui, BackColor = UiTheme.Surface };
+                _on = new ScaledCheckBox { Text = label, AutoSize = true, Location = new Point(0, UiTheme.S(6)), BackColor = UiTheme.Surface };
                 _h = MakeNud(UiTheme.S(240), 999); _m = MakeNud(UiTheme.S(300), 59); _s = MakeNud(UiTheme.S(360), 59);
                 Controls.Add(_on);
                 Controls.Add(new Label { Text = "at", Location = new Point(UiTheme.S(222), UiTheme.S(8)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
@@ -424,9 +430,9 @@ namespace NGUAdvisor
             public ChRow(SystemCatalog.ChallengeInfo info, int from, int to)
             {
                 _code = info.Code;
-                Height = UiTheme.S(26); BackColor = UiTheme.Surface;
+                Height = UiTheme.SNumRow(26); BackColor = UiTheme.Surface;
 
-                Controls.Add(new Label { Text = $"{info.Code} — {info.Label}", Location = new Point(0, UiTheme.S(5)), Size = new Size(UiTheme.S(200), UiTheme.S(20)), Font = UiTheme.Ui, ForeColor = UiTheme.Ink });
+                Controls.Add(new Label { Text = $"{info.Code} — {info.Label}", Location = new Point(0, UiTheme.S(5)), Size = new Size(UiTheme.S(200), UiTheme.SText(20)), Font = UiTheme.Ui, ForeColor = UiTheme.Ink });
                 Controls.Add(new Label { Text = "count", Location = new Point(UiTheme.S(208), UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
                 _from = MakeNud(UiTheme.S(252), info.Cap, from);
                 Controls.Add(_from);

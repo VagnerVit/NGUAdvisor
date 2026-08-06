@@ -21,9 +21,9 @@ namespace NGUAdvisor.Managers
     // zones 5/7 whose in-game chance multiplies a zeroed variable) are deliberately absent:
     // they have no farmable rate.
     //
-    // Rate model mirrors BoostFarmAdvisor: kill cadence ~equal across one-shottable zones
-    // (respawn ~4.5s -> ~800 kills/h), enemy-type mix ~77% normal / ~10% boss. Only zones the
-    // character one-shots (attack >= OPower) and has boss-unlocked compete.
+    // Rate model mirrors BoostFarmAdvisor: kill cadence and the enemy-type mix are measured per zone
+    // and per combat mode by ZoneCadence, off the game's own spawn table. Zones compete when they are
+    // boss-unlocked, killable and survivable; each plan reports the combat mode it was costed at.
     public static class GearFarmAdvisor
     {
         private class Roll
@@ -37,9 +37,6 @@ namespace NGUAdvisor.Managers
             public int[] Items;
         }
 
-        private const double KillsPerHour = 800.0;
-        private const double NormalShare = 0.77;
-        private const double BossShare = 0.10;
         // A zone is "worth farming now" if its slowest uncapped item finishes inside this budget
         // (same hours-scale ruling as the quest capstone hold: forced farm time is cheap).
         private const double TargetHours = 3.0;
@@ -278,9 +275,10 @@ namespace NGUAdvisor.Managers
             public int Zone;
             public string ZoneName;
             public List<int> MissingItems = new List<int>();
-            public double HoursToCap;      // slowest missing item at current DC
+            public double HoursToCap;      // slowest missing item at current DC, at Mode
             public double ReqLootFactor;   // lootFactor that brings HoursToCap inside TargetHours (0 = already there, -1 = no DC can)
             public bool Viable;            // HoursToCap <= TargetHours
+            public int Mode;               // Settings.CombatMode value this plan was costed at
         }
 
         public class Verdict
@@ -311,11 +309,18 @@ namespace NGUAdvisor.Managers
         }
 
         // Per-hour drop rate of one roll at the given (already zone-adjusted) DC factor.
-        private static double RollRate(Roll r, double dcFactor)
+        //
+        // The kill rate is measured per zone and per combat mode by ZoneCadence (from the game's own
+        // spawn table) rather than the old flat 800 kills/h with 77%/10% enemy-type shares: the real
+        // normal share ranges 0.714-0.8125, the boss share is 1/spawn-table-size, and a zone whose
+        // enemies need a second swing farms materially slower.
+        private static double RollRate(Roll r, double dcFactor, ZoneCadence.Estimate est)
         {
             double p = Math.Min(r.Base + r.Chance * dcFactor, r.Cap) / r.Span;
-            double share = r.Boss ? BossShare : r.Normal ? NormalShare : 1.0;
-            return KillsPerHour * share * p;
+            double killsPerSecond = r.Boss ? est.BossKillsPerSecond
+                : r.Normal ? est.NormalKillsPerSecond
+                : est.SecondsPerSpawn > 0 ? 1.0 / est.SecondsPerSpawn : 0.0;
+            return killsPerSecond * 3600.0 * p;
         }
 
         // Zones whose LootDrop function uses lootFactorRooted() (Evil+): the DC factor is the
@@ -327,7 +332,7 @@ namespace NGUAdvisor.Managers
             => RootedZones.Contains(zone) ? Math.Pow(lootFactor, 1.0 / 3.0) : lootFactor;
 
         // Hours until every missing item in the zone is capped, at the given lootFactor.
-        private static double HoursToCap(int zone, Roll[] rolls, List<int> missing, double lootFactor)
+        private static double HoursToCap(int zone, Roll[] rolls, List<int> missing, double lootFactor, ZoneCadence.Estimate est)
         {
             double dc = DcFactor(zone, lootFactor);
             double worst = 0;
@@ -336,7 +341,7 @@ namespace NGUAdvisor.Managers
                 double perHour = 0;
                 foreach (var r in rolls)
                     if (Array.IndexOf(r.Items, id) >= 0)
-                        perHour += RollRate(r, dc);
+                        perHour += RollRate(r, dc, est);
                 if (perHour <= 0) return double.PositiveInfinity;
                 worst = Math.Max(worst, DropsNeeded(id) / perHour);
             }
@@ -352,8 +357,8 @@ namespace NGUAdvisor.Managers
                 if (c == null) return v;
 
                 double lootFactor = c.lootFactor();
-                double attack = ZoneStatHelper.EffectiveAdvAttack();
                 var il = c.inventory.itemList;
+                int[] modes = CombatHelpers.RegularAttackUnlocked() ? new[] { 0, 3 } : new[] { 0 };
 
                 var plans = new List<ZonePlan>();
                 foreach (var kv in Table)
@@ -363,9 +368,26 @@ namespace NGUAdvisor.Managers
                     {
                         if (ZoneHelpers.ZoneIsTitan(zone)) continue;
                         if (zone >= ZoneHelpers.ZoneUnlocks.Length || c.bossID <= ZoneHelpers.ZoneUnlocks[zone]) continue;
-                        // Only one-shottable zones farm at full cadence (same gate as the boost advisor).
-                        if (ZoneStatHelper.UserOverrides != null && ZoneStatHelper.UserOverrides.TryGetValue(zone, out var st))
-                            if (st.OPower > 0 && attack < st.OPower) continue;
+
+                        // Cadence decides viability now, not OPower: a zone we cannot dent (damage
+                        // below enemy regen) or cannot survive is out, and everything else is costed
+                        // at its real kill rate. OPower gated on one-shotting the BOSS, which is only
+                        // the right question for the boss-only rolls — and those already price
+                        // themselves through est.BossKillsPerSecond.
+                        int bestMode = -1;
+                        ZoneCadence.Estimate bestEst = null;
+                        foreach (int mode in modes)
+                        {
+                            ZoneCadence.Estimate e = ZoneCadence.For(zone, mode);
+                            if (!e.Known || !e.Killable || e.SecondsPerSpawn <= 0) continue;
+                            if (!ZoneCadence.Survivable(zone, mode, e)) continue;
+                            if (bestEst == null || e.SecondsPerSpawn < bestEst.SecondsPerSpawn)
+                            {
+                                bestEst = e;
+                                bestMode = mode;
+                            }
+                        }
+                        if (bestEst == null) continue;
 
                         var missing = new List<int>();
                         foreach (var id in kv.Value.SelectMany(r => r.Items).Distinct())
@@ -384,15 +406,16 @@ namespace NGUAdvisor.Managers
                             Zone = zone,
                             ZoneName = ZoneHelpers.ZoneList.TryGetValue(zone, out var n) ? n : $"Zone {zone}",
                             MissingItems = missing,
-                            HoursToCap = HoursToCap(zone, kv.Value, missing, lootFactor)
+                            Mode = bestMode,
+                            HoursToCap = HoursToCap(zone, kv.Value, missing, lootFactor, bestEst)
                         };
                         plan.Viable = plan.HoursToCap <= TargetHours;
 
                         // Required lootFactor for the budget: rates are monotonic in DC, so binary
                         // search; if even a huge DC can't cap in budget (roll caps), report -1.
                         if (plan.Viable) plan.ReqLootFactor = 0;
-                        else if (double.IsInfinity(HoursToCap(zone, kv.Value, missing, lootFactor * 1e9))
-                            || HoursToCap(zone, kv.Value, missing, lootFactor * 1e9) > TargetHours)
+                        else if (double.IsInfinity(HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst))
+                            || HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst) > TargetHours)
                             plan.ReqLootFactor = -1;
                         else
                         {
@@ -400,7 +423,7 @@ namespace NGUAdvisor.Managers
                             for (int i = 0; i < 60; i++)
                             {
                                 double mid = Math.Sqrt(lo * hi);   // geometric: the range spans decades
-                                if (HoursToCap(zone, kv.Value, missing, mid) <= TargetHours) hi = mid;
+                                if (HoursToCap(zone, kv.Value, missing, mid, bestEst) <= TargetHours) hi = mid;
                                 else lo = mid;
                             }
                             plan.ReqLootFactor = hi;

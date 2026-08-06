@@ -606,8 +606,8 @@ namespace NGUAdvisor.Managers
                     // run (diggers need gold income to cover their drain; user-caught: no TM feed → grossGold
                     // stays 0 → diggers never turn on), best augment → AT (EV-exploder) → NGUs; magic feeds
                     // Wandoos then Number. TM/Wandoos CAP tokens self-skip while still locked.
-                    if (e) { list.Add("CAPALLBT"); list.Add("CAPTM:5"); list.Add("CAPWAN:40"); list.Add("BESTAUG"); list.Add("CAPALLAT"); }
-                    else { list.Add("CAPWAN:40"); list.Add("NGU-3"); }   // magic: Wandoos (when unlocked) then Number NGU
+                    if (e) { list.Add("CAPALLBT"); list.Add("CAPTM:5"); list.Add("CAPWAN:30"); list.Add("BESTAUG"); list.Add("CAPALLAT"); }
+                    else { list.Add("CAPWAN:30"); list.Add("NGU-3"); }   // magic: Wandoos (when unlocked) then Number NGU
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;
                 case "AUGMENTATION":
@@ -624,27 +624,27 @@ namespace NGUAdvisor.Managers
                     // AT has its own hour, and BT energy persists once capped.
                     if (e) list.Add("CAPALLBT");
                     list.Add("CAPTM:30");
-                    list.Add("CAPWAN:40");
+                    list.Add("CAPWAN:30");
                     if (e) list.Add("BESTAUG");
                     break;
                 case "RECOVERY":
                     if (e) list.Add("CAPALLBT");   // cheap caps first (adventure stats for the push)
                     list.Add("CAPTM:5");
-                    list.Add("CAPWAN:40");
+                    list.Add("CAPWAN:30");
                     if (e) { list.Add("BESTAUG"); list.Add("CAPALLAT"); }
                     else list.Add("NGU-3");   // D3: the Number NGU IS the number-growth allocation
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;
                 case "AT HOUR":
-                    if (e) { list.Add("CAPALLAT"); list.Add("CAPWAN:40"); list.Add("BESTAUG"); }
-                    else { list.Add("CAPTM:5"); list.Add("CAPWAN:40"); }
+                    if (e) { list.Add("CAPALLAT"); list.Add("CAPWAN:30"); list.Add("BESTAUG"); }
+                    else { list.Add("CAPTM:5"); list.Add("CAPWAN:30"); }
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;
                 default:
                     // NGU MARATHON — hot NGU lanes get their full equal shares (the old plain
                     // BESTAUG/CAPALLAT here stole equal shares from them; augs/AT have their hours).
                     list.Add("CAPTM:5");
-                    list.Add("CAPWAN:60");
+                    list.Add("CAPWAN:30");
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     // SURPLUS ABSORBERS (user 2026-07-11: 4.7B of a 5.4B pool sat idle once the
                     // hot lanes took their caps — the game hard-caps each NGU at ONE level per

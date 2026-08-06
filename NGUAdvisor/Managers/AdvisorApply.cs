@@ -774,6 +774,20 @@ namespace NGUAdvisor.Managers
             if ((DateTime.UtcNow - _lastZoneCheck).TotalMinutes < 10) return;
             _lastZoneCheck = DateTime.UtcNow;
 
+            // Adventure combat mode for the farm park the advisor is about to route to. Idle pays a
+            // full attackSpeed of spawn latency on EVERY kill (AdventureController zeroes
+            // idleAttackTimer when the enemy spawns and only advances it mid-fight), while a manual
+            // mode lands the opening swing on the spawn frame because moveTimer keeps running through
+            // the respawn — up to 2x the kills per hour. The farm advisors return the mode their rate
+            // was costed at; honouring it is what makes the recommendation real.
+            void ApplyFarmCombatMode(int mode, string forWhat)
+            {
+                if (mode < 0 || mode > 3) return;
+                if (Main.Settings.CombatMode == mode) return;
+                Main.Settings.CombatMode = mode;
+                Main.Log($"Advisor: adventure combat -> {BoostFarmAdvisor.ModeName(mode)} (fastest for {forWhat})");
+            }
+
             // Farm Gear Zones outranks the boost farm: every capped item is a PERMANENT item-list
             // bonus, and only zones that finish inside the advisor's time budget qualify.
             if (Main.Settings.AdvisorFarmGear)
@@ -781,6 +795,7 @@ namespace NGUAdvisor.Managers
                 var g = GearFarmAdvisor.Analyze();
                 if (g.Known && g.Best != null)
                 {
+                    ApplyFarmCombatMode(g.Best.Mode, g.Best.ZoneName);
                     if (Main.Settings.SnipeZone != g.Best.Zone)
                     {
                         Main.Settings.SnipeZone = g.Best.Zone;
@@ -792,9 +807,10 @@ namespace NGUAdvisor.Managers
 
             var v = BoostFarmAdvisor.Analyze();
             if (!v.Known) return;
+            ApplyFarmCombatMode(v.BestMode, v.BestName);
             int target = v.BestZone == -1000 ? 1000 : v.BestZone;
             string name = v.BestName;
-            string detail = $"{v.BestRate:0.##} boost-value/kill";
+            string detail = $"{v.BestRate:0.###} boost/s";
             // Farm Best Boost: boost zones only beat the ITOPOD while something consumes boosts.
             if (Main.Settings.AdvisorFarmBoost && target != 1000 && !BoostFarmAdvisor.BoostDemandExists(out var why))
             {

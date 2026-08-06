@@ -9,11 +9,26 @@ namespace NGUAdvisor.Managers
     // for the early zones; ITOPOD from itopodDrop: flat 14% chance (NOT drop-chance scaled), boost
     // tier laddered from floor tier (one tier per 50 floors).
     //
-    // Value model: boost-value per kill = sum(value_i * min(chance_i * dcFactor, 1)) * normal-enemy%.
-    // dcFactor = lootFactor() for Normal zones, lootFactor()^(1/3) for Evil+ zones (the game's
-    // lootChanceDisplayRooted marks them). Kill cadence is ~equal across one-shottable zones (idle
-    // attack + respawn), so ranking per-kill is ranking per-second; only one-shottable (attack >=
-    // zone OPower) and boss-unlocked zones compete.
+    // Rate model — boost POINTS PER SECOND, not per kill:
+    //
+    //   rate = sum_rolls min(chance_i * dcFactor, cap_i) * BoostSinks.ValueOfDrop(tier_i)
+    //          * ZoneCadence.NormalKillsPerSecond(zone, mode)
+    //
+    // dcFactor = lootFactor() for Normal zones, lootFactor()^(1/3) for Evil+ (the game's
+    // lootChanceDisplayRooted marks them; verified: zones 20-45 use lootFactorRooted()).
+    //
+    // Three things this deliberately does NOT simplify any more, because each one changed the
+    // ranking:
+    //
+    //  1. A dropped boost is priced by what it can actually absorb (BoostSinks): overflow past a
+    //     gear channel's cap is destroyed, the cube is a sqrt-diminishing soft sink, and the
+    //     recycling chain adds the lower tiers back. A flat "tier value" over-priced high tiers.
+    //  2. Kill cadence is measured per zone (ZoneCadence) from the game's own spawn table, per
+    //     combat mode, including multi-hit enemies, enemy regen and paralyzer downtime. The old
+    //     "cadence is ~equal across one-shottable zones" shortcut both hid the ~2x idle/offensive
+    //     gap and excluded every zone that needs a second swing.
+    //  3. Zones are gated on killing NORMAL enemies (the only enemyType that rolls boosts) and on
+    //     surviving the zone — not on OPower, which is calibrated on the boss.
     public static class BoostFarmAdvisor
     {
         private class ZoneBoost
@@ -23,8 +38,6 @@ namespace NGUAdvisor.Managers
             public bool Rooted;
         }
 
-        private const double NormalEnemyShare = 0.77;
-
         private static readonly ZoneBoost[] Table =
         {
             // Zones 0-18: extracted VERBATIM from LootDrop.zoneNDrop (value = boost-tier value,
@@ -32,6 +45,10 @@ namespace NGUAdvisor.Managers
             // The old table lacked caps AND undervalued mid zones (user-reported: the Almanac ranked
             // Badly Drawn World 56.4 over A Very Strange Place 23.6 while we said the reverse — at
             // high drop chance AVSP saturates at its 0.25 cap while BDW's T7+T8 values keep going).
+            // Zones 0 and 1 fire a single uncapped tier-1 roll — dominated by zone 2 in practice,
+            // but they belong here so the table is the whole truth rather than the useful part.
+            new ZoneBoost { Zone = 0, Rolls = new[] { new[] { 1.0, 0.15, 1.0 } } },
+            new ZoneBoost { Zone = 1, Rolls = new[] { new[] { 1.0, 0.15, 1.0 } } },
             new ZoneBoost { Zone = 2, Rolls = new[] { new[] { 1.0, 0.12, 1.0 }, new[] { 2.0, 0.08, 1.0 } } },
             new ZoneBoost { Zone = 3, Rolls = new[] { new[] { 1.0, 0.13, 1.0 }, new[] { 2.0, 0.12, 1.0 } } },
             new ZoneBoost { Zone = 4, Rolls = new[] { new[] { 5.0, 0.08, 1.0 }, new[] { 2.0, 0.08, 1.0 } } },
@@ -57,7 +74,10 @@ namespace NGUAdvisor.Managers
             // NOTE: this materially changes Evil boost-farm vs ITOPOD recommendations — validate in-game.
             new ZoneBoost { Zone = 20, Rolls = new[] { new[] { 200.0, 0.00055, 0.1 }, new[] { 500.0, 0.00055, 0.1 } }, Rooted = true },
             new ZoneBoost { Zone = 21, Rolls = new[] { new[] { 200.0, 0.00012, 0.1 }, new[] { 500.0, 0.00012, 0.1 } }, Rooted = true },
-            new ZoneBoost { Zone = 22, Rolls = new[] { new[] { 500.0, 0.0001, 0.08 }, new[] { 1000.0, 0.0001, 0.08 } }, Rooted = true },
+            // Zone 22's two rolls do NOT share a cap — zone22Drop caps roll 1 at 0.08f and roll 2 at
+            // 0.06f. We had 0.08 on both, which over-priced PPPL by up to 25% at high drop chance
+            // (the 1000-value roll is two thirds of the zone's total). The Almanac had this right.
+            new ZoneBoost { Zone = 22, Rolls = new[] { new[] { 500.0, 0.0001, 0.08 }, new[] { 1000.0, 0.0001, 0.06 } }, Rooted = true },
             new ZoneBoost { Zone = 24, Rolls = new[] { new[] { 1000.0, 5E-05, 0.07 }, new[] { 2000.0, 5E-05, 0.07 } }, Rooted = true },
             new ZoneBoost { Zone = 25, Rolls = new[] { new[] { 1000.0, 3E-05, 0.08 }, new[] { 2000.0, 3E-05, 0.08 } }, Rooted = true },
             new ZoneBoost { Zone = 27, Rolls = new[] { new[] { 1000.0, 2.2E-05, 0.09 }, new[] { 2000.0, 2.2E-05, 0.09 } }, Rooted = true },
@@ -75,16 +95,15 @@ namespace NGUAdvisor.Managers
             new ZoneBoost { Zone = 43, Rolls = new[] { new[] { 10000.0, 1E-08, 0.17 }, new[] { 10000.0, 1E-08, 0.17 } }, Rooted = true },
         };
 
-        // ITOPOD boost tier ladder (itopodDrop): tier index into the 13 boost values, from floor/50.
-        private static readonly double[] BoostValues = { 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000 };
-
         public struct Verdict
         {
             public bool Known;
             public int BestZone;          // -1000 = ITOPOD
             public string BestName;
-            public double BestRate;       // boost-value per kill
-            public double ItopodRate;
+            public double BestRate;       // boost points per SECOND, at BestMode
+            public double ItopodRate;     // ditto, for ITOPOD at its optimal floor
+            public int BestMode;          // Settings.CombatMode value that produced BestRate
+            public double RateAtCurrentMode;
             public string Text;
         }
 
@@ -125,6 +144,45 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // Boost points a single NORMAL kill in this zone is expected to yield, priced through the
+        // live sinks. The type split (1/3 Power, 1/3 Toughness, 1/3 Special) and the recycling chain
+        // both live in BoostSinks.ValueOfDrop.
+        private static double ValuePerNormalKill(ZoneBoost z, double dc, double dcRoot, BoostSinks.Sinks sinks)
+        {
+            double factor = z.Rooted ? dcRoot : dc;
+            double total = 0;
+            foreach (var roll in z.Rolls)
+            {
+                double cap = roll.Length > 2 ? roll[2] : 1.0;
+                double p = BoostValueMath.RollProbability(roll[1], factor, cap);
+                int tier = BoostValueMath.TierOfValue(roll[0]);
+                total += p * BoostSinks.ValueOfDrop(tier, sinks);
+            }
+            return total;
+        }
+
+        // The combat modes worth comparing for a farm park: Idle and Offensive. Snipe (1) waits out
+        // pre-casts and Defensive (2) inserts WaitFor stalls, so neither can beat Offensive on
+        // throughput; mode 4 is not reachable from the Adventure dropdown.
+        private static int[] CandidateModes()
+            => CombatHelpers.RegularAttackUnlocked() ? new[] { 0, 3 } : new[] { 0 };
+
+        // ITOPOD boost points per second at the floor the given mode can hold. The floor -> tier
+        // ladder and its bends are ITOPODManager's knowledge, not ours.
+        private static double ItopodRate(int combatMode, BoostSinks.Sinks sinks)
+        {
+            int floor = ITOPODManager.OptimalFloorForMode(combatMode);
+            int tier = Math.Max(1, Math.Min(floor / 50 + 1, 24));
+            int idx = tier >= 24 ? 13 : tier >= 18 ? 12 : tier >= 15 ? 11 : tier > 10 ? 10 : tier;
+            double perKill = 0.14 * BoostSinks.ValueOfDrop(idx, sinks);
+
+            // At its optimal floor every ITOPOD enemy dies to one swing, and the pod has no bosses,
+            // so the cycle is the bare spawn-plus-swing loop.
+            double cycle = BoostValueMath.CycleSeconds(ZoneCadence.IsIdle(combatMode),
+                CombatHelpers.BaseRespawnTime(), ZoneCadence.SwingSeconds(combatMode), 1.0);
+            return cycle > 0 ? perKill / cycle : 0;
+        }
+
         public static Verdict Analyze()
         {
             var v = new Verdict { BestZone = int.MinValue };
@@ -135,62 +193,104 @@ namespace NGUAdvisor.Managers
 
                 double dc = c.lootFactor();
                 double dcRoot = Math.Pow(dc, 1.0 / 3.0);
-                double attack = c.totalAdvAttack();
+                BoostSinks.Sinks sinks = BoostSinks.Current();
+                int[] modes = CandidateModes();
+                int currentMode = Main.Settings?.CombatMode ?? 0;
 
                 double bestRate = 0;
                 int bestZone = -1;
+                int bestMode = currentMode;
+                double bestAtCurrentMode = 0;
+
                 foreach (var z in Table)
                 {
                     try
                     {
                         // Unlocked = boss requirement met (ZoneHelpers.ZoneUnlocks, indexed by zone).
                         if (z.Zone >= ZoneHelpers.ZoneUnlocks.Length || c.bossID <= ZoneHelpers.ZoneUnlocks[z.Zone]) continue;
-                        if (ZoneStatHelper.UserOverrides != null && ZoneStatHelper.UserOverrides.TryGetValue(z.Zone, out var st))
+
+                        double perKill = ValuePerNormalKill(z, dc, dcRoot, sinks);
+                        if (perKill <= 0) continue;   // nothing this zone drops can be absorbed
+
+                        foreach (int mode in modes)
                         {
-                            if (st.OPower > 0 && attack < st.OPower) continue;   // not one-shottable idle
-                        }
-                        double factor = z.Rooted ? dcRoot : dc;
-                        double rate = 0;
-                        foreach (var roll in z.Rolls)
-                        {
-                            double cap = roll.Length > 2 ? roll[2] : 1.0;
-                            rate += roll[0] * Math.Min(roll[1] * factor, cap);
-                        }
-                        rate *= NormalEnemyShare;
-                        if (rate > bestRate)
-                        {
-                            bestRate = rate;
-                            bestZone = z.Zone;
+                            ZoneCadence.Estimate est = ZoneCadence.For(z.Zone, mode);
+                            if (!est.Known || !est.Killable) continue;
+                            if (!ZoneCadence.Survivable(z.Zone, mode, est)) continue;
+
+                            double rate = perKill * est.NormalKillsPerSecond;
+                            if (rate > bestRate)
+                            {
+                                bestRate = rate;
+                                bestZone = z.Zone;
+                                bestMode = mode;
+                            }
                         }
                     }
-                    catch { }
+                    catch (Exception e) { Main.LogDebug($"BoostFarm zone {z.Zone}: {e.Message}"); }
                 }
 
-                // ITOPOD at the OPTIMAL floor: tier = floor/50, laddered into the boost-value table.
-                double idleAttack = attack * c.idleAttackPower();
-                int optFloor = idleAttack > ItopodConstants.FloorHpNormalizer ? (int)Math.Floor(Math.Log(idleAttack / ItopodConstants.FloorHpNormalizer, ItopodConstants.FloorGrowthBase)) : 0;
-                int tier = Math.Max(1, Math.Min(optFloor / 50 + 1, 24));
-                int idx = tier >= 24 ? 13 : tier >= 18 ? 12 : tier >= 15 ? 11 : tier > 10 ? 10 : tier;
-                v.ItopodRate = 0.14 * BoostValues[idx - 1];
+                // Re-price the winner at the mode actually configured, so the UI can say what the
+                // current setting costs instead of only what the best one earns.
+                if (bestZone >= 0)
+                {
+                    ZoneCadence.Estimate cur = ZoneCadence.For(bestZone, currentMode);
+                    if (cur.Known && cur.Killable && ZoneCadence.Survivable(bestZone, currentMode, cur))
+                    {
+                        ZoneBoost zb = Array.Find(Table, t => t.Zone == bestZone);
+                        if (zb != null)
+                            bestAtCurrentMode = ValuePerNormalKill(zb, dc, dcRoot, sinks) * cur.NormalKillsPerSecond;
+                    }
+                }
+
+                double itopodBest = 0;
+                int itopodMode = currentMode;
+                foreach (int mode in modes)
+                {
+                    double r = ItopodRate(mode, sinks);
+                    if (r > itopodBest) { itopodBest = r; itopodMode = mode; }
+                }
+                v.ItopodRate = itopodBest;
 
                 v.Known = true;
-                if (bestZone >= 0 && bestRate > v.ItopodRate)
+                if (bestZone >= 0 && bestRate > itopodBest)
                 {
                     v.BestZone = bestZone;
                     v.BestName = ZoneHelpers.ZoneList.TryGetValue(bestZone, out var n) ? n : $"Zone {bestZone}";
                     v.BestRate = bestRate;
-                    v.Text = $"Best boost farm: {v.BestName} (~{bestRate:0.##} boost-value/kill vs ITOPOD {v.ItopodRate:0.##})";
+                    v.BestMode = bestMode;
+                    v.RateAtCurrentMode = bestAtCurrentMode;
+                    v.Text = $"Best boost farm: {v.BestName} in {ModeName(bestMode)} (~{bestRate:0.###} boost/s vs ITOPOD {itopodBest:0.###})";
                 }
                 else
                 {
                     v.BestZone = -1000;
                     v.BestName = "ITOPOD";
-                    v.BestRate = v.ItopodRate;
-                    v.Text = $"Best boost farm: ITOPOD (~{v.ItopodRate:0.##} boost-value/kill beats every one-shottable zone)";
+                    v.BestRate = itopodBest;
+                    v.BestMode = itopodMode;
+                    v.RateAtCurrentMode = ItopodRate(currentMode, sinks);
+                    // Bosses roll no boosts, so Bosses Only makes every adventure zone worth exactly
+                    // zero. Say so — otherwise the verdict reads as a drop-chance problem.
+                    bool bossOnly = Main.Settings != null && Main.Settings.SnipeBossOnly;
+                    v.Text = bossOnly && bestRate <= 0
+                        ? $"Best boost farm: ITOPOD in {ModeName(itopodMode)} (~{itopodBest:0.###} boost/s) — Bosses Only zeroes every zone, bosses drop no boosts"
+                        : $"Best boost farm: ITOPOD in {ModeName(itopodMode)} (~{itopodBest:0.###} boost/s beats every farmable zone)";
                 }
                 return v;
             }
             catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor: {e.Message}"); return v; }
+        }
+
+        public static string ModeName(int mode)
+        {
+            switch (mode)
+            {
+                case 0: return "Idle";
+                case 1: return "Snipe";
+                case 2: return "Defensive";
+                case 3: return "Offensive";
+                default: return $"mode {mode}";
+            }
         }
     }
 }

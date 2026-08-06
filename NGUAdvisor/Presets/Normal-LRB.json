@@ -6,7 +6,7 @@
       { "Time": 0, "Priorities": [ "CAPALLBT", "CAPALLAT", "BESTAUG:25", "NGU-4", "NGU-5" ] }
     ],
     "Magic": [
-      { "Time": 0, "Priorities": [ "BR:25", "NGU-0" ] }
+      { "Time": 0, "Priorities": [ "BR:75", "NGU-0" ] }
     ],
     "R3": [ { "Time": 0, "Priorities": [] } ],
     "Gear": [

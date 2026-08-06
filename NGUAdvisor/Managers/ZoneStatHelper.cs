@@ -97,6 +97,16 @@ namespace NGUAdvisor.Managers
             return c.totalAdvAttack() / Math.Max(1f, c.adventureController.beastModeBonus());
         }
 
+        // Attack that guarantees a one-shot of this zone's hardest spawn. Measured off the game's own
+        // enemy table; the zone table's OPower column is only the fallback for when that read fails,
+        // because it mixes three conventions and is up to 18x too low in the late Evil zones.
+        public static double OneShotPower(int zone)
+        {
+            double live = ZoneCadence.RawOneShotPower(zone);
+            if (live > 0) return live;
+            return UserOverrides != null && UserOverrides.TryGetValue(zone, out var st) ? st.OPower : 0;
+        }
+
         // FightType of one specific zone at current stats (2 for zones we have no data on, so
         // unknown zones never block progress).
         public static int ZoneFightType(int zone)
@@ -104,7 +114,7 @@ namespace NGUAdvisor.Managers
             if (UserOverrides == null || !UserOverrides.TryGetValue(zone, out var st))
                 return 2;
             float power = EffectiveAdvAttack();
-            return st.FightType(power, Main.Character.totalAdvDefense());
+            return st.FightType(power, Main.Character.totalAdvDefense(), OneShotPower(zone));
         }
 
         public static ZoneTarget GetBestZone()
@@ -132,7 +142,7 @@ namespace NGUAdvisor.Managers
             {
                 if (kvp.Key > maxReachable)
                     continue;
-                int ft = kvp.Value.FightType(power, toughness);
+                int ft = kvp.Value.FightType(power, toughness, OneShotPower(kvp.Key));
                 if (ft < fightType)
                     continue;
                 if (!found || kvp.Key > bestZoneId)
@@ -522,12 +532,16 @@ namespace NGUAdvisor.Managers
 
         public string Name { get; set; }
 
-        public int FightType(float attack, float def)
+        // `oneShotPower` is the attack that guarantees a one-shot, measured live off the game's enemy
+        // table (ZoneCadence.RawOneShotPower) with the OPower column as fallback. It is a PARAMETER
+        // rather than a read of OPower because that column mixes three incompatible conventions — see
+        // the derivation comment on ZoneCadence.RawOneShotPower.
+        public int FightType(float attack, float def, double oneShotPower)
         {
             // 2 Means we can use fast combat
             // 1 means we need to precast buffs
             // 0 Means we cant do the zone
-            if (attack > OPower)
+            if (oneShotPower > 0 && attack > oneShotPower)
                 return 2;
             if (attack >= IPower && def >= IToughness)
                 return 2;

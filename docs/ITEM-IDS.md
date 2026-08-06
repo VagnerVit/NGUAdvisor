@@ -8,9 +8,13 @@ Regenerate with `build/gen-item-ids.sh`.
 
 ## 1-39: boosts (NOT gear)
 
-Reconstructed from the boost ladder in `Managers/BoostFarmAdvisor.cs:79` plus the id anchors in the
-comment at `:54-55` ("id 8 = Power Boost 200, id 9 = 500", "id stays 13/26/39" for the 10K ceiling):
+**Verified against the game**, no longer reconstructed: `ItemNameDesc` assigns
+`itemName[1] = "Power Boost 1"` .. `itemName[13] = "Power Boost 10K"`,
+`itemName[14] = "Toughness Boost 1"`, `itemName[26] = "Defense boost 10K"`,
+`itemName[27] = "Special Boost 1"`, `itemName[39] = "Special boost 10K"`,
+`itemName[40] = "Crappy Helmet"` -- so gear really does start at 40.
 13 value tiers x 3 boost types, `id = tierIndex + 1` for Power, `+13` Toughness, `+26` Special.
+The ladder itself lives in `Managers/BoostValueMath.cs`.
 
 Cross-checked against `GearFarmAdvisor`'s Normal-branch rolls, which carry identical chance and cap
 values per zone: Forest (id 1/2 = value 1/2), The Sky (id 3 = 5), The 2D Universe (id 4/5 = 10/20),

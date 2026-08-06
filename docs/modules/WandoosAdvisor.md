@@ -24,4 +24,45 @@ each OS's A/D bonus over a run-matched window and recommends the best.
 - `RunHorizonMinutes()`: remaining time to the profile's time-based rebirth target, clamped
   10 m–4 h; 120 m when no rebirth target (NORB/LRB).
 
-Consumers: the Wandoos auto-switch + Systems HUD line (`Advantage` = best/current bonus ratio).
+## `DumpWorthwhile(energy, alloc, minMultiplier = 10)` — the lane's right to exist
+
+`WandoosBP.TargetMet()` asks this instead of the old hardcoded `false` that made the lane a
+leftovers black hole (AllocationProfiles.md §WAN). Projects `alloc` at full-boot speed on the
+CURRENT OS and answers whether the resulting levels clear `minMultiplier` A/D.
+
+**Bosses gained = `log10(A/D multiplier)`** — boss requirements grow ~10× per boss (`bossAttack`
+1.98e72 at boss 74 vs 1.98e77 at boss 79), the same arithmetic AllocationProfiles.md uses. Hence
+the 10× default = one boss = the smallest unit of progress the A/D lever exists to buy.
+
+Two deliberate choices, both forced by the dump being **wiped at rebirth** — the question is "should
+this run carry a Wandoos lane at all?", which has one answer per run:
+
+- **Whole run, not the remainder** (`RunSeconds()`, same 10 m–4 h clamp / 120 m default as
+  `RunHorizonMinutes()`).
+- **From level 0, not marginally over banked levels.** A marginal read retires the lane ~30 s after
+  the rebirth on any concave bonus: at 1 805 levels/run the break-even sits at **8 banked levels**,
+  however well the lane pays over the run. Measured during implementation, not assumed.
+
+**Why not a fixed rate/allocation threshold** (the obvious cheaper design): levels-per-10× spans
+three orders of magnitude across the OSs — 98 needs ~1 678 energy levels, MEH ~45, XL ~2 — so a
+constant tuned on 98 silently retires a good MEH/XL dump. `baseTime` moves the opposite way
+(1e9/1e12/1e15), so only the full formula gets both right.
+
+Verified numerically against the ch.3 Normal measurement in AllocationProfiles.md (cap 5 571 250,
+speed 3.0):
+
+| case | levels/run | bonus | bosses | verdict |
+|---|---|---|---|---|
+| 98, `CAPWAN:30`, 2 h | 1 805 | 10.6× | 1.02 | lives (just clears) |
+| 98, `CAPWAN:30`, 4 h | 3 610 | 18.0× | 1.26 | lives |
+| MEH, `CAPWAN:30`, 2 h | 2 | 1.4× | 0.13 | retired |
+| XL, `CAPWAN:30`, 2 h | 0 | 1.0× | 0.00 | retired |
+| 98 Evil (`baseTime` 1e21), cap 1e9 | 0 | 1.0× | 0.00 | retired |
+
+Any unreadable input (no character, `boot < 0.02`, exception) answers **TRUE** — never retire a lane
+on a failed read. `WandoosBP` additionally skips the whole check when
+`OptimizationAdvisor.WandoosIsPowerSource()` is true (challenge block / NORB / NOAUG /
+gold-starved), where the dump earns its lane however slow it looks.
+
+Consumers: the Wandoos auto-switch + Systems HUD line (`Advantage` = best/current bonus ratio), and
+`WandoosBP.TargetMet()` via `DumpWorthwhile`.

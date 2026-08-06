@@ -531,10 +531,12 @@ namespace NGUAdvisor
             {
                 var v = BoostFarmAdvisor.Analyze();
                 if (!v.Known) { _boostLine1.Text = "…"; return; }
-                _boostLine1.Text = $"Best boost farm: {v.BestName}";
+                _boostLine1.Text = $"Best boost farm: {v.BestName} in {BoostFarmAdvisor.ModeName(v.BestMode)}";
                 string line2 = v.BestZone == -1000
-                    ? $"~{v.ItopodRate:0.##} boost-value/kill at the optimal floor — beats every one-shottable zone"
-                    : $"~{v.BestRate:0.##} boost-value/kill (ITOPOD {v.ItopodRate:0.##}) — updates with your drop chance";
+                    ? $"~{v.ItopodRate:0.###} boost/s at the optimal floor — beats every farmable zone"
+                    : $"~{v.BestRate:0.###} boost/s (ITOPOD {v.ItopodRate:0.###}) — priced against your gear/cube headroom";
+                if (v.RateAtCurrentMode > 0 && v.BestRate > v.RateAtCurrentMode * 1.02)
+                    line2 += $" · your current {BoostFarmAdvisor.ModeName(Settings?.CombatMode ?? 0)} gets {v.RateAtCurrentMode:0.###} ({v.BestRate / v.RateAtCurrentMode:0.##}x slower)";
                 if (Settings != null && Settings.AdvisorFarmBoost && !BoostFarmAdvisor.BoostDemandExists(out var why))
                     line2 += $" · no demand ({why}) — ITOPOD wins";
                 UiLayout.FitOrGrow(_boostLine2, line2, 2);

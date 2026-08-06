@@ -489,11 +489,26 @@ namespace NGUAdvisor.Managers
 
         // Owner-draw a TabControl's tabs so the SELECTED tab is obvious in dark mode (the OS renders the tab
         // strip dark-on-dark otherwise). Selected = accent fill + white bold; others = surface + muted.
+        // Call this AFTER the pages exist - the strip width is derived from the captions.
         public static void OwnerDrawTabs(TabControl tc)
         {
+            if (tc == null) return;
             try
             {
                 tc.DrawMode = TabDrawMode.OwnerDrawFixed;
+
+                // A TabControl sizes its own strip from Font.Height - the 96-DPI ~15px value, the same trap
+                // ComboBox and NumericUpDown fall into. The captions then paint at the real DPI into a band
+                // built for a third of that, so the strip shows a horizontal slice of its own labels. There
+                // is no property for the measured height, so state the size: SizeMode.Fixed + ItemSize.
+                // Width comes from the widest caption measured in Bold, because the SELECTED tab draws bold
+                // and bold is the wider of the two - sizing to Ui would ellipsize whichever tab is active.
+                int w = S(56);
+                foreach (TabPage p in tc.TabPages)
+                    w = Math.Max(w, UiLayout.MeasureText(p.Text, Bold) + S(18));
+                tc.SizeMode = TabSizeMode.Fixed;
+                tc.ItemSize = new Size(w, SCtl(22));
+
                 tc.DrawItem -= TabDraw;
                 tc.DrawItem += TabDraw;
             }

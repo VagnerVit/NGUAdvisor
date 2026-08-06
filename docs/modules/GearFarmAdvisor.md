@@ -27,13 +27,25 @@ P(per kill) = min(Base + Chance × dcFactor, Cap), then 1-of-Span outcomes
 - `Cap` matters: some items can NEVER cap inside a time budget no matter the DC (the "roll caps
   hold them past budget" verdict) — the honest-answer branch in `Analyze`.
 
-## Rate model (shared with BoostFarmAdvisor)
+## Rate model (shared with BoostFarmAdvisor via `ZoneCadence`)
 
-`KillsPerHour = 800` (respawn ~4.5 s, one-shottable zones), enemy mix ~77 % normal / 10 % boss.
-Only zones the character one-shots (`EffectiveAdvAttack() >= OPower` from
-`ZoneStatHelper.UserOverrides`) and has boss-unlocked (`bossID > ZoneUnlocks[zone]`) compete.
-Titan zones excluded. `TargetHours = 3.0` — the "worth farming now" budget (same hours-scale
-ruling as the quest capstone hold).
+Kill rate and enemy mix are **measured per zone and per combat mode** off the game's own spawn table —
+see `ZoneCadence.md`. `RollRate` picks `est.NormalKillsPerSecond`, `est.BossKillsPerSecond` or
+`1/est.SecondsPerSpawn` according to which enemy-type branch the roll fires in, and multiplies by 3600.
+
+This replaced `KillsPerHour = 800` with `~77 % normal / 10 % boss` shares. All three were wrong: the
+real normal share ranges 0.7143–0.8125, the boss share is `1 / spawnTableSize`, and zones whose enemies
+need a second swing farm materially slower.
+
+Zones compete when they are boss-unlocked (`bossID > ZoneUnlocks[zone]`), **killable** (damage per swing
+outpaces enemy regen) and **survivable**. Titan zones excluded. The OPower one-shot gate is gone: it is
+calibrated on the boss, and boss-only rolls now price themselves correctly through
+`est.BossKillsPerSecond` — a boss that takes 40 swings collapses its own rolls' rate instead of being
+excluded or counted at full speed.
+
+Each `ZonePlan` carries the `Mode` it was costed at, and `AdvisorApply.ApplyZones` applies it to
+`Settings.CombatMode` before routing. `TargetHours = 3.0` — the "worth farming now" budget (same
+hours-scale ruling as the quest capstone hold).
 
 ## Analysis details
 

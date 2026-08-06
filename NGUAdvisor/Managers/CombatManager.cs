@@ -172,7 +172,16 @@ namespace NGUAdvisor.Managers
                 if (zone < 0 || zone >= 1000 || ZoneHelpers.ZoneIsTitan(zone)) return fallback;
                 if (ZoneStatHelper.UserOverrides == null || !ZoneStatHelper.UserOverrides.TryGetValue(zone, out var st)) return fallback;
                 float attack = ZoneStatHelper.EffectiveAdvAttack();
-                if (st.OPower > 0 && attack > st.OPower) return Math.Min(fallback, 0.2f);
+                // One-shotting every spawn is what makes 0.2 safe, and it is mode-dependent: a manual
+                // swing carries regAttackMulti and the offensive buffs, so it clears zones idle cannot.
+                // Measured live (ZoneCadence) rather than read off the OPower column, which is up to
+                // 18x too low in the late Evil zones and would relax entry HP in a zone that kills us.
+                int mode = IsCurrentlyAdventuring ? Settings.CombatMode
+                    : IsCurrentlyQuesting ? Settings.QuestCombatMode
+                    : IsCurrentlyFightingTitan ? Settings.TitanCombatMode : 2;
+                if (ZoneCadence.OneShotsEverySpawn(zone, mode)) return Math.Min(fallback, 0.2f);
+                bool measured = ZoneCadence.OneShotPowerForMode(zone, mode, false) > 0;
+                if (!measured && st.OPower > 0 && attack > st.OPower) return Math.Min(fallback, 0.2f);
                 if (attack >= st.IPower && _character.totalAdvDefense() >= st.IToughness) return Math.Min(fallback, 0.6f);
             }
             catch { }

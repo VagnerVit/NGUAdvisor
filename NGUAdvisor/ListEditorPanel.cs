@@ -17,9 +17,22 @@ namespace NGUAdvisor
     public class ListEditorPanel : UserControl
     {
         private static readonly int RowH = UiTheme.SNumRow(26);   // holds a NumericUpDown — derive, don't scale
-        private static readonly int HeaderH = UiTheme.S(40);
-        private static readonly int SlotsH = UiTheme.S(30);
-        private static readonly int ColHeadH = UiTheme.S(20);
+        // Containers DERIVED from what they hold (ui-infra.md): the chip from the NumericUpDown line,
+        // the column strip from the header font.
+        private static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
+        private static readonly int HeaderH = ChipH + UiTheme.S(8);
+        private static readonly int SlotsH = UiTheme.SCtl(30);
+        private static readonly int ColHeadH = UiTheme.SHead(20) + UiTheme.S(4);
+        private static readonly int IconW = IconWidth();
+        private static readonly int IconPitch = IconW + UiTheme.S(2);
+
+        private static int IconWidth()
+        {
+            int w = UiTheme.S(26);
+            foreach (string glyph in new[] { "↑", "↓" })
+                w = Math.Max(w, UiLayout.MeasureText(glyph, UiTheme.Ui) + UiTheme.S(16));
+            return w;
+        }
         private static readonly int BodyPad = UiTheme.S(10);
         private static readonly int StripW = UiTheme.S(6);
         private static readonly int CardGap = UiTheme.S(10);
@@ -46,7 +59,7 @@ namespace NGUAdvisor
             _scroll.Controls.Add(_content);
 
             var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = UiTheme.S(42), FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(UiTheme.S(8), UiTheme.S(8), 0, 0), BackColor = UiTheme.Ground };
-            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.S(26), Width = UiTheme.S(170), Font = UiTheme.Ui };
+            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.SCtl(26), Width = UiLayout.BtnWidth("+ Add time breakpoint"), Font = UiTheme.Ui };
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
@@ -143,14 +156,17 @@ namespace NGUAdvisor
                 _body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(12), BodyPad, UiTheme.S(12), BodyPad) };
 
                 var header = new Panel { Dock = DockStyle.Top, Height = HeaderH, BackColor = UiTheme.Surface };
-                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), UiTheme.S(30)), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
-                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
+                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), ChipH), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
+                int chipLblY = (ChipH - UiTheme.HeadH) / 2;
+                int chipTextY = (ChipH - UiTheme.LineH) / 2;
+                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), chipLblY), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
                 _h = Nud(UiTheme.S(42), 9999); _m = Nud(UiTheme.S(106), 59); _s = Nud(UiTheme.S(170), 59);
-                chip.Controls.Add(Sep("h", UiTheme.S(90))); chip.Controls.Add(Sep("m", UiTheme.S(154))); chip.Controls.Add(Sep("s", UiTheme.S(218)));
+                chip.Controls.Add(Sep("h", UiTheme.S(90), chipTextY)); chip.Controls.Add(Sep("m", UiTheme.S(154), chipTextY)); chip.Controls.Add(Sep("s", UiTheme.S(218), chipTextY));
                 chip.Controls.Add(_h); chip.Controls.Add(_m); chip.Controls.Add(_s);
                 header.Controls.Add(chip);
-                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(11)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
-                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiTheme.S(150), Height = UiTheme.S(26), Top = UiTheme.S(4), Font = UiTheme.Ui };
+                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(4) + chipTextY), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
+                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiLayout.BtnWidth("🗑  Delete breakpoint"), Height = UiTheme.SCtl(26), Font = UiTheme.Ui };
+                _del.Top = (HeaderH - _del.Height) / 2;
                 UiTheme.StyleFlat(_del); _del.ForeColor = UiTheme.Danger;
                 _del.Click += (s, e) => DeleteRequested?.Invoke(this, EventArgs.Empty);
                 header.Controls.Add(_del);
@@ -167,8 +183,8 @@ namespace NGUAdvisor
                 slotsRow.Controls.Add(_slotsInfo);
 
                 var colHead = new Panel { Dock = DockStyle.Top, Height = ColHeadH, BackColor = UiTheme.Surface };
-                colHead.Controls.Add(new Label { Text = "PRIORITY  (top = highest)", Location = new Point(UiTheme.S(6), UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
-                _orderHdr = new Label { Text = "MOVE", Location = new Point(0, UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
+                colHead.Controls.Add(new Label { Text = "PRIORITY  (top = highest)", Location = new Point(UiTheme.S(6), UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
+                _orderHdr = new Label { Text = "MOVE", Location = new Point(0, UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
                 colHead.Controls.Add(_orderHdr);
                 colHead.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
 
@@ -209,11 +225,12 @@ namespace NGUAdvisor
                     AddRow(new Row(id, SystemCatalog.NameOf(_options, id)));
             }
 
-            private static Label Sep(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+            private static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
             private NumericUpDown Nud(int x, int max)
             {
-                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Location = new Point(x, UiTheme.S(4)), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
-                UiTheme.StyleNum(n);
+                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+                UiTheme.StyleNum(n);   // states the height, so centre AFTER it
+                n.Location = new Point(x, (ChipH - n.Height) / 2);
                 return n;
             }
 
@@ -226,7 +243,7 @@ namespace NGUAdvisor
                 if (_del != null) _del.Left = bodyW - _del.Width - UiTheme.S(24);
                 // Anchor the challenge picker left of Delete so they can never collide.
                 if (_chTag != null && _del != null) _chTag.Left = _del.Left - _chTag.Width - UiTheme.S(10);
-                _orderHdr.Left = rowW - UiTheme.S(64);
+                _orderHdr.Left = rowW - 2 * IconPitch;   // stays over the icon block when the icons widen
                 RecalcHeight();
             }
 
@@ -333,14 +350,17 @@ namespace NGUAdvisor
 
             private void Place()
             {
-                _tag.Location = new Point(Width - 2 * UiTheme.S(28) - UiTheme.S(70), UiTheme.S(5));
-                int rx = Width - 2 * UiTheme.S(28) - UiTheme.S(8);
-                _up.Location = new Point(rx, UiTheme.S(1)); _down.Location = new Point(rx + UiTheme.S(28), UiTheme.S(1));
+                _tag.Location = new Point(Width - 2 * IconPitch - UiTheme.S(70), Mid(UiTheme.LineH));
+                int rx = Width - 2 * IconPitch - UiTheme.S(8);
+                int iconY = Mid(_up.Height);
+                _up.Location = new Point(rx, iconY); _down.Location = new Point(rx + IconPitch, iconY);
             }
+
+            private int Mid(int childHeight) => Math.Max(0, (Height - childHeight) / 2);
 
             private static Button Icon(string t)
             {
-                var b = new Button { Text = t, Width = UiTheme.S(26), Height = UiTheme.S(22), Font = UiTheme.Ui };
+                var b = new Button { Text = t, Width = IconW, Height = UiTheme.SCtl(22), Font = UiTheme.Ui };
                 UiTheme.StyleIcon(b);
                 return b;
             }

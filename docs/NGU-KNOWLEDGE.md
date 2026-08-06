@@ -234,6 +234,43 @@ Evil bugs came from FOUR cross-cutting patterns, not the math. Every new advisor
 **Evil farm data (closed 2026-07-17):** GearFarmAdvisor Evil-era zones (20-43) were already sourced from
 LootDrop (correct chances + caps). BoostFarmAdvisor Evil zones now sourced too (per-roll caps added from
 LootDrop.zone{N}Drop; the almanac's zone-29 boost chance 1.5E-6 was the in-game tooltip's typo — the drop
-code is 1.5E-5, matching GearFarm). Remaining approximation: BoostFarm models one of the two boost rolls
-per zone (~2x low on absolute value, but Evil-zone ranking preserved). The drop FORMULA (cube-root for
-Evil/Rooted zones) was already correct in both.
+code is 1.5E-5, matching GearFarm). Both boost rolls per zone are modelled. The drop FORMULA (cube-root
+for Evil/Rooted zones) was already correct in both, and re-verified: zones 20-45 use `lootFactorRooted()`,
+0-19 use `lootFactor()`.
+
+---
+
+## Adventure farm throughput — the cadence facts (decomp-verified 2026-08-06)
+
+Full derivation and invariants in `docs/modules/ZoneCadence.md`. The headlines, because they are strategy
+facts and not just implementation details:
+
+- **Idle attacking pays a full `attackSpeed` of spawn latency on every kill.**
+  `AdventureController` sets `idleAttackTimer = 0f` when the enemy spawns, and the timer only advances
+  mid-fight. A manual mode's `moveTimer` keeps running through the respawn, so the advisor lands the
+  opening swing on the spawn frame. Per kill: idle = `respawn + hits x attackSpeed`, manual =
+  `max(respawn, gcd) + (hits-1) x gcd`. **Manual is never slower and up to 2x faster** (ceiling reached
+  when `respawn <= gcd`, i.e. with heavy Respawn gear). For any farm park — boosts, gear, PP — prefer
+  Offensive over Idle. "Idle behaves like manual but weaker" is false.
+- `attackSpeed` and the global cooldown are the SAME number and always move together (1 -> 0.8 on maxxed
+  Mysterious Red Liquid, set in one branch of `AllItemListController`). Never model them apart.
+- **Bosses drop no boosts.** Boost rolls live only in the `enemyType.normal` branch of
+  `LootDrop.zone{N}Drop`. OPower — which is calibrated on the zone BOSS (`bossHP/0.8 + bossDef/2`,
+  exact for zones 0-9) — is therefore the wrong gate for boost farming; it asked 1.79x too much attack
+  in zone 0.
+- **The OPower column was three different quantities.** Zones 0-9 held the guaranteed one-shot power
+  (worst 0.8 roll), zones 10-28 the luckiest-roll one (exactly 1.5x too low), and zones 29/31-41 just
+  the idle-SURVIVAL power (10-18x too low; zone 29 is 80x IPower, a stray digit). Nothing gates on it
+  now — `ZoneCadence.RawOneShotPower` computes it live from the enemy table and the column is only the
+  fallback. Full table in `docs/modules/ZoneCadence.md`.
+- Enemy tables are hardcoded in `AdventureController.createEnemyTable()` and `spawnEnemy` picks
+  **uniformly**, so per-zone enemy-type shares are exact facts, not estimates: normal share ranges
+  0.7143 (Ancient Battlefield) to 0.8125 (Cave of Many Things). The old flat 0.77/0.10 pair was wrong
+  for every zone.
+- **Boost overflow is destroyed.** `Equipment.boostEquip` adds the whole boost then clamps at
+  `floor(cap x (1 + level/100))`. Apply high-tier boosts to the hungriest item, not the nearest one.
+  Special boosts cascade spec1 -> spec2 -> spec3, so they waste far less. The Infinity Cube is a soft
+  sink (`softcap + sqrt(raw - softcap)`), so it always absorbs something — just steeply less.
+- **Boost recycling** (`purchases.boost + 0.1 x Basic Challenge completions`) returns the next tier DOWN,
+  recursively, keeping the boost type. At 50% it is worth roughly +32% on a tier-13 drop — enough to
+  matter when comparing zones with different tier mixes.

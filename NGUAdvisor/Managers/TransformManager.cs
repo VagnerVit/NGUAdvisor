@@ -298,6 +298,17 @@ namespace NGUAdvisor.Managers
                 {
                     var e = c.inventory.inventory[slot];
                     if (e == null || e.level < 100 || e.id == 0) continue;
+                    // The inventory padlock is a HARD veto, and it outranks the KeepOne slot heuristic.
+                    // A transform CONSUMES the item (deleteItem + makeLoot of the next tier at level 1),
+                    // and both of the game's own transform paths refuse to consume a protected copy:
+                    // ItemController.consumeItem() requires `removable`, and mergeable() returns false
+                    // for any at-100 copy that is not removable. This was the one path in the whole
+                    // system that ignored it — and because MaxItem() biases merges toward the locked
+                    // copy (Extensions.cs, locked => level + 101) so it survives, the locked copy is
+                    // exactly the one that reaches 100 first. Net effect, user-reported: the padlocked
+                    // maxed Ascended Forest Pendant was consumed to mint a level-1 Ascended x2 while a
+                    // lower unlocked copy was "kept".
+                    if (!e.removable) continue;
                     int tierIdx = Array.IndexOf(tiers, e.id);
                     if (tierIdx < 0 || tierIdx >= tiers.Length - 1) continue;
                     bool gated = Chains[i].SadisticGate && tierIdx == tiers.Length - 2

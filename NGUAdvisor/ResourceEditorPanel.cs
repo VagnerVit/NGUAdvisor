@@ -19,8 +19,12 @@ namespace NGUAdvisor
     public class ResourceEditorPanel : UserControl
     {
         private static readonly int RowH = UiTheme.SNumRow(30);   // holds a NumericUpDown — derive, don't scale
-        private static readonly int HeaderH = UiTheme.S(40);
-        private static readonly int ColHeadH = UiTheme.S(20);
+        // The time chip holds three NumericUpDowns, so it is derived from NumH and the header from the chip.
+        // Scaling these alongside their content is what pushed the spinners out through the chip's bottom
+        // edge, which a card cannot show (no scrollbar) — the silent-clip corollary in ui-infra.md.
+        private static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
+        private static readonly int HeaderH = ChipH + UiTheme.S(8);
+        private static readonly int ColHeadH = UiTheme.SHead(20) + UiTheme.S(4);
         private static readonly int AddH = UiTheme.SNumRow(30);
         private static readonly int BodyPad = UiTheme.S(10);
         private static readonly int StripW = UiTheme.S(6);
@@ -34,6 +38,20 @@ namespace NGUAdvisor
         private static readonly int ColScopeX = UiTheme.S(396);
         private static readonly int ColNumX = UiTheme.S(476);
         private static readonly int ColUnitX = UiTheme.S(524);
+
+        // ✕ / ↑ / ↓ are wider than the 26px the layout was tuned for once the glyphs render at the measured
+        // DPI (the audit wanted 51px for ✕ in a 40px button). One width for all three keeps the block even,
+        // and the pitch is DERIVED from it so widening a button can't drive them into each other.
+        private static readonly int IconW = IconWidth();
+        private static readonly int IconPitch = IconW + UiTheme.S(2);
+
+        private static int IconWidth()
+        {
+            int w = UiTheme.S(26);
+            foreach (string glyph in new[] { "↑", "↓", "✕" })
+                w = Math.Max(w, UiLayout.MeasureText(glyph, UiTheme.Ui) + UiTheme.S(16));
+            return w;
+        }
 
         private readonly List<ProfileModel.PriorityBreakpoint> _data;
         private readonly Color _accent;
@@ -56,7 +74,7 @@ namespace NGUAdvisor
             _scroll.Controls.Add(_content);
 
             var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = UiTheme.S(42), FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(UiTheme.S(8), UiTheme.S(8), 0, 0), BackColor = UiTheme.Ground };
-            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.S(26), Width = UiTheme.S(170), Font = UiTheme.Ui };
+            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.SCtl(26), Width = UiLayout.BtnWidth("+ Add time breakpoint"), Font = UiTheme.Ui };
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
@@ -151,14 +169,17 @@ namespace NGUAdvisor
                 _body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(12), BodyPad, UiTheme.S(12), BodyPad) };
 
                 var header = new Panel { Dock = DockStyle.Top, Height = HeaderH, BackColor = UiTheme.Surface };
-                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), UiTheme.S(30)), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
-                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
+                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), ChipH), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
+                int chipLblY = (ChipH - UiTheme.HeadH) / 2;
+                int chipTextY = (ChipH - UiTheme.LineH) / 2;
+                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), chipLblY), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
                 _h = Nud(UiTheme.S(42)); _m = Nud(UiTheme.S(106)); _s = Nud(UiTheme.S(170));
-                chip.Controls.Add(Sep("h", UiTheme.S(90))); chip.Controls.Add(Sep("m", UiTheme.S(154))); chip.Controls.Add(Sep("s", UiTheme.S(218)));
+                chip.Controls.Add(Sep("h", UiTheme.S(90), chipTextY)); chip.Controls.Add(Sep("m", UiTheme.S(154), chipTextY)); chip.Controls.Add(Sep("s", UiTheme.S(218), chipTextY));
                 chip.Controls.Add(_h); chip.Controls.Add(_m); chip.Controls.Add(_s);
                 header.Controls.Add(chip);
-                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(11)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
-                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiTheme.S(150), Height = UiTheme.S(26), Top = UiTheme.S(4), Font = UiTheme.Ui };
+                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(4) + chipTextY), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
+                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiLayout.BtnWidth("🗑  Delete breakpoint"), Height = UiTheme.SCtl(26), Font = UiTheme.Ui };
+                _del.Top = (HeaderH - _del.Height) / 2;
                 UiTheme.StyleFlat(_del); _del.ForeColor = UiTheme.Danger;
                 _del.Click += (s, e) => DeleteRequested?.Invoke(this, EventArgs.Empty);
                 header.Controls.Add(_del);
@@ -199,12 +220,13 @@ namespace NGUAdvisor
                 _h.ValueChanged += TimeChanged; _m.ValueChanged += TimeChanged; _s.ValueChanged += TimeChanged;
             }
 
-            private static Label Sep(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
-            private static Label ColLabel(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
+            private static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+            private static Label ColLabel(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
             private NumericUpDown Nud(int x)
             {
-                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.S(46), Location = new Point(x, UiTheme.S(4)), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
-                UiTheme.StyleNum(n);
+                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+                UiTheme.StyleNum(n);   // states the height, so centre AFTER it
+                n.Location = new Point(x, (ChipH - n.Height) / 2);
                 return n;
             }
 
@@ -217,7 +239,7 @@ namespace NGUAdvisor
                 if (_del != null) _del.Left = bodyW - _del.Width - UiTheme.S(24);
                 // Anchor the challenge picker left of Delete so they can never collide.
                 if (_chTag != null && _del != null) _chTag.Left = _del.Left - _chTag.Width - UiTheme.S(10);
-                _orderHdr.Left = rowW - UiTheme.S(84);
+                _orderHdr.Left = rowW - 3 * IconPitch;   // stays over the icon block when the icons widen
                 RecalcHeight();
             }
 
@@ -291,7 +313,7 @@ namespace NGUAdvisor
 
             public CapToggle()
             {
-                Size = new Size(ColCapW, UiTheme.S(24));
+                Size = new Size(ColCapW, UiTheme.SText(22) + UiTheme.S(2));
                 BorderStyle = BorderStyle.FixedSingle;
                 _yes = Half("Yes", 0);
                 _no = Half("No", ColCapW / 2);
@@ -305,7 +327,8 @@ namespace NGUAdvisor
             {
                 Text = t,
                 Location = new Point(x, 0),
-                Size = new Size(ColCapW / 2 - 1, UiTheme.S(22)),
+                // Fixed-height label holding 9pt: the height takes the TextH floor, never raw S().
+                Size = new Size(ColCapW / 2 - 1, UiTheme.SText(22)),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = UiTheme.Ui
             };
@@ -343,7 +366,9 @@ namespace NGUAdvisor
             private readonly ComboBox _base = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = ColPrioW, Font = UiTheme.Ui };
             private readonly NumericUpDown _index = new NumericUpDown { Minimum = 0, Maximum = 99, Width = ColIdxW, Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
             private readonly CapToggle _cap = new CapToggle();
-            private readonly CheckBox _pctEnable = new CheckBox { Width = UiTheme.S(16), Height = UiTheme.S(20) };
+            // ScaledCheckBox, not CheckBox: the native check glyph is a fixed ~13px system metric that
+            // ignores font and DPI, which is the tiny box next to 38px text in the high-DPI report.
+            private readonly CheckBox _pctEnable = new ScaledCheckBox { AutoSize = false, Width = UiTheme.S(20), Height = UiTheme.LineH };
             private readonly Label _scope = new Label { AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui };
             private readonly NumericUpDown _pct = new NumericUpDown { Minimum = 0, Maximum = 100, Width = UiTheme.S(44), Enabled = false, Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
             private readonly Label _unit = new Label { Text = "%", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui };
@@ -420,21 +445,30 @@ namespace NGUAdvisor
                 _pctEnable.BackColor = BackColor; _warn.BackColor = BackColor;
             }
 
+            // Every Y is CENTRED on the row, never a tuned offset. StyleCombo/StyleNum state their own
+            // heights from the measured line (a NumericUpDown comes out at UiTheme.NumH), so a hardcoded
+            // S(4) put a 54px control 6px down a 57px row and pushed it out through the bottom — which a
+            // row has no scrollbar to reach. Centring keeps the row valid at any measured scale.
             private void Place()
             {
-                _base.Location = new Point(ColPrioX, UiTheme.S(3));
-                _index.Location = new Point(ColIdxX, UiTheme.S(4));
-                _idxDim.Location = new Point(ColIdxX + UiTheme.S(14), UiTheme.S(6));
-                _cap.Location = new Point(ColCapX, UiTheme.S(3));
-                _pctEnable.Location = new Point(ColPctX, UiTheme.S(5));
-                _scope.Location = new Point(ColScopeX, UiTheme.S(6));
-                _pct.Location = new Point(ColNumX, UiTheme.S(4));
-                _unit.Location = new Point(ColUnitX, UiTheme.S(6));
-                _warn.Location = new Point(ColPrioX, UiTheme.S(7));
-                int rx = Width - 3 * UiTheme.S(28) - UiTheme.S(8);
-                _up.Location = new Point(rx, UiTheme.S(3)); _down.Location = new Point(rx + UiTheme.S(28), UiTheme.S(3)); _rem.Location = new Point(rx + UiTheme.S(56), UiTheme.S(3));
+                _base.Location = new Point(ColPrioX, Mid(_base.Height));
+                _index.Location = new Point(ColIdxX, Mid(_index.Height));
+                _idxDim.Location = new Point(ColIdxX + UiTheme.S(14), Mid(UiTheme.LineH));
+                _cap.Location = new Point(ColCapX, Mid(_cap.Height));
+                _pctEnable.Location = new Point(ColPctX, Mid(_pctEnable.Height));
+                _scope.Location = new Point(ColScopeX, Mid(UiTheme.LineH));
+                _pct.Location = new Point(ColNumX, Mid(_pct.Height));
+                _unit.Location = new Point(ColUnitX, Mid(UiTheme.LineH));
+                _warn.Location = new Point(ColPrioX, Mid(UiTheme.LineH));
+                int rx = Width - 3 * IconPitch - UiTheme.S(8);
+                int iconY = Mid(_up.Height);
+                _up.Location = new Point(rx, iconY);
+                _down.Location = new Point(rx + IconPitch, iconY);
+                _rem.Location = new Point(rx + 2 * IconPitch, iconY);
                 ApplyRowColor();
             }
+
+            private int Mid(int childHeight) => Math.Max(0, (Height - childHeight) / 2);
 
             private void LoadFrom(string token)
             {
@@ -502,7 +536,7 @@ namespace NGUAdvisor
 
             private static Button Icon(string t, bool danger = false)
             {
-                var b = new Button { Text = t, Width = UiTheme.S(26), Height = UiTheme.S(24), Font = UiTheme.Ui };
+                var b = new Button { Text = t, Width = IconW, Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
                 UiTheme.StyleIcon(b, danger);
                 return b;
             }

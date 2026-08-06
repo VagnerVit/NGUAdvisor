@@ -721,6 +721,23 @@ namespace NGUAdvisor.Managers
                 return attack * _character.regAttackPower() / ItopodConstants.FloorHpNormalizerF;
         }
 
+        // Highest floor a given Adventure combat mode can still one-shot, for advisors that need to
+        // price ITOPOD against adventure zones without disturbing the live ITOPOD settings. Same
+        // normalizer and growth base as CalculateMaxAttack/CalculateBestFloor above; the mode is a
+        // parameter here because the caller is asking "what if", not "what is".
+        public static int OptimalFloorForMode(int combatMode)
+        {
+            try
+            {
+                float attack = Main.Character.totalAdvAttack();
+                float multi = combatMode == 0 || !RegularAttackUnlocked()
+                    ? _character.idleAttackPower()
+                    : _character.regAttackPower();
+                return CalculateBestFloor(attack * multi / ItopodConstants.FloorHpNormalizerF);
+            }
+            catch (Exception e) { Main.LogDebug($"OptimalFloorForMode: {e.Message}"); return 0; }
+        }
+
         private static int CalculateBestFloor(float attack)
         {
             int floor = (int)Math.Floor(Math.Log(attack, ItopodConstants.FloorGrowthBase));

@@ -3,40 +3,77 @@
 Where to farm boosts: ranks one-shottable zones vs ITOPOD by boost-value per kill. Modeled on
 Farmer Sanc's Boost Almanac, but constants re-sourced from the CURRENT game decomp.
 
-## Value model
+## Rate model — boost POINTS PER SECOND
 
 ```
-boost-value/kill = Σ_rolls value_i × min(chance_i × dcFactor, cap_i) × 0.77 (normal-enemy share)
+rate = Σ_rolls min(chance_i × dcFactor, cap_i) × BoostSinks.ValueOfDrop(tier_i)
+       × ZoneCadence.For(zone, mode).NormalKillsPerSecond
+
 dcFactor = lootFactor()          (Normal zones)
          = lootFactor()^(1/3)    (Rooted = Evil+ zones; game's lootChanceDisplayRooted)
 ```
 
-Kill cadence is ~equal across one-shottable zones, so per-kill ranking = per-second ranking.
-Only boss-unlocked zones with `attack ≥ OPower` (ZoneStatHelper) compete.
+Verified: zones 20–45 use `lootFactorRooted()`, zones 0–19 use `lootFactor()`. Zone 20 is Chocolate
+World, which matches the guide's "from Chocolate World onwards Drop Chance is cube-rooted".
+
+Three things this model used to simplify, each of which changed the ranking — **read
+`ZoneCadence.md` before touching any of them**:
+
+1. **Drop value is priced through the live sinks** (`BoostSinks`), not taken flat from the ladder:
+   gear overflow past a channel cap is destroyed, the cube is a `sqrt` soft sink past its softcap, and
+   the recycling chain adds lower tiers back against the *same* channel. Flat tier values massively
+   over-priced high tiers on a nearly-capped loadout.
+2. **Cadence is measured per zone and per combat mode** (`ZoneCadence`), from the game's own spawn
+   table, including multi-hit enemies, enemy regen and paralyzer downtime. The old "cadence is ~equal
+   across one-shottable zones" shortcut hid the ~2× Idle/Offensive gap *and* excluded every zone that
+   needs a second swing, however valuable.
+3. **The gate is "can we kill the NORMALS and survive"**, not `attack ≥ OPower`. OPower is calibrated
+   on the zone boss, and bosses roll no boosts at all — it demanded 1.79× too much attack in zone 0.
+
+`Analyze()` evaluates each zone at both candidate modes (Idle and Offensive; Snipe pre-casts and
+Defensive stalls, so neither can win on throughput) and returns `BestMode` alongside the rate.
+`AdvisorApply.ApplyZones` applies it to `Settings.CombatMode` — the recommendation is worthless if the
+mode it was costed at is not the one running. `RateAtCurrentMode` is the same winner re-priced at the
+configured mode, so the UI can show what the current setting costs.
+
+ITOPOD's floor comes from `ITOPODManager.OptimalFloorForMode(mode)` rather than a local
+reimplementation of the floor-HP math.
 
 ITOPOD (`itopodDrop`): flat **14 % chance, NOT drop-chance scaled**; boost tier laddered from
 optimal floor: tier = floor/50+1, mapped into the 13-value ladder {1…10000} with the game's
 tier→index bends (tier ≥ 24→13, ≥ 18→12, ≥ 15→11, > 10→10).
 
-## Data provenance — two real bugs are encoded in the comments, don't regress them
+## Data provenance — these bugs are encoded in the comments, don't regress them
 
 1. **Per-roll caps (zones 0–18)**: the old table lacked the game's `Mathf.Min(cap, chance×DC)`
    caps and mis-ranked zones at high DC (user-reported: Almanac ranked Badly Drawn World over
    A Very Strange Place; AVSP saturates at its 0.25 cap while BDW keeps scaling).
-2. **Evil zone values (finding #21)**: the old single-roll `value` held the TOOLTIP's display-cap
+2. **Zone 22 (Pretty Pink Princess Land) rolls do NOT share a cap.** `zone22Drop` caps roll 1 at
+   `0.08f` and roll 2 at `0.06f`; we had 0.08 on both, over-pricing PPPL by up to 25% at high drop
+   chance (the 1000-value roll is two thirds of the zone). The Boost Almanac had this right
+   (`Max Drop Chance 8%`, `2nd Max DC 6%`) — we were the only ones wrong. Every other zone's chances
+   and caps were re-verified verbatim against the drop code and agree with the almanac.
+3. **Evil zone values (finding #21)**: the old single-roll `value` held the TOOLTIP's display-cap
    percent, not a boost value — Evil zones were undervalued 20–1000× and never won vs ITOPOD.
    Current values are the real boost ladder {200,500,1000,2000,5000,10000} keyed by the makeLoot
    item id (verified `LootDrop.zone{N}Drop` + ItemNameDesc). Each Evil zone fires TWO boost rolls
-   with identical chance/cap (roll 2 = next tier up, `makeLoot id+1`); zones 36+ repeat the 10K
-   ceiling. **Zone 29's in-game tooltip chance 1.5E-06 is a TYPO — the drop code says 1.5E-05.**
+   with identical chance (roll 2 = next tier up, `makeLoot id+1`) and — **except zone 22** — an
+   identical cap; zones 36+ repeat the 10K ceiling. **Zone 29's in-game tooltip chance 1.5E-06 is a
+   TYPO — the drop code says 1.5E-05.**
 
 ## Demand gate (`BoostDemandExists`)
 
-Boosts only pay while something consumes them: an Infinity Cube under its softcap (game-truth:
-`cubePower()/cubeToughness()` CLAMP effective cube stats at base + gear attack/defense — feeding
-a capped cube adds nothing), or equipped/priority-listed gear with `GetNeededBoosts().Total() > 0`.
-Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand unknown → keep farming) —
-the classic always-boost behavior on any read error.
+A coarse on/off switch behind the `AdvisorFarmBoost` setting: boosts only pay while something consumes
+them — an Infinity Cube under its softcap, or equipped/priority-listed gear with
+`GetNeededBoosts().Total() > 0`. Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand
+unknown → keep farming) — the classic always-boost behavior on any read error.
+
+Note this gate is now mostly belt-and-braces: `BoostSinks` prices drops against the same headroom
+continuously, so a saturated loadout drives `BestRate` toward zero and ITOPOD wins on its own. The gate
+survives because it is a user-facing toggle with documented semantics, and because its cube test is
+deliberately stricter than the value model's — `cubePower()` does not hard-clamp at the softcap, it
+returns `softcap + sqrt(raw − softcap)`, so the value model still credits an over-cap cube with the
+diminishing remainder while the gate calls it done.
 
 ## Consumers
 

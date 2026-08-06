@@ -14,7 +14,11 @@ namespace NGUAdvisor
     // Mono-safe explicit layout + single-content-child scroll, UiTheme styling.
     public class WanDiffEditorPanel : UserControl
     {
-        private static readonly int CardH = UiTheme.S(92);
+        // The chip holds NumericUpDowns and the header holds the chip: derive both, and derive the card
+// height from the header it contains rather than scaling it alongside (ui-infra.md).
+        private static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
+        private static readonly int CardHeaderH = ChipH + UiTheme.S(8);
+        private static readonly int CardH = CardHeaderH + UiTheme.SCtl(26) + UiTheme.S(30);
         private static readonly int CardGap = UiTheme.S(8);
         private static readonly int SectionGap = UiTheme.S(18);
         private static readonly int HeaderH = UiTheme.S(26);
@@ -58,7 +62,7 @@ namespace NGUAdvisor
             {
                 sec.Head = new Label { Text = sec.Title, AutoSize = true, ForeColor = sec.Accent, Font = UiTheme.Bold };
                 _content.Controls.Add(sec.Head);
-                sec.Add = new Button { Text = "+ Add time breakpoint", Height = AddH, Width = UiTheme.S(170), Font = UiTheme.Ui };
+                sec.Add = new Button { Text = "+ Add time breakpoint", Height = AddH, Width = UiLayout.BtnWidth("+ Add time breakpoint"), Font = UiTheme.Ui };
                 UiTheme.StyleFlat(sec.Add);
                 var captured = sec;
                 sec.Add.Click += (s, e) => AddBreakpoint(captured);
@@ -138,22 +142,25 @@ namespace NGUAdvisor
                 var strip = new Panel { Dock = DockStyle.Left, Width = StripW, BackColor = accent };
                 var body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(12), UiTheme.S(10), UiTheme.S(12), UiTheme.S(10)) };
 
-                var header = new Panel { Dock = DockStyle.Top, Height = UiTheme.S(40), BackColor = UiTheme.Surface };
-                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), UiTheme.S(30)), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
-                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
+                var header = new Panel { Dock = DockStyle.Top, Height = CardHeaderH, BackColor = UiTheme.Surface };
+                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), ChipH), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
+                int chipTextY = (ChipH - UiTheme.LineH) / 2;
+                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), (ChipH - UiTheme.HeadH) / 2), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
                 _h = Nud(UiTheme.S(42), 9999); _m = Nud(UiTheme.S(106), 59); _s = Nud(UiTheme.S(170), 59);
-                chip.Controls.Add(Sep("h", UiTheme.S(90))); chip.Controls.Add(Sep("m", UiTheme.S(154))); chip.Controls.Add(Sep("s", UiTheme.S(218)));
+                chip.Controls.Add(Sep("h", UiTheme.S(90), chipTextY)); chip.Controls.Add(Sep("m", UiTheme.S(154), chipTextY)); chip.Controls.Add(Sep("s", UiTheme.S(218), chipTextY));
                 chip.Controls.Add(_h); chip.Controls.Add(_m); chip.Controls.Add(_s);
                 header.Controls.Add(chip);
-                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(11)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
-                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiTheme.S(150), Height = UiTheme.S(26), Top = UiTheme.S(4), Font = UiTheme.Ui };
+                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(4) + chipTextY), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
+                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiLayout.BtnWidth("🗑  Delete breakpoint"), Height = UiTheme.SCtl(26), Font = UiTheme.Ui };
+                _del.Top = (CardHeaderH - _del.Height) / 2;
                 UiTheme.StyleFlat(_del); _del.ForeColor = UiTheme.Danger;
                 _del.Click += (s, e) => DeleteRequested?.Invoke(this, EventArgs.Empty);
                 header.Controls.Add(_del);
 
                 var row = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface };
                 row.Controls.Add(new Label { Text = "Set to:", Location = new Point(UiTheme.S(2), UiTheme.S(8)), AutoSize = true, ForeColor = UiTheme.Ink, Font = UiTheme.Bold });
-                _sel = new SegmentedSelector(options, accent) { Location = new Point(UiTheme.S(58), UiTheme.S(4)) };
+                _sel = new SegmentedSelector(options, accent);
+                _sel.Location = new Point(UiTheme.S(58), UiTheme.S(4));
                 _sel.Changed += (s, e) => { if (!_loading) { _bp.Value = _sel.Value; Changed?.Invoke(this, EventArgs.Empty); } };
                 row.Controls.Add(_sel);
 
@@ -172,11 +179,12 @@ namespace NGUAdvisor
                 _h.ValueChanged += TimeChanged; _m.ValueChanged += TimeChanged; _s.ValueChanged += TimeChanged;
             }
 
-            private static Label Sep(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+            private static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
             private NumericUpDown Nud(int x, int max)
             {
-                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Location = new Point(x, UiTheme.S(4)), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
-                UiTheme.StyleNum(n);
+                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+                UiTheme.StyleNum(n);   // states the height, so centre AFTER it
+                n.Location = new Point(x, (ChipH - n.Height) / 2);
                 return n;
             }
 
@@ -208,7 +216,7 @@ namespace NGUAdvisor
             public SegmentedSelector(IReadOnlyList<KeyValuePair<int, string>> options, Color accent)
             {
                 _accent = accent;
-                Height = UiTheme.S(26);
+                Height = UiTheme.SText(24) + UiTheme.S(2);
                 BorderStyle = BorderStyle.FixedSingle;
 
                 int x = 0;
@@ -219,7 +227,7 @@ namespace NGUAdvisor
                     {
                         Text = kv.Value,
                         Location = new Point(x, 0),
-                        Size = new Size(wseg, UiTheme.S(24)),
+                        Size = new Size(wseg, UiTheme.SText(24)),
                         TextAlign = ContentAlignment.MiddleCenter,
                         Font = UiTheme.Ui
                     };

@@ -19,11 +19,24 @@ namespace NGUAdvisor
     public class GearEditorPanel : UserControl
     {
         private static readonly int RowH = UiTheme.SNumRow(26);   // holds a NumericUpDown — derive, don't scale
-        private static readonly int HeaderH = UiTheme.S(40);
+        // Containers DERIVED from what they hold (ui-infra.md): the chip from the NumericUpDown line, the
+        // objective band from the two stacked lines inside it, the column strip from the header font.
+        private static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
+        private static readonly int HeaderH = ChipH + UiTheme.S(8);
         private static readonly int SourceH = UiTheme.S(40);
-        private static readonly int ObjInfoH = UiTheme.S(46);
-        private static readonly int BarH = UiTheme.S(30);
-        private static readonly int ColHeadH = UiTheme.S(20);
+        private static readonly int ObjInfoH = UiTheme.SLines(2, 10);
+        private static readonly int BarH = UiTheme.SCtl(24) + UiTheme.S(8);
+        private static readonly int ColHeadH = UiTheme.SHead(20) + UiTheme.S(4);
+        private static readonly int IconW = IconWidth();
+        private static readonly int IconPitch = IconW + UiTheme.S(2);
+
+        private static int IconWidth()
+        {
+            int w = UiTheme.S(26);
+            foreach (string glyph in new[] { "↑", "↓", "✕" })
+                w = Math.Max(w, UiLayout.MeasureText(glyph, UiTheme.Ui) + UiTheme.S(16));
+            return w;
+        }
         private static readonly int AddH = UiTheme.SNumRow(30);
         private static readonly int BodyPad = UiTheme.S(10);
         private static readonly int StripW = UiTheme.S(6);
@@ -49,7 +62,7 @@ namespace NGUAdvisor
             _scroll.Controls.Add(_content);
 
             var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = UiTheme.S(42), FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(UiTheme.S(8), UiTheme.S(8), 0, 0), BackColor = UiTheme.Ground };
-            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.S(26), Width = UiTheme.S(170), Font = UiTheme.Ui };
+            var addBtn = new Button { Text = "+ Add time breakpoint", Height = UiTheme.SCtl(26), Width = UiLayout.BtnWidth("+ Add time breakpoint"), Font = UiTheme.Ui };
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
@@ -193,14 +206,17 @@ namespace NGUAdvisor
                 _body = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, Padding = new Padding(UiTheme.S(12), BodyPad, UiTheme.S(12), BodyPad) };
 
                 var header = new Panel { Dock = DockStyle.Top, Height = HeaderH, BackColor = UiTheme.Surface };
-                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), UiTheme.S(30)), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
-                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
+                var chip = new Panel { Location = new Point(0, UiTheme.S(4)), Size = new Size(UiTheme.S(238), ChipH), BackColor = UiTheme.AccentWeak, BorderStyle = BorderStyle.FixedSingle };
+                int chipLblY = (ChipH - UiTheme.HeadH) / 2;
+                int chipTextY = (ChipH - UiTheme.LineH) / 2;
+                chip.Controls.Add(new Label { Text = "TIME", Location = new Point(UiTheme.S(8), chipLblY), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Chip });
                 _h = Nud(UiTheme.S(42), 9999); _m = Nud(UiTheme.S(106), 59); _s = Nud(UiTheme.S(170), 59);
-                chip.Controls.Add(Sep("h", UiTheme.S(90))); chip.Controls.Add(Sep("m", UiTheme.S(154))); chip.Controls.Add(Sep("s", UiTheme.S(218)));
+                chip.Controls.Add(Sep("h", UiTheme.S(90), chipTextY)); chip.Controls.Add(Sep("m", UiTheme.S(154), chipTextY)); chip.Controls.Add(Sep("s", UiTheme.S(218), chipTextY));
                 chip.Controls.Add(_h); chip.Controls.Add(_m); chip.Controls.Add(_s);
                 header.Controls.Add(chip);
-                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(11)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
-                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiTheme.S(150), Height = UiTheme.S(26), Top = UiTheme.S(4), Font = UiTheme.Ui };
+                header.Controls.Add(new Label { Text = "of the rebirth", Location = new Point(UiTheme.S(250), UiTheme.S(4) + chipTextY), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui });
+                _del = new Button { Text = "🗑  Delete breakpoint", Width = UiLayout.BtnWidth("🗑  Delete breakpoint"), Height = UiTheme.SCtl(26), Font = UiTheme.Ui };
+                _del.Top = (HeaderH - _del.Height) / 2;
                 UiTheme.StyleFlat(_del); _del.ForeColor = UiTheme.Danger;
                 _del.Click += (s, e) => DeleteRequested?.Invoke(this, EventArgs.Empty);
                 header.Controls.Add(_del);
@@ -212,24 +228,27 @@ namespace NGUAdvisor
                 var sourcePanel = new Panel { Dock = DockStyle.Top, Height = SourceH, BackColor = UiTheme.AccentWeak };
                 sourcePanel.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
                 sourcePanel.Controls.Add(new Label { Text = "GEAR SOURCE", Location = new Point(UiTheme.S(2), UiTheme.S(13)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Bold });
-                _source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(UiTheme.S(104), UiTheme.S(9)), Width = UiTheme.S(260), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
-                UiTheme.StyleCombo(_source);
+                _source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(260), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
+                UiTheme.StyleCombo(_source);   // states the height, so centre AFTER it
+                _source.Location = new Point(UiTheme.S(104), (SourceH - _source.Height) / 2);
                 _source.Items.Add("Manual (item IDs)");
                 foreach (var o in GearObjectives.Objectives) _source.Items.Add("Optimize: " + o.Name);
                 sourcePanel.Controls.Add(_source);
 
                 // Objective-mode details: the "keep top respawn" toggle + a live-optimize note.
                 _objPanel = new Panel { Dock = DockStyle.Top, Height = ObjInfoH, BackColor = UiTheme.Surface };
-                _respawn = new CheckBox { Text = "Always keep the single best Respawn item", Location = new Point(UiTheme.S(2), UiTheme.S(3)), AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Ink };
+                _respawn = new ScaledCheckBox { Text = "Always keep the single best Respawn item", Location = new Point(UiTheme.S(2), UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Ink };
                 _respawn.CheckedChanged += RespawnChanged;
-                _objInfo = new Label { Location = new Point(UiTheme.S(2), UiTheme.S(26)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Text = "Gear is auto-optimized live for this objective while the breakpoint is active." };
+                // Second of two stacked lines — one LinePitch below the first, and ObjInfoH is derived from
+                // both, never scaled next to them.
+                _objInfo = new Label { Location = new Point(UiTheme.S(2), UiTheme.S(3) + UiTheme.LinePitch), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Text = "Gear is auto-optimized live for this objective while the breakpoint is active." };
                 _objPanel.Controls.Add(_respawn);
                 _objPanel.Controls.Add(_objInfo);
 
                 // paste/copy/undo bar
                 _bar = new Panel { Dock = DockStyle.Top, Height = BarH, BackColor = UiTheme.Surface };
-                _paste = new Button { Text = "Paste IDs", Width = UiTheme.S(90), Height = UiTheme.S(24), Font = UiTheme.Ui };
-                _copy = new Button { Text = "Copy IDs", Width = UiTheme.S(90), Height = UiTheme.S(24), Font = UiTheme.Ui };
+                _paste = new Button { Text = "Paste IDs", Width = UiLayout.BtnWidth("Paste IDs"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
+                _copy = new Button { Text = "Copy IDs", Width = UiLayout.BtnWidth("Copy IDs"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
                 UiTheme.StyleFlat(_paste); UiTheme.StyleFlat(_copy);
                 _paste.Click += (s, e) => PasteIds();
                 _copy.Click += (s, e) => CopyIds();
@@ -240,7 +259,7 @@ namespace NGUAdvisor
                 {
                     Text = "Undo paste",
                     Width = UiLayout.BtnWidth("Undo paste") + UiTheme.S(6),
-                    Height = UiTheme.S(24),
+                    Height = UiTheme.SCtl(24),
                     Font = UiTheme.Ui,
                     Visible = false
                 };
@@ -257,9 +276,11 @@ namespace NGUAdvisor
                 LayoutBar();
 
                 _colHead = new Panel { Dock = DockStyle.Top, Height = ColHeadH, BackColor = UiTheme.Surface };
-                _colHead.Controls.Add(new Label { Text = "ITEM ID", Location = new Point(UiTheme.S(6), UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
-                _colHead.Controls.Add(new Label { Text = "NAME", Location = new Point(UiTheme.S(74), UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
-                _orderHdr = new Label { Text = "ORDER", Location = new Point(0, UiTheme.S(5)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
+                // y = S(3), not S(5): a 7.5pt AutoSize label renders HeadH tall, so at S(5) it ran out
+                // through the bottom of the column strip.
+                _colHead.Controls.Add(new Label { Text = "ITEM ID", Location = new Point(UiTheme.S(6), UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
+                _colHead.Controls.Add(new Label { Text = "NAME", Location = new Point(UiTheme.S(74), UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader });
+                _orderHdr = new Label { Text = "ORDER", Location = new Point(0, UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
                 _colHead.Controls.Add(_orderHdr);
                 _colHead.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
 
@@ -307,11 +328,12 @@ namespace NGUAdvisor
                 _h.ValueChanged += TimeChanged; _m.ValueChanged += TimeChanged; _s.ValueChanged += TimeChanged;
             }
 
-            private static Label Sep(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(9)), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+            private static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
             private NumericUpDown Nud(int x, int max)
             {
-                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Location = new Point(x, UiTheme.S(4)), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
-                UiTheme.StyleNum(n);
+                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = max, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+                UiTheme.StyleNum(n);   // states the height, so centre AFTER it
+                n.Location = new Point(x, (ChipH - n.Height) / 2);
                 return n;
             }
 
@@ -325,7 +347,7 @@ namespace NGUAdvisor
                 if (_del != null) _del.Left = bodyW - _del.Width - UiTheme.S(24);
                 // Anchor the challenge picker left of Delete so they can never collide.
                 if (_chTag != null && _del != null) _chTag.Left = _del.Left - _chTag.Width - UiTheme.S(10);
-                _orderHdr.Left = rowW - UiTheme.S(84);
+                _orderHdr.Left = rowW - 3 * IconPitch;   // stays over the icon block when the icons widen
                 PlaceBackup();
                 RecalcHeight();
             }
@@ -664,18 +686,25 @@ namespace NGUAdvisor
 
             public void SetWidth(int w) { Width = w; Place(); }
 
+            // Centred on the row, never a tuned offset — StyleNum states a NumH-tall control and a
+            // hardcoded top pushed it out through a row that has no scrollbar to reach it.
             private void Place()
             {
-                _id.Location = new Point(UiTheme.S(6), UiTheme.S(3));
-                _name.Location = new Point(UiTheme.S(74), UiTheme.S(5));
-                int rx = Width - 3 * UiTheme.S(28) - UiTheme.S(8);
-                _up.Location = new Point(rx, UiTheme.S(2)); _down.Location = new Point(rx + UiTheme.S(28), UiTheme.S(2)); _rem.Location = new Point(rx + UiTheme.S(56), UiTheme.S(2));
+                _id.Location = new Point(UiTheme.S(6), Mid(_id.Height));
+                _name.Location = new Point(UiTheme.S(74), Mid(UiTheme.LineH));
+                int rx = Width - 3 * IconPitch - UiTheme.S(8);
+                int iconY = Mid(_up.Height);
+                _up.Location = new Point(rx, iconY);
+                _down.Location = new Point(rx + IconPitch, iconY);
+                _rem.Location = new Point(rx + 2 * IconPitch, iconY);
                 ApplyRowColor();
             }
 
+            private int Mid(int childHeight) => Math.Max(0, (Height - childHeight) / 2);
+
             private static Button Icon(string t, bool danger = false)
             {
-                var b = new Button { Text = t, Width = UiTheme.S(26), Height = UiTheme.S(22), Font = UiTheme.Ui };
+                var b = new Button { Text = t, Width = IconW, Height = UiTheme.SCtl(22), Font = UiTheme.Ui };
                 UiTheme.StyleIcon(b, danger);
                 return b;
             }

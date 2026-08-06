@@ -2,6 +2,102 @@
 
 All notable changes to NGU Advisor are documented in this file.
 
+## [1.2.26] - 2026-08-06
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **Automatic transform climbing destroyed padlocked items.** A transform consumes the item and mints
+  the next tier at level 1, and the game itself refuses to spend a padlocked copy on that — but the
+  advisor's climb never checked the padlock. Worse, merging deliberately funnels copies *into* the
+  padlocked one so it survives, which means the padlocked copy is the one that reaches level 100 first
+  and then got eaten: a protected maxed Ascended Forest Pendant was consumed to create a level-1
+  Ascended x2 while a weaker unprotected copy was kept. The padlock is now an absolute veto on climbing,
+  outranking the "keep one maxed copy" slot heuristic — so padlocking a copy is a reliable way to pin
+  exactly the one you want kept.
+
+- **Farming in Idle mode was costing you up to half your kills, and the advisor could not see it.**
+  Idle attacking restarts its attack timer every time an enemy spawns, so every single kill waits a full
+  attack cycle before the first swing lands — whereas a manual mode swings on the frame the enemy
+  appears. With respawn gear that is a factor of two in boosts, gear drops and PP per hour. Both farm
+  advisors now measure kill speed per zone and per combat mode, report which mode they costed their
+  recommendation at, and automatic zone routing switches Adventure combat to it.
+- **Pretty Pink Princess Land was over-valued for boost farming.** Its two boost rolls have different
+  drop-chance ceilings (8% and 6%); we used 8% for both, over-stating the zone by up to a quarter at high
+  drop chance.
+- **Boost farming demanded far more Power than it needed.** The requirement was "one-shot the zone boss",
+  but bosses do not drop boosts at all — only ordinary enemies do. Zones now qualify on killing the
+  enemies that actually pay, which unlocks earlier zones roughly 1.8x sooner.
+- **The zone table's one-shot power was wrong for every zone past Ancient Battlefield — badly wrong in
+  late Evil.** It turned out to hold three different quantities: the reliable one-shot power up to The
+  2D Universe, the best-case-luck one from Ancient Battlefield to The Fad-lands (a factor of 1.5 too
+  low), and from JRPGVille onward not a one-shot number at all but the idle-survival power — a factor
+  of 10 to 18 too low, e.g. The Rad-Lands claimed a one-shot at a twenty-seventh of the real
+  requirement. Anything that asked "do I one-shot this zone?" now measures it from the game's own enemy
+  data instead. The most consequential fix is post-fight recovery: it used to skip healing to 20% HP in
+  zones it wrongly believed were trivial, and it now also credits manual combat's stronger swing, so it
+  wastes less time in the Safe Zone where that is genuinely safe. Your own `zoneOverride.json` values
+  still take precedence.
+- **Zones you kill in two hits were invisible to both farm advisors.** They were excluded outright rather
+  than costed, so a zone with far better drops could never be recommended just because it needed a second
+  swing. They now compete on their real rate, and a zone whose enemies out-regenerate your damage is
+  correctly reported as unfarmable instead of being silently treated as fast.
+
+- **"Bosses Only" silently made boost farming pointless.** Bosses drop no boosts at all — only ordinary
+  enemies do — so with that toggle on an adventure zone yields exactly nothing. The advisor now accounts
+  for it, routes to the Pod (which the toggle does not affect) and says why. Blacklisted enemies are
+  likewise counted as the Safe-Zone round trip they cost rather than ignored.
+
+### Changed
+
+- **Fights that take more than one hit are no longer over-estimated.** Kill times were computed as if
+  every single swing rolled its worst possible damage, which inflated a ten-swing enemy to thirteen
+  swings, and manual combat was priced as if it only ever used the regular attack. Longer fights now use
+  average damage and the real attack rotation, so zones that need a second swing are ranked on what they
+  actually do. Anything that decides whether you *reliably* one-shot still uses the pessimistic number —
+  that call must not rest on a lucky roll.
+- **A boost drop is now valued by what it can actually absorb.** Power and Toughness boosts are clamped
+  to the item they land on and the overflow is destroyed, so a 10,000 boost dropped when your hungriest
+  item needs 300 was never worth 10,000. The advisor now prices every drop against your real gear
+  headroom, credits the Infinity Cube with its diminishing-but-never-zero returns instead of writing it
+  off at the softcap, counts Special boosts' ability to spill across all three special slots, and adds
+  the expected value of the Boost Recycling chain. Boost-farm figures are now shown as boost points per
+  second rather than per kill.
+- Enemy-mix assumptions are gone: the share of ordinary enemies per zone is read from the game (it ranges
+  from 71% to 81%, not the flat 77% both advisors assumed), as is the boss share, enemy regeneration and
+  the downtime paralyzing enemies cost.
+
+## [1.2.25] - 2026-08-01
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **A gear hunt now actually runs the drop chance digger.** The hunt already promoted it ahead of the
+  Perk Points digger, but the rule that puts the Adventure digger first ran afterwards and won — so on a
+  character with a single digger slot the hunt farmed drops with no drop chance bonus at all. An active
+  gear hunt now outranks even the Adventure digger, because farming drops is the entire point of camping
+  a stage. Titan windows are unchanged: there the Adventure digger still leads.
+
+### Changed
+
+- **Automatic allocation no longer parks most of your energy and magic in Wandoos.** The Normal
+  long-rebirth preset was fixed for this in 1.2.24, but automatic allocation was not: it asked for 40% of
+  both caps in most phases and 60% during the NGU marathon, and because a Wandoos lane requests its whole
+  ceiling on every pass, that is what it took. The ceiling is now 30% in every phase. The phases where
+  Wandoos genuinely is your power source — the No-NGU, No-Time-Machine and No-Augment challenge templates
+  and the all-systems-dead fallback — keep their original share on purpose.
+- **A Wandoos lane that cannot pay for itself now steps aside instead of holding its share.** The lane
+  used to be unable to ever drop out, so it kept its allocation whatever the payoff was. It now projects
+  what its allocation would earn over the run and gives the share back unless that is worth at least one
+  boss, measured against how much stronger bosses get as you climb. This retires it on every Evil-and-up
+  run, where the levels are unreachably expensive, while leaving it running where it pays — and it is
+  never retired inside a challenge block, a No-Rebirth or No-Augment run, or when gold is too low to
+  maintain augments, since those are exactly the runs Wandoos is the power source for. The projection
+  follows each operating system's own bonus formula, so switching between 98, MEH and XL is accounted
+  for rather than assumed.
+
 ## [1.2.24] - 2026-07-31
 
 Existing settings and profile files remain compatible with version 1.1.0.

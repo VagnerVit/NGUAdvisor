@@ -8,7 +8,28 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         protected override bool Unlocked() => _character.buttons.wandoos.interactable && !_character.wandoos98.disabled;
 
-        protected override bool TargetMet() => false;
+        // This used to be a hardcoded `false`, which is what made the lane a leftovers BLACK HOLE
+        // (AllocationProfiles.md, "WAN/CAPWAN"): it never dropped out, never released its share, and
+        // the ceil() math below makes it request its ENTIRE ceiling on every pass whenever the
+        // 1-level-per-tick allocation is out of reach — the normal case, not the edge case. Retire
+        // the lane instead once even its whole ceiling cannot buy one boss (10x A/D) over the rest
+        // of the run; the dump levels die at the rebirth, so a lane that slow is pure loss.
+        //
+        // EXCEPTION: inside a challenge block / NORB / NOAUG / gold-starved run, Wandoos IS the
+        // power source — ask the owning module rather than re-deriving that context here.
+        protected override bool TargetMet()
+        {
+            try
+            {
+                if (Managers.OptimizationAdvisor.WandoosIsPowerSource())
+                    return false;
+                return !Managers.WandoosAdvisor.DumpWorthwhile(Type == ResourceType.Energy, CeilingAllocation());
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         public override bool Allocate()
         {
