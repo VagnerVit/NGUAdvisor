@@ -562,7 +562,11 @@ namespace NGUAdvisor
                 if (rates.Known)
                     text += $"\nAt {BoostFarmAdvisor.ModeName(rates.CombatMode)}, floors {rates.DefaultFloor}-{rates.PeakFloor}:"
                           + $" {rates.PpPerSecond:0.####} PP/s · {rates.ExpPerSecond:0.##} EXP/s";
-                UiLayout.FitOrGrow(_floorInfo, text, 2);
+                // Direct assignment, NOT FitOrGrow: this label is AutoSize (MkLbl) and was never given
+                // a Width, so FitOrGrow measured against the width of the empty string it was created
+                // with and wrapped every line into "Optimal / idle f...". FitOrGrow is for labels that
+                // own a fixed width; an AutoSize label grows on its own, including across the \n.
+                _floorInfo.Text = text;
             }
             catch (Exception ex) { LogDebug($"Floor info: {ex.Message}"); }
         }
