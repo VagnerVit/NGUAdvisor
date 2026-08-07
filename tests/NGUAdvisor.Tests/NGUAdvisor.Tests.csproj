@@ -30,6 +30,8 @@
     <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostSeed.cs" Link="Linked\BoostSeed.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostValueMath.cs" Link="Linked\BoostValueMath.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\ItopodConstants.cs" Link="Linked\ItopodConstants.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\ItopodRewards.cs" Link="Linked\ItopodRewards.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\GoldDropTables.cs" Link="Linked\GoldDropTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ExpRatioTables.cs" Link="Linked\ExpRatioTables.cs" />
   </ItemGroup>

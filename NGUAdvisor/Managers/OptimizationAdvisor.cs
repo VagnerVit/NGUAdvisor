@@ -453,15 +453,14 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
 
-            // ITOPOD — beacon vs the idle-best floor (the advisor's own optimizer formula:
-            // floor(log1.05(attack × idleAttackPower/ItopodConstants.FloorHpNormalizer))). Auto-managed when optimize mode is on.
+            // ITOPOD — beacon vs the idle-best floor (ItopodConstants.BestFloor, the same game-truth
+            // one-shot solve the optimizer uses). Auto-managed when optimize mode is on.
             try
             {
                 int highest = c.adventure.highestItopodLevel;
                 if (highest > 0)
                 {
-                    double atk = c.totalAdvAttack() * c.idleAttackPower() / ItopodConstants.FloorHpNormalizer;
-                    int optimal = atk > 1 ? (int)Math.Floor(Math.Log(atk, ItopodConstants.FloorGrowthBase)) : 0;
+                    int optimal = ItopodConstants.BestFloor(c.totalAdvAttack(), c.idleAttackPower(), false);
                     int maxL = c.adventureController.maxItopodLevel();
                     if (optimal > maxL) optimal = maxL;
                     if (optimal < 0) optimal = 0;

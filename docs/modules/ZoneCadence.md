@@ -48,6 +48,12 @@ Do not collapse these — they answer different questions and were conflated onc
 | "do we one-shot this?" | **regular attack**, **worst** roll (×0.8) | `CombatAI.CombatAttacks` checks the regular attack first and only escalates, and a guaranteed kill must not rest on a lucky roll. Feeds the gates and the entry-HP relaxation. |
 | "how long does this fight take?" | **sustained rotation**, **mean** roll (×1.0) | A multi-swing fight really does get Strong/Piercing/Ultimate as their cooldowns come up. Feeds the farm rates only. |
 
+Piercing's multiplier is **`strongAttackPower()` (= `strongAttackMulti`)**, not `pierceAttackPower()`:
+`PlayerController.pierceAttack()` reads `adventureController.strongAttackMulti`, so
+`Character.pierceAttackPower()` (`pierceAttackMulti`) is dead code as far as damage is concerned.
+`ZoneCadence` used the dead one until this was traced, which meant zones and ITOPOD were compared with
+two different piercing multipliers.
+
 `SustainedDamagePerSlot` models the rotation as: each big move fires at most once per its own cooldown,
 one move per global cooldown, every remaining slot a regular attack — which is what `CombatAI`'s
 gain/loss scheduler converges to, without reimplementing its scheduler. Piercing is priced against

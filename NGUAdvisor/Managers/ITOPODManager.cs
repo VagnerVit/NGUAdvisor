@@ -173,16 +173,29 @@ namespace NGUAdvisor.Managers
                 if (!OffensiveBuffUnlocked())
                     return;
 
-                int bestFloor = CalculateBestFloor(CalculateMaxAttack(true));
+                int bestFloor = FloorFor(ChooseMaxAttack(true));
                 if (bestFloor >= 1550)
                     return;
 
-                float threshold = Mathf.Pow(1.05f, maxFloor) / CalculateMaxAttack();
-                if (threshold <= 1f)
+                // How much extra multiplier the buff burst has to supply to reach maxFloor. Solved
+                // from the game's damage formula instead of scaling a normalized attack: the
+                // defense term is a constant, so the required multiplier is NOT linear in the gap.
+                AttackChoice strongest = ChooseMaxAttack();
+                float threshold = (float)(ItopodConstants.MultiplierForFloor(
+                    _character.totalAdvAttack(), maxFloor, strongest.Piercing) / strongest.Multiplier);
+                if (threshold <= 1f || float.IsInfinity(threshold) || float.IsNaN(threshold))
                     return;
 
                 int tier = _ac.lootDrop.itopodTier(bestFloor);
-                if (tier >= 20 && BaseRespawnTime() < 2f * BaseGlobalCooldown())
+
+                // The burst has to actually reach a HIGHER reward tier than the floor we already
+                // farm, or it buys nothing: every ITOPOD reward keys off the tier, not the floor.
+                //
+                // This replaces a "tier >= 20 with a fast respawn, skip the dance" rule whose only
+                // premise was that killsPerAP bottoms out at tier 20 -- true, but AP is 1 either way,
+                // while the EXP award on that same kill is (T-1)(T-2)+2 and never stops growing.
+                // The dance was being switched off exactly where its payoff was largest.
+                if (ItopodRewards.Tier(maxFloor) <= ItopodRewards.Tier(bestFloor))
                     return;
 
                 float chargePower = _character.chargePower();
@@ -435,8 +448,7 @@ namespace NGUAdvisor.Managers
                 if (_character.arbitrary.boughtLazyITOPOD && _character.arbitrary.lazyITOPODOn)
                     return;
 
-                float attack = CalculateAttack();
-                int floor = CalculateBestFloor(attack);
+                int floor = FloorFor(ChooseAttack());
 
                 if (floor > Adventure.highestItopodLevel - 1)
                     floor = Adventure.highestItopodLevel - 1;
@@ -466,7 +478,7 @@ namespace NGUAdvisor.Managers
 
                 if (Settings.ITOPODOptimizeMode == 2)
                 {
-                    int floor = CalculateBestFloor(CalculateAttack(time) * multi);
+                    int floor = FloorFor(ChooseAttack(time), multi);
 
                     if (floor > Adventure.highestItopodLevel - 1)
                         floor = Adventure.highestItopodLevel - 1;
@@ -476,11 +488,11 @@ namespace NGUAdvisor.Managers
 
                 if (Settings.ITOPODOptimizeMode == 3)
                 {
-                    int defaultFloor = CalculateBestFloor(CalculateMaxAttack(true) * multi);
+                    int defaultFloor = FloorFor(ChooseMaxAttack(true), multi);
                     if (defaultFloor > Adventure.highestItopodLevel - 1)
                         defaultFloor = Adventure.highestItopodLevel - 1;
 
-                    int floor = CalculateBestFloor(CalculateAttack(time) * multi);
+                    int floor = FloorFor(ChooseAttack(time), multi);
                     if (floor > Adventure.highestItopodLevel - 1)
                         floor = Adventure.highestItopodLevel - 1;
 
@@ -633,21 +645,21 @@ namespace NGUAdvisor.Managers
                 }
             }
 
-            float attack = CalculateMaxAttack();
+            float buffs = 1f;
 
             if (OffensiveBuffUnlocked())
-                attack *= 1.2f;
+                buffs *= 1.2f;
 
             if (ChargeUnlocked())
-                attack *= _character.chargePower();
+                buffs *= _character.chargePower();
 
             if (UltimateBuffUnlocked())
-                attack *= 1.3f;
+                buffs *= 1.3f;
 
             if (MegaBuffUnlocked())
-                attack *= 1.2f;
+                buffs *= 1.2f;
 
-            maxFloor = CalculateBestFloor(attack);
+            maxFloor = FloorFor(ChooseMaxAttack(), buffs);
 
             if (Settings.ITOPODOptimizeMode == 2)
                 maxFloor -= maxFloor % 10;
@@ -672,84 +684,216 @@ namespace NGUAdvisor.Managers
             mode = CombatMode.Farm;
         }
 
-        private static float CalculateAttack(float time = -1f)
+        // The attack we will actually swing with, and what it multiplies totalAdvAttack() by.
+        //
+        // Piercing carries its own flag because it subtracts defense/3 rather than defense/2. Its
+        // multiplier is strongAttackMulti and NOT pierceAttackMulti: PlayerController.pierceAttack()
+        // reads character.adventureController.strongAttackMulti, which leaves
+        // Character.pierceAttackPower() dead code as far as damage is concerned.
+        private class AttackChoice
         {
-            float attack = Main.Character.totalAdvAttack();
+            public float Multiplier;
+            public bool Piercing;
+        }
 
-            // Using idle attack
+        private static AttackChoice Choice(float multiplier, bool piercing = false)
+            => new AttackChoice { Multiplier = multiplier, Piercing = piercing };
+
+        // The attack available within `time` seconds. time == -1 resolves it against the live
+        // respawn/cooldown window.
+        private static AttackChoice ChooseAttack(float time = -1f)
+        {
             if (Settings.ITOPODCombatMode == 0 || !RegularAttackUnlocked())
-                return attack * _character.idleAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.idleAttackPower());
 
-            // Using regular attack
             if (Settings.ITOPODOptimizeMode == 1)
-                return attack * _character.regAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.regAttackPower());
 
             if (time == -1f)
                 time = Mathf.Max(RemainingRespawnTime(), RemainingGlobalCooldown());
 
-            // Using strongest attacks
             if (UltimateAttackAvailable() && UltimateAttackCooldown() <= time)
-                return attack * _character.ultimateAttackPower() / ItopodConstants.FloorHpNormalizerF;
-            else if (PiercingAttackAvailable() && PiercingAttackCooldown() <= time)
-                return attack * _character.strongAttackPower() / ItopodConstants.PiercingHpNormalizerF;
-            else if (StrongAttackAvailable() && StrongAttackCooldown() <= time)
-                return attack * _character.strongAttackPower() / ItopodConstants.FloorHpNormalizerF;
-            else
-                return attack * _character.regAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.ultimateAttackPower());
+            if (PiercingAttackAvailable() && PiercingAttackCooldown() <= time)
+                return Choice(_character.strongAttackPower(), true);
+            if (StrongAttackAvailable() && StrongAttackCooldown() <= time)
+                return Choice(_character.strongAttackPower());
+            return Choice(_character.regAttackPower());
         }
 
-        private static float CalculateMaxAttack(bool regularAttack = false)
+        // The strongest attack we own, ignoring cooldowns.
+        private static AttackChoice ChooseMaxAttack(bool regularAttack = false)
         {
-            float attack = Main.Character.totalAdvAttack();
-
-            // Using idle attack
             if (Settings.ITOPODCombatMode == 0 || !RegularAttackUnlocked())
-                return attack * _character.idleAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.idleAttackPower());
 
-            // Using regular attack
             if (Settings.ITOPODOptimizeMode == 1 || regularAttack)
-                return attack * _character.regAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.regAttackPower());
 
-            // Using strongest attacks
             if (UltimateAttackUnlocked())
-                return attack * _character.ultimateAttackPower() / ItopodConstants.FloorHpNormalizerF;
-            else if (PiercingAttackUnlocked())
-                return attack * _character.strongAttackPower() / ItopodConstants.PiercingHpNormalizerF;
-            else if (StrongAttackUnlocked())
-                return attack * _character.strongAttackPower() / ItopodConstants.FloorHpNormalizerF;
-            else
-                return attack * _character.regAttackPower() / ItopodConstants.FloorHpNormalizerF;
+                return Choice(_character.ultimateAttackPower());
+            if (PiercingAttackUnlocked())
+                return Choice(_character.strongAttackPower(), true);
+            if (StrongAttackUnlocked())
+                return Choice(_character.strongAttackPower());
+            return Choice(_character.regAttackPower());
         }
 
-        // Highest floor a given Adventure combat mode can still one-shot, for advisors that need to
-        // price ITOPOD against adventure zones without disturbing the live ITOPOD settings. Same
-        // normalizer and growth base as CalculateMaxAttack/CalculateBestFloor above; the mode is a
-        // parameter here because the caller is asking "what if", not "what is".
-        public static int OptimalFloorForMode(int combatMode)
+        // Highest floor this attack, with `buffMulti` of buffs on top, still one-shots on the worst
+        // roll. The buff multiplier is passed in rather than pre-multiplied into a normalized attack
+        // because the enemy's defense term does not shrink with our multiplier -- see ItopodConstants.
+        private static int FloorFor(AttackChoice choice, float buffMulti = 1f)
         {
+            int floor = ItopodConstants.BestFloor(_character.totalAdvAttack(),
+                choice.Multiplier * buffMulti, choice.Piercing);
+            int maxLevel = _ac.maxItopodLevel();
+            return floor > maxLevel ? maxLevel : floor;
+        }
+
+        // One kill's worth of the rotation: the share of kills that land at `Floor`.
+        public class RotationSlice
+        {
+            public double Fraction;
+            public int Floor;
+        }
+
+        // What ITOPOD looks like at a given Adventure combat mode, for advisors pricing it against
+        // adventure zones. A "what if" question, so nothing here touches live settings.
+        //
+        // The old answer was a single floor derived from the regular attack alone. That is not what
+        // the pod actually runs: OptimizeFloor re-picks the floor between every pair of kills from
+        // whatever move is off cooldown, so the yield is an AVERAGE over the rotation, and the
+        // spread between a regular swing and an ultimate under buffs is 20-30x -- roughly 66 floors,
+        // more than a boost tier and a third of the PP per kill.
+        public class Profile
+        {
+            public bool Known;
+            public int CombatMode;
+            public double CycleSeconds;
+            public double KillsPerSecond;
+            public int DefaultFloor;      // plain swing, no big move, no buff
+            public int PeakFloor;
+            public RotationSlice[] Slices;
+        }
+
+        private class RotationMove
+        {
+            public float Multiplier;
+            public bool Piercing;
+            public float Cooldown;
+        }
+
+        // Fraction of the time a buff is up, from its own duty cycle.
+        private static double Uptime(double duration, double cooldown)
+        {
+            if (duration <= 0.0 || cooldown <= 0.0) return 0.0;
+            return Math.Min(1.0, duration / cooldown);
+        }
+
+        public static Profile ProfileForMode(int combatMode)
+        {
+            Profile p = new Profile { CombatMode = combatMode };
             try
             {
-                float attack = Main.Character.totalAdvAttack();
-                float multi = combatMode == 0 || !RegularAttackUnlocked()
+                bool idle = ZoneCadence.IsIdle(combatMode);
+                double swing = ZoneCadence.SwingSeconds(combatMode);
+                double cycle = BoostValueMath.CycleSeconds(idle, BaseRespawnTime(), swing, 1.0);
+                if (cycle <= 0.0 || double.IsInfinity(cycle) || double.IsNaN(cycle)) return p;
+
+                // beastModeBonus() is folded into totalAdvAttack(), so sampling it live would make
+                // this answer depend on whether beast happened to be up at the moment of the call.
+                // Start from the beast-free baseline and add the mode's own beast policy back.
+                double attack = ZoneStatHelper.EffectiveAdvAttack();
+                if (Settings.ITOPODBeastMode && BeastModeUnlocked())
+                    attack *= _character.inventory.itemList.purpleLiquidComplete ? 1.5 : 1.4;
+
+                int ceiling = Math.Min(_ac.maxItopodLevel(), Math.Max(0, Adventure.highestItopodLevel - 1));
+                Func<double, bool, int> floorOf = (multi, pierce) =>
+                    Math.Min(ceiling, ItopodConstants.BestFloor(attack, multi, pierce));
+
+                double regularMulti = idle || !RegularAttackUnlocked()
                     ? _character.idleAttackPower()
                     : _character.regAttackPower();
-                return CalculateBestFloor(attack * multi / ItopodConstants.FloorHpNormalizerF);
+                if (regularMulti <= 0f) regularMulti = 1f;
+
+                List<RotationSlice> slices = new List<RotationSlice>();
+
+                if (idle)
+                {
+                    slices.Add(new RotationSlice { Fraction = 1.0, Floor = floorOf(regularMulti, false) });
+                }
+                else
+                {
+                    // Each big move fires at most once per its own cooldown; one kill happens per
+                    // cycle, so its share of kills is cycle/cooldown. Strongest first, remainder to
+                    // the regular attack -- the same accounting SustainedDamagePerSlot uses for
+                    // multi-swing fights, applied to one-swing kills.
+                    List<RotationMove> moves = new List<RotationMove>();
+                    if (UltimateAttackUnlocked())
+                        moves.Add(new RotationMove { Multiplier = _character.ultimateAttackPower(), Cooldown = _character.ultimateAttackCooldown() });
+                    if (PiercingAttackUnlocked())
+                        moves.Add(new RotationMove { Multiplier = _character.strongAttackPower(), Piercing = true, Cooldown = _character.pierceAttackCooldown() });
+                    if (StrongAttackUnlocked())
+                        moves.Add(new RotationMove { Multiplier = _character.strongAttackPower(), Cooldown = _character.strongAttackCooldown() });
+
+                    // Buffs multiply every attack, so they split each attack share again. Treated as
+                    // independent of the move schedule, which is an approximation -- CombatAI does
+                    // try to line the big moves up with the buffs, so this is the conservative side.
+                    double offUp = OffensiveBuffUnlocked()
+                        ? Uptime(_ac.offenseBuffDuration, _character.offenseBuffCooldown()) : 0.0;
+                    double ultUp = UltimateBuffUnlocked()
+                        ? Uptime(_character.ultimateBuffDuration(), _character.ultimateBuffCooldown()) : 0.0;
+                    double[][] buffStates =
+                    {
+                        new[] { (1.0 - offUp) * (1.0 - ultUp), 1.0 },
+                        new[] { offUp * (1.0 - ultUp), 1.2 },
+                        new[] { (1.0 - offUp) * ultUp, 1.3 },
+                        new[] { offUp * ultUp, 1.2 * 1.3 },
+                    };
+
+                    List<RotationMove> schedule = new List<RotationMove>();
+                    List<double> shares = new List<double>();
+                    double left = 1.0;
+                    foreach (RotationMove m in moves)
+                    {
+                        if (left <= 0.0) break;
+                        if (m.Cooldown <= 0f || m.Multiplier <= 0f) continue;
+                        double share = Math.Min(left, cycle / m.Cooldown);
+                        if (share <= 0.0) continue;
+                        schedule.Add(m);
+                        shares.Add(share);
+                        left -= share;
+                    }
+                    schedule.Add(new RotationMove { Multiplier = (float)regularMulti });
+                    shares.Add(Math.Max(0.0, left));
+
+                    for (int i = 0; i < schedule.Count; i++)
+                    {
+                        if (shares[i] <= 0.0) continue;
+                        foreach (double[] buff in buffStates)
+                        {
+                            if (buff[0] <= 0.0) continue;
+                            slices.Add(new RotationSlice
+                            {
+                                Fraction = shares[i] * buff[0],
+                                Floor = floorOf(schedule[i].Multiplier * buff[1], schedule[i].Piercing)
+                            });
+                        }
+                    }
+                }
+
+                if (slices.Count == 0) return p;
+
+                p.Known = true;
+                p.CycleSeconds = cycle;
+                p.KillsPerSecond = 1.0 / cycle;
+                p.DefaultFloor = floorOf(regularMulti, false);
+                p.Slices = slices.ToArray();
+                foreach (RotationSlice s in slices)
+                    if (s.Floor > p.PeakFloor) p.PeakFloor = s.Floor;
             }
-            catch (Exception e) { Main.LogDebug($"OptimalFloorForMode: {e.Message}"); return 0; }
-        }
-
-        private static int CalculateBestFloor(float attack)
-        {
-            int floor = (int)Math.Floor(Math.Log(attack, ItopodConstants.FloorGrowthBase));
-
-            if (floor < 0)
-                return 0;
-
-            int maxLevel = _ac.maxItopodLevel();
-            if (floor > maxLevel)
-                floor = maxLevel;
-
-            return floor;
+            catch (Exception e) { Main.LogDebug($"ITOPOD ProfileForMode({combatMode}): {e.Message}"); }
+            return p;
         }
 
         private static void SetFloor(int start, int end = 0)

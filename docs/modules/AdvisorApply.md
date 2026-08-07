@@ -73,6 +73,10 @@ not a framework:
   outranks everything, is cheap, and sits OUTSIDE the 10-min throttle (toggle acts next tick).
   Then Farm Gear Zones (permanent item-max bonuses) > boost farm > ITOPOD; Farm Best Boost
   falls back to ITOPOD when `BoostDemandExists` says nothing consumes boosts.
+  **The fallback picks its combat mode on PP, not on boosts** — routing to the pod *because nothing
+  consumes boosts* and then choosing the mode by boost rate is self-contradictory. PP is the currency
+  nothing else in the game produces, so it decides; the PP/EXP/AP rates and the floor band go in the
+  log line (`ItopodFarmAdvisor`). When ITOPOD wins on boosts outright, the boost mode stands.
 - **Titan gold** (`ApplyTitanGold` + `HighestAkTitan` 30 s cache): auto-targets the HIGHEST
   AK-able titan (its drop dwarfs all lower ones) **on every AK cycle** — the kill is free, so there is
   no payoff gate and the `TitanMoneyDone` latch is re-armed here rather than blocking (see

@@ -36,12 +36,15 @@ Defensive stalls, so neither can win on throughput) and returns `BestMode` along
 mode it was costed at is not the one running. `RateAtCurrentMode` is the same winner re-priced at the
 configured mode, so the UI can show what the current setting costs.
 
-ITOPOD's floor comes from `ITOPODManager.OptimalFloorForMode(mode)` rather than a local
-reimplementation of the floor-HP math.
+ITOPOD is priced by `ItopodFarmAdvisor.ForMode(mode, sinks).BoostPerSecond` — this advisor consumes
+only the boost component and stays boost-only by design. The floor distribution over the attack
+rotation, the tier ladder and the reward formulas all live there and in `ItopodRewards`; do not
+reimplement any of them here. **Read `ItopodFarmAdvisor.md`** — in particular that the boost yield
+stops improving at floor 1150 while PP and EXP do not, which is why a boost-only reading of the pod
+is not a reading of the pod.
 
-ITOPOD (`itopodDrop`): flat **14 % chance, NOT drop-chance scaled**; boost tier laddered from
-optimal floor: tier = floor/50+1, mapped into the 13-value ladder {1…10000} with the game's
-tier→index bends (tier ≥ 24→13, ≥ 18→12, ≥ 15→11, > 10→10).
+The old `ItopodRate` evaluated one floor from `OptimalFloorForMode` (regular attack, no buffs, no big
+moves) and assumed one swing per kill at it.
 
 ## Data provenance — these bugs are encoded in the comments, don't regress them
 

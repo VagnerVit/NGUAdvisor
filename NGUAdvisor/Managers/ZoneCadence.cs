@@ -193,8 +193,11 @@ namespace NGUAdvisor.Managers
             List<double[]> moves = new List<double[]>();
             if (CombatHelpers.UltimateAttackUnlocked())
                 moves.Add(new[] { Raw(2.0) * c.ultimateAttackPower() * buff, (double)c.ultimateAttackCooldown() });
+            // strongAttackPower(), not pierceAttackPower(): PlayerController.pierceAttack() multiplies
+            // by adventureController.strongAttackMulti. Character.pierceAttackPower() returns
+            // pierceAttackMulti, which nothing in the damage path ever reads.
             if (CombatHelpers.PiercingAttackUnlocked())
-                moves.Add(new[] { Raw(3.0) * c.pierceAttackPower() * buff, (double)c.pierceAttackCooldown() });
+                moves.Add(new[] { Raw(3.0) * c.strongAttackPower() * buff, (double)c.pierceAttackCooldown() });
             if (CombatHelpers.StrongAttackUnlocked())
                 moves.Add(new[] { Raw(2.0) * c.strongAttackPower() * buff, (double)c.strongAttackCooldown() });
 

@@ -553,9 +553,16 @@ namespace NGUAdvisor
             {
                 var c = Main.Character;
                 if (c == null) return;
-                double atk = c.totalAdvAttack() * c.idleAttackPower() / ItopodConstants.FloorHpNormalizer;
-                int optimal = atk > 1 ? (int)Math.Floor(Math.Log(atk, ItopodConstants.FloorGrowthBase)) : 0;
-                _floorInfo.Text = $"Optimal idle floor right now: {optimal}  (highest reached: {c.adventure.highestItopodLevel})";
+                int optimal = ItopodConstants.BestFloor(c.totalAdvAttack(), c.idleAttackPower(), false);
+                string text = $"Optimal idle floor right now: {optimal}  (highest reached: {c.adventure.highestItopodLevel})";
+                // The floor above is the idle one-shot floor; the rates are what the CONFIGURED mode
+                // actually earns, averaged over its attack rotation. Boosts are left out — they need
+                // a BoostSinks snapshot, and the boost advisor already shows them.
+                var rates = ItopodFarmAdvisor.ForMode(Settings?.CombatMode ?? 0);
+                if (rates.Known)
+                    text += $"\nAt {BoostFarmAdvisor.ModeName(rates.CombatMode)}, floors {rates.DefaultFloor}-{rates.PeakFloor}:"
+                          + $" {rates.PpPerSecond:0.####} PP/s · {rates.ExpPerSecond:0.##} EXP/s";
+                UiLayout.FitOrGrow(_floorInfo, text, 2);
             }
             catch (Exception ex) { LogDebug($"Floor info: {ex.Message}"); }
         }

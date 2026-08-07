@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace NGUAdvisor.Managers
 {
@@ -167,21 +166,11 @@ namespace NGUAdvisor.Managers
         private static int[] CandidateModes()
             => CombatHelpers.RegularAttackUnlocked() ? new[] { 0, 3 } : new[] { 0 };
 
-        // ITOPOD boost points per second at the floor the given mode can hold. The floor -> tier
-        // ladder and its bends are ITOPODManager's knowledge, not ours.
+        // ITOPOD boost points per second, averaged over the rotation the mode actually runs. The
+        // floor distribution, the tier ladder and the reward formulas all live in ItopodFarmAdvisor
+        // / ItopodRewards — this advisor only consumes the boost component.
         private static double ItopodRate(int combatMode, BoostSinks.Sinks sinks)
-        {
-            int floor = ITOPODManager.OptimalFloorForMode(combatMode);
-            int tier = Math.Max(1, Math.Min(floor / 50 + 1, 24));
-            int idx = tier >= 24 ? 13 : tier >= 18 ? 12 : tier >= 15 ? 11 : tier > 10 ? 10 : tier;
-            double perKill = 0.14 * BoostSinks.ValueOfDrop(idx, sinks);
-
-            // At its optimal floor every ITOPOD enemy dies to one swing, and the pod has no bosses,
-            // so the cycle is the bare spawn-plus-swing loop.
-            double cycle = BoostValueMath.CycleSeconds(ZoneCadence.IsIdle(combatMode),
-                CombatHelpers.BaseRespawnTime(), ZoneCadence.SwingSeconds(combatMode), 1.0);
-            return cycle > 0 ? perKill / cycle : 0;
-        }
+            => ItopodFarmAdvisor.ForMode(combatMode, sinks).BoostPerSecond;
 
         public static Verdict Analyze()
         {

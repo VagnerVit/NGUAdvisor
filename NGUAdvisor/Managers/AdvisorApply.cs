@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -807,17 +807,35 @@ namespace NGUAdvisor.Managers
 
             var v = BoostFarmAdvisor.Analyze();
             if (!v.Known) return;
-            ApplyFarmCombatMode(v.BestMode, v.BestName);
             int target = v.BestZone == -1000 ? 1000 : v.BestZone;
             string name = v.BestName;
             string detail = $"{v.BestRate:0.###} boost/s";
+            int farmMode = v.BestMode;
             // Farm Best Boost: boost zones only beat the ITOPOD while something consumes boosts.
+            bool routedForBoosts = true;
             if (Main.Settings.AdvisorFarmBoost && target != 1000 && !BoostFarmAdvisor.BoostDemandExists(out var why))
             {
                 target = 1000;
                 name = "ITOPOD";
                 detail = $"no boost demand — {why}";
+                routedForBoosts = false;
             }
+
+            // Parking in the pod because nothing consumes boosts means the boost rate is exactly the
+            // wrong thing to pick its combat mode on. PP is the currency nothing else in the game
+            // produces, so it decides — and the other rates go in the log, because the four do not
+            // peak at the same floor (boosts stop improving at floor 1150, AP at 950, EXP never).
+            if (target == 1000 && !routedForBoosts)
+            {
+                ItopodFarmAdvisor.Rates rates = ItopodFarmAdvisor.Best(r => r.PpPerSecond, BoostSinks.Current());
+                if (rates.Known)
+                {
+                    farmMode = rates.CombatMode;
+                    detail += $" · {rates.PpPerSecond:0.####} PP/s, {rates.ExpPerSecond:0.##} EXP/s"
+                            + $" (floors {rates.DefaultFloor}-{rates.PeakFloor})";
+                }
+            }
+            ApplyFarmCombatMode(farmMode, name);
             if (Main.Settings.SnipeZone != target)
             {
                 Main.Settings.SnipeZone = target;

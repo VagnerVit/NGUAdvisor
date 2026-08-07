@@ -75,6 +75,8 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |
 | `TitanTables.md` | TitanTables + NumberFormatter |
 | `ZoneCadence.md` | ZoneCadence + BoostValueMath + BoostSinks (**farm-rate substrate: kill cadence, idle-vs-manual truth, boost pricing — read before touching either farm advisor**) |
+| `ItopodFarmAdvisor.md` | ItopodFarmAdvisor + ItopodRewards (**the pod's four currencies and where each one saturates — read before pricing ITOPOD against anything**) |
+| `ITOPODManager.md` | ITOPODManager + ItopodConstants (**the one-shot floor solve; the defense term is NOT divided by the multiplier**) |
 | `ExpBalancer.md` | ExpBalancer + ExpRatioTables (guide EXP-ratio phase table) |
 | `GoldDropAdvisor.md` | GoldDropAdvisor + GoldDropTables (gold-kill payoff vs. the TM's banked drop) |
 | `reference-gear-optimizer.md` | `external/gear-optimizer/` (the JS oracle) |

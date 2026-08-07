@@ -4,6 +4,41 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.27] - 2026-08-07
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **The ITOPOD floor formula overshot, and it overshot worst exactly where you use it hardest.** The
+  advisor solved the one-shot floor as if the enemy's defense shrank along with your attack multiplier.
+  It does not — the game subtracts defense *before* multiplying — so the stronger the rotation, the
+  higher the floor it claimed you could hold: about three floors too high on a full Offensive buff
+  stack, ten at very high multipliers. Those are floors where kills silently stop being one-shots and
+  your kill rate quietly halves. The floor is now solved from the game's own mob table and damage
+  formula.
+- **Piercing attacks were priced with the wrong multiplier when ranking zones.** The game's piercing
+  attack multiplies by the Strong Attack multiplier, not the Piercing one; zone kill-speed estimates
+  used the latter, so zones and ITOPOD were being compared on two different scales.
+
+### Changed
+
+- **ITOPOD is no longer valued on boosts alone.** Its boost drops stop improving at floor 1150 and its
+  AP at floor 950, but EXP keeps growing quadratically and PP keeps growing with every floor up to
+  1600 — so the old boost-only reading saw a plateau that is not there and routed away from the pod
+  too early. The advisor now prices PP, EXP, AP and boosts separately, and averages each over the
+  attack rotation the pod actually runs (the floor is re-picked between kills, so a single-floor
+  estimate was never what happened). When the advisor parks you in ITOPOD *because nothing is
+  consuming boosts*, it now picks the combat mode on PP rather than on boosts, and logs the PP and
+  EXP rates with the floor band. The Adventure panel shows them too. AP is modelled but neither
+  displayed nor used to decide anything — an AP award is always exactly 1, so it cannot tell two
+  floors apart the way PP and EXP can.
+- **The ITOPOD buff burst is no longer switched off where it pays best.** The floor-jump burst in
+  optimize mode 3 stopped firing above tier 20 with a fast respawn, because that is where the AP
+  reward interval bottoms out. But the EXP award lands on the very same kill and keeps growing
+  quadratically with the tier, so the burst was being disabled exactly where it earned the most. It
+  now fires whenever it reaches a higher reward tier than the floor being farmed.
+
 ## [1.2.26] - 2026-08-06
 
 Existing settings and profile files remain compatible with version 1.1.0.

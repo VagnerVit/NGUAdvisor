@@ -5,17 +5,75 @@ Two modes: **Farm** (sit on the optimal one-shot floor) and **Push** (climb
 `itopodStart..itopodEnd`, full CombatAI mode 2). `UpdateMaxFloor()` (periodic) decides the mode;
 `Update()` (per tick) runs zone check + quick actions.
 
-## Game-truth constants (`ItopodConstants`)
+## Game-truth floor math (`ItopodConstants`)
 
-Floor difficulty: mob HP grows ~5 %/floor. Best one-shot floor =
-`log_1.05(attack × attackPower / normalizer)`:
+Every ITOPOD spawn is the SAME mob — `Enemy(name, AR 1.2, atk 10, def 10, regen 1, hp 600)` from
+`createEnemyTable()` — scaled by `powerUp(e, L)`: each stat `× 1.05^L`, then `× Random.Range(0.98, 1.02)`.
 
-- `FloorHpNormalizer = 771.375` (idle/regular/strong/ultimate branches)
-- `PiercingHpNormalizer = 769.25` (piercing branch only)
-- `FloorGrowthBase = 1.05`
+`PlayerController` subtracts the enemy's defense **before** the multiplier:
 
-Sourced from the game's ITOPOD mob-HP scaling; NOT yet read from a live game field — if the game
-patches the scaling, this is the one-line update point.
+```
+damage = (totalAdvAttack − defense/divisor) × multiplier × Random.Range(0.8, 1.2)
+divisor = 3 for pierceAttack, 2 for everything else
+```
+
+so a guaranteed one-shot on floor `L` needs
+
+```
+attack ≥ 1.05^L × ( 600×1.02 / (0.8 × M) + 10×1.02 / divisor )
+                   \______ AttackPerFloorUnit(M, piercing) ______/
+```
+
+**The defense term is a constant — it does not shrink as the rotation gets stronger.** The retired
+`FloorHpNormalizer = 771.375` / `PiercingHpNormalizer = 769.25` folded it inside the `0.8` divisor,
+i.e. divided it by `M` too. They are exactly `(600×1.02 + 10×1.02/divisor)/0.8`, correct only at
+`M = 1` and increasingly OPTIMISTIC above it:
+
+| M | floors overshot |
+|---|---|
+| 1 | 0 (0.17 % conservative) |
+| 10 | +1 |
+| 29 (ult × offBuff × ultBuff × charge 2.2 × mega) | +3 |
+| 100 | +10 |
+
+Those are floors the advisor would park on without being able to guarantee the one-shot it assumed —
+worst exactly in Offensive mode, where the full buff stack lives. Pinned in
+`tests/NGUAdvisor.Tests/ItopodMathTests.cs`, including the derivation of the two old constants.
+
+API: `AttackPerFloorUnit`, `NormalizedAttack`, `FloorOfNormalized`, `BestFloor`,
+`MultiplierForFloor` (the inverse — and it returns `+inf` when the scaled defense alone eats the
+whole swing, a state the old form could not express). `MaxFloor = 1600` (`maxItopodLevel()`).
+
+`ITOPODManager` never pre-multiplies a normalized attack by a buff factor any more: `FloorFor(choice,
+buffMulti)` passes the multiplier into the solve. `ChooseAttack`/`ChooseMaxAttack` return an
+`AttackChoice { Multiplier, Piercing }` — piercing carries its own flag for the `defense/3` divisor,
+and its multiplier is `strongAttackMulti`, NOT `pierceAttackMulti`: `PlayerController.pierceAttack()`
+reads `adventureController.strongAttackMulti`, which leaves `Character.pierceAttackPower()` dead code
+for damage. Mode 3's `threshold` is `MultiplierForFloor(...) / choice.Multiplier` — the required
+multiplier is not linear in the floor gap, so the old `1.05^maxFloor / normalizedAttack` was wrong
+for the same reason.
+
+## `ProfileForMode(combatMode)` — what advisors price ITOPOD with
+
+Replaces `OptimalFloorForMode`, which answered with a single floor derived from the regular attack
+alone. That is not what the pod runs: `OptimizeFloor` re-picks the floor between every pair of kills
+from whichever move is off cooldown, so the yield is an AVERAGE over the rotation, and the spread
+between a regular swing and a buffed ultimate is 20–30× ≈ 66 floors.
+
+Returns `Profile { CycleSeconds, KillsPerSecond, DefaultFloor, PeakFloor, Slices[] }`, where each
+`RotationSlice` is `{ Fraction, Floor }`. Shares: each big move fires at most once per its own
+cooldown, so it takes `cycle / cooldown` of the kills, strongest first, remainder to the regular
+attack. Buff uptime (`min(1, duration/cooldown)` for the offensive and ultimate buffs) splits each
+attack share again, treated as independent of the move schedule — the conservative side, since
+`CombatAI` does try to line them up.
+
+Two things it deliberately does NOT read live:
+
+- **Beast mode.** `beastModeBonus()` is folded into `totalAdvAttack()`, so sampling it live would
+  make a "what if" answer depend on whether beast happened to be up. Starts from
+  `ZoneStatHelper.EffectiveAdvAttack()` (beast-free) and adds the mode's own beast policy back
+  (`×1.5` with Purple Liquid, else `×1.4`).
+- **Floors we cannot reach.** Capped at `highestItopodLevel − 1`; farming above that needs a push.
 
 ## Optimize modes (`Settings.ITOPODOptimizeMode`)
 
