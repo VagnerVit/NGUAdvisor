@@ -97,5 +97,57 @@ namespace NGUAdvisor.Tests
         {
             Assert.Empty(ProfileValidator.Warnings(Profile(@"""AUG-X"", ""AUG-99"", ""AUG-8""")));
         }
+
+        [Fact]
+        public void UnknownChainObjectiveIsWarned()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],
+                ""Priorities"":[{""Objective"":""Definitely Not An Objective"",""Slots"":2}]}]}}";
+
+            Assert.Contains(ProfileValidator.Warnings(json),
+                w => w.Contains("Definitely Not An Objective"));
+        }
+
+        [Fact]
+        public void NegativeSlotCountIsWarned()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],
+                ""Priorities"":[{""Objective"":""Adventure"",""Slots"":-1}]}]}}";
+
+            Assert.Contains(ProfileValidator.Warnings(json), w => w.Contains("Slots"));
+        }
+
+        [Fact]
+        public void ChainLongerThanTheCapIsWarned()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],""Priorities"":[
+                {""Objective"":""Adventure"",""Slots"":1},{""Objective"":""Adventure"",""Slots"":1},
+                {""Objective"":""Adventure"",""Slots"":1},{""Objective"":""Adventure"",""Slots"":1},
+                {""Objective"":""Adventure"",""Slots"":1},{""Objective"":""Adventure"",""Slots"":1}]}]}}";
+
+            Assert.Contains(ProfileValidator.Warnings(json), w => w.Contains("5"));
+        }
+
+        [Fact]
+        public void AValidChainProducesNoChainWarnings()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],""Priorities"":[
+                {""Objective"":""Adventure"",""Slots"":3},{""Objective"":""Respawn"",""Slots"":1}]}]}}";
+
+            Assert.DoesNotContain(ProfileValidator.Warnings(json), w => w.Contains("gear priority"));
+        }
+
+        [Fact]
+        public void MissingObjectiveWithNegativeSlotsIdentifiesStepByPositionNotAnEmptyName()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],
+                ""Priorities"":[{""Objective"":"""",""Slots"":-1}]}]}}";
+
+            var warnings = ProfileValidator.Warnings(json);
+
+            Assert.Contains(warnings, w => w.Contains("has no Objective and will be skipped"));
+            Assert.Contains(warnings, w => w.Contains("step 1") && w.Contains("negative Slots"));
+            Assert.DoesNotContain(warnings, w => w.Contains("\"\""));
+        }
     }
 }

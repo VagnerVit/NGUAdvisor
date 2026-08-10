@@ -84,5 +84,52 @@ namespace NGUAdvisor.Tests
         {
             Assert.ThrowsAny<System.Exception>(() => ProfileModel.Load(@"{ ""NotBreakpoints"": 1 }"));
         }
+
+        [Fact]
+        public void GearPrioritiesLoadIntoTypedEntries()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],""Priorities"":[
+                {""Objective"":""Adventure"",""Slots"":3},
+                {""Objective"":""Energy NGU"",""Slots"":2},
+                {""Objective"":""Respawn""}]}]}}";
+
+            var model = ProfileModel.Load(json);
+
+            var bp = Assert.Single(model.Gear);
+            Assert.Equal(3, bp.Priorities.Count);
+            Assert.Equal("Adventure", bp.Priorities[0].Objective);
+            Assert.Equal(3, bp.Priorities[0].Slots);
+            Assert.Equal("Energy NGU", bp.Priorities[1].Objective);
+            Assert.Equal(2, bp.Priorities[1].Slots);
+            Assert.Equal("Respawn", bp.Priorities[2].Objective);
+            Assert.Equal(0, bp.Priorities[2].Slots);   // omitted Slots == unlimited
+        }
+
+        [Fact]
+        public void GearPrioritiesSurviveARoundTrip()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[],""Priorities"":[
+                {""Objective"":""Adventure"",""Slots"":3},
+                {""Objective"":""Respawn"",""Slots"":1}]}]}}";
+
+            var reloaded = ProfileModel.Load(ProfileModel.Load(json).ToJson());
+
+            var bp = Assert.Single(reloaded.Gear);
+            Assert.Equal(2, bp.Priorities.Count);
+            Assert.Equal("Adventure", bp.Priorities[0].Objective);
+            Assert.Equal(3, bp.Priorities[0].Slots);
+            Assert.Equal("Respawn", bp.Priorities[1].Objective);
+            Assert.Equal(1, bp.Priorities[1].Slots);
+        }
+
+        [Fact]
+        public void GearBreakpointWithoutPrioritiesEmitsNoPrioritiesKey()
+        {
+            const string json = @"{""Breakpoints"":{""Gear"":[{""Time"":0,""ID"":[1,2],""Objective"":""Adventure""}]}}";
+
+            var saved = ProfileModel.Load(json).ToJson();
+
+            Assert.DoesNotContain("Priorities", saved);
+        }
     }
 }

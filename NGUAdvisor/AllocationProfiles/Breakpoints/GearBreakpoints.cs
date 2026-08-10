@@ -1,6 +1,7 @@
 using NGUAdvisor.AllocationProfiles.BreakpointTypes;
 using NGUAdvisor.Managers;
 using SimpleJSON;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace NGUAdvisor.AllocationProfiles.Breakpoints
@@ -14,6 +15,8 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
         public int[] Ids;
         public string Objective;
         public bool ForceRespawn;
+        // An explicit priority chain ("Priorities"). When non-empty it supersedes Objective.
+        public List<GearPriority> Priorities;
     }
 
     // ActiveObjective/ActiveForceRespawn mirror the objective of the last-applied gear breakpoint
@@ -37,11 +40,67 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
             var id = bp["ID"];
             if (id != null && id.IsArray)
                 spec.Ids = id.AsArray.Children.Select(x => x.AsInt).ToArray();
+            var chain = bp["Priorities"];
+            if (chain != null && chain.IsArray)
+            {
+                spec.Priorities = new List<GearPriority>();
+                // Truncate BEFORE filtering, exactly as GearOptimizer.Optimize does (Take then Where), so
+                // ProfileValidator's "only the first 5 are used" message describes what actually happens.
+                foreach (var step in chain.AsArray.Children.Take(GearChain.MaxPriorities))
+                {
+                    var name = step["Objective"]?.Value ?? "";
+                    var objective = GearChain.FindObjective(name);
+                    // Refuse, don't guess: an unresolved name is SKIPPED and logged, never mapped onto a
+                    // near-match. ProfileValidator surfaces the same names as warnings in the editor.
+                    if (objective == null)
+                    {
+                        Main.LogDebug($"Gear priority objective '{name}' not recognized; step skipped.");
+                        continue;
+                    }
+                    // Profile-side convention: Slots == 0 (or absent) means "all remaining accessory
+                    // slots", which GearPriority spells as GearChain.Unlimited. THIS is the only place the
+                    // two conventions meet.
+                    //
+                    // A NEGATIVE Slots claims nothing (0), agreeing with the optimizer's own
+                    // Math.Max(0, MaxAccessorySlots) clamp (GearOptimizer.cs:585) and with the
+                    // ProfileValidator warning the user is shown. Mapping it to
+                    // Unlimited instead would make a typo'd "-1" swallow every accessory slot and starve
+                    // the rest of the chain -- the loudest possible failure from the quietest typo.
+                    var slots = step["Slots"]?.AsInt ?? 0;
+                    spec.Priorities.Add(new GearPriority
+                    {
+                        Objective = objective,
+                        MaxAccessorySlots = slots == 0 ? GearChain.Unlimited : System.Math.Max(0, slots),
+                    });
+                }
+            }
             return spec;
         }
 
         public static string ActiveObjective { get; private set; }
         public static bool ActiveForceRespawn { get; private set; }
+        // The chain the last-applied gear breakpoint resolved to (null when it was a manual ID list).
+        // Always a chain, even for a plain objective, so AdvisorApply's refresh has one shape to handle.
+        public static IReadOnlyList<GearPriority> ActiveChain { get; private set; }
+        // The NAME ActiveChain was resolved FROM -- a chain preset or a plain objective -- or null when the
+        // breakpoint carried an explicit Priorities list, which no name can express.
+        //
+        // This is NOT ActiveObjective. That one is the chain's LEAD objective, so the preset
+        // "Adventure + Respawn" reports "Adventure" and is indistinguishable from the plain objective of
+        // the same name: a challenge/segment override asking for "Adventure" would silently be handed the
+        // profile's whole three-step chain. AdvisorApply matches on this instead.
+        public static string ActiveChainSource { get; private set; }
+
+        // Profile reload / rebirth: the Active* mirror describes a breakpoint that is no longer applied, and
+        // a stale ActiveChain outranks the name AdvisorApply resolves for itself.
+        public override void Reset()
+        {
+            base.Reset();
+            ActiveChain = null;
+            ActiveChainSource = null;
+            ActiveObjective = null;
+            ActiveForceRespawn = false;
+        }
 
         protected override bool PerformSwap(Breakpoint bp)
         {
@@ -63,25 +122,41 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 }
             }
 
-            int[] ids;
-            if (!string.IsNullOrEmpty(objectiveName))
+            // Resolution order: explicit Priorities -> a named chain preset -> a single objective ->
+            // (the challenge default above already folded into objectiveName) -> the manual ID list.
+            List<GearPriority> chain = null;
+            string chainSource = null;
+            if (bp.priorities.Priorities != null && bp.priorities.Priorities.Count > 0)
+                chain = bp.priorities.Priorities;
+            else if (!string.IsNullOrEmpty(objectiveName))
             {
-                var objective = GearOptimizer.FindObjective(objectiveName);
-                if (objective == null)
+                chain = GearChain.Resolve(objectiveName);
+                if (chain == null)
                 {
                     Main.LogDebug($"Gear breakpoint objective '{objectiveName}' not recognized.");
                     return false;
                 }
-                ids = GearOptimizer.OptimizeIds(objective, forceRespawn);
+                chainSource = objectiveName;
+            }
+
+            int[] ids;
+            if (chain != null)
+            {
+                ids = GearOptimizer.OptimizeIds(chain, null, forceRespawn);
                 if (ids.Length == 0)
                     return false;
-                Main.Log($"Optimized gear for '{objective.Name}'{(forceRespawn ? " (+top respawn)" : "")}: {ids.Length} items.");
-                ActiveObjective = objectiveName;
+                Main.Log($"Optimized gear for '{GearChain.Describe(chain)}'{(forceRespawn ? " (+top respawn)" : "")}: {ids.Length} items.");
+                // Copy: ActiveChain is a static and must never alias the live profile structure.
+                ActiveChain = chain.ToList();
+                ActiveChainSource = chainSource;
+                ActiveObjective = chain[0].Objective.Name;
                 ActiveForceRespawn = forceRespawn;
             }
             else
             {
                 ids = bp.priorities.Ids ?? new int[0];
+                ActiveChain = null;
+                ActiveChainSource = null;
                 ActiveObjective = null;
                 ActiveForceRespawn = false;
             }

@@ -324,6 +324,70 @@ The list of IDs is the IDs of the gear desired.
 
 You can dump your loadouts from Gear Optimizer using the method found on [this wiki page](https://github.com/rus9384/NGUAdvisor/wiki/Dump-Equipment-from-GO).
 
+### Optimising instead of listing IDs
+
+Instead of `ID`, a gear breakpoint can name an **objective** and let the advisor optimise your live
+inventory for it — so your gear keeps improving as your drops do:
+
+```
+"Gear": [
+    {
+        "Time": 0,
+        "Objective": "Adventure",
+        "TopRespawn": true
+    }
+]
+```
+
+`Objective` accepts either a single objective name or the name of a built-in **priority chain**
+(`"Adventure + Respawn"`, `"Adventure + Energy"`). `TopRespawn` additionally keeps the single best
+Respawn item in the loadout when the optimised set would otherwise have no respawn at all.
+
+### Priority chains (`Priorities`)
+
+A single objective fills every accessory slot with the same stat. A chain is an **ordered** list of
+objectives, each allowed to claim a number of the accessory slots that are still free when its turn
+comes — which is how you get a mixed set:
+
+```
+"Gear": [
+    {
+        "Time": { "h": 1 },
+        "Priorities": [
+            { "Objective": "Adventure", "Slots": 3 },
+            { "Objective": "Respawn",   "Slots": 1 },
+            { "Objective": "Adventure" }
+        ]
+    }
+]
+```
+
+That reads: best Power×Toughness gear using at most 3 accessory slots, then one respawn accessory,
+then fill everything still free with Adventure again.
+
+- **`Slots` omitted (or `0`) means "all remaining accessory slots"** — which is why the last step
+  above needs no number. A negative `Slots` claims none.
+- The same objective may appear more than once; that is how you express "reserve some slots for X".
+- At most **5** steps are used; extra steps are ignored (the profile editor stops offering **+ Add
+  step** at 5, and warns if a hand-edited file has more).
+- A step whose `Objective` is not recognised is **skipped**, never guessed at — the profile editor
+  shows that as a warning, and `debug.log` records it.
+- When `Priorities` is present and non-empty it **supersedes** `Objective` for that breakpoint. The
+  first step's objective is the one shown on the LIGHTS page and the one the advisor's re-equip
+  threshold measures against.
+- The first step also picks your weapons and armour; later steps only choose accessories.
+
+### ALWAYS EQUIP (pinned items)
+
+**Settings → ALWAYS EQUIP** holds a global list of item IDs that are placed into every optimised
+loadout before the objective gets to pick anything — for gear you want worn no matter what (a Ring of
+Greed, a utility accessory). It applies to every optimised set, including titan and gold gear, with
+one deliberate exception: during a **live titan fight that cannot be auto-killed**, the advisor
+equips its kill set and ignores pins, because loot/utility gear on a real titan is a death loop.
+
+Pinned items you no longer own are skipped, the same ID pinned twice is refused, and pins beyond your
+accessory slots are dropped — all three are reported in `debug.log`, never silently.
+
 ## Beards
 
 A beard breakpoint is structured as follows:

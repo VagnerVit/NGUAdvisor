@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace NGUAdvisor.Managers
 {
@@ -52,7 +53,8 @@ namespace NGUAdvisor.Managers
                 double worn = GearOptimizer.CurrentScore(objective);
                 if (worn <= 0)
                     return _gearFactor;
-                double best = GearOptimizer.Optimize(objective).Score;
+                // No pins: this is the best/worn RATIO, and CurrentScore above is unpinned.
+                double best = GearOptimizer.Optimize(objective, false, new int[0]).Score;
                 _gearFactor = best > worn ? best / worn : 1.0;
             }
             catch (Exception e)
@@ -89,6 +91,16 @@ namespace NGUAdvisor.Managers
             if (predicted <= 0)
                 return true;
             return predicted > banked * margin;
+        }
+
+        // The number the owner asked the gold diagnostics for: what the candidate drop would do to the
+        // basis the Time Machine converts, as a percentage of the bank it has to beat. With no bank yet
+        // there is no percentage to quote — any drop is the new basis.
+        public static string PctVsBank(double predicted, double banked)
+        {
+            if (banked <= 0) return "new-bank";
+            if (predicted <= 0) return "n/a";
+            return ((predicted / banked - 1.0) * 100.0).ToString("+0.#;-0.#;0", CultureInfo.InvariantCulture) + "%";
         }
 
         public static bool ZoneSnipeBeatsBank(int zone, out double predicted, out double banked)

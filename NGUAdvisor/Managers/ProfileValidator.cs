@@ -89,6 +89,35 @@ namespace NGUAdvisor.Managers
                         "its pair) and spend the rest elsewhere. BESTAUG picks that augment for you.");
             }
 
+            // Gear priority chains: advice only. A step whose objective never resolves is SKIPPED by
+            // GearBreakpoints rather than mis-applied (same refuse-don't-guess rule SpendPlanner uses
+            // for perk names), so a silent skip would look like "the chain ran" while a slot budget
+            // quietly vanished. Say so here instead.
+            foreach (var bp in model.Gear)
+            {
+                if (bp.Priorities.Count == 0)
+                    continue;
+
+                if (bp.Priorities.Count > GearChain.MaxPriorities)
+                    warnings.Add($"A gear priority chain at {FormatTime(bp.TimeSeconds)} has {bp.Priorities.Count} " +
+                        $"steps; only the first {GearChain.MaxPriorities} are used.");
+
+                for (var i = 0; i < bp.Priorities.Count; i++)
+                {
+                    var step = bp.Priorities[i];
+                    var name = step.Objective ?? "";
+                    var stepLabel = string.IsNullOrEmpty(name) ? $"step {i + 1}" : $"\"{name}\"";
+
+                    if (string.IsNullOrEmpty(name))
+                        warnings.Add($"A gear priority step at {FormatTime(bp.TimeSeconds)} has no Objective and will be skipped.");
+                    else if (GearChain.FindObjective(name) == null)
+                        warnings.Add($"Gear priority objective \"{name}\" at {FormatTime(bp.TimeSeconds)} is not recognized; that step will be skipped.");
+
+                    if (step.Slots < 0)
+                        warnings.Add($"Gear priority {stepLabel} at {FormatTime(bp.TimeSeconds)} has negative Slots; it will claim no accessory slots.");
+                }
+            }
+
             return warnings;
         }
 

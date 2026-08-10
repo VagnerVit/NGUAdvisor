@@ -107,10 +107,61 @@ purpose — those are exactly the Wandoos-is-the-power-source cases.
 
 ## Non-resource systems
 
-- **GearBreakpoints** — either a static `ID` list or an `Objective` (+`ForceRespawn`); exposes
-  `ActiveObjective`/`ActiveForceRespawn`, which `AdvisorApply.ApplyGearRefresh` and
-  `AdvisorApply`'s optimize call read. `ActiveProfileDiggers()` on DiggerBreakpoints is the Hybrid
-  pool `OptimizationAdvisor.CurrentDiggerSet` consults.
+- **GearBreakpoints** — a static `ID` list, an `Objective` (+`ForceRespawn`), or an explicit
+  `Priorities` chain. `PerformSwap` resolves in this order: explicit `Priorities` → a named
+  `GearChain` preset matching `Objective` → a single objective → the `ChallengeDetector.DefaultGear`
+  smart default (which yields a NAME, so it flows through the preset lookup too) → the manual ID
+  list. Exposes `ActiveObjective` (priority-0's name — so a chain PRESET's own name is not preserved
+  in it; `GearChain.Describe` names the whole chain) / `ActiveChainSource` / `ActiveForceRespawn` /
+  `ActiveChain`, which `AdvisorApply.ApplyGearRefresh` reads. `ActiveChain` is a **copy**
+  (`chain.ToList()`) — a static must never alias the live profile structure.
+  - **`ActiveChainSource` is the name the chain was resolved FROM** (a preset or a plain objective;
+    `null` for an explicit `Priorities` list). It exists because `ActiveObjective` is only the LEAD
+    objective, so the preset "Adventure + Respawn" reports "Adventure" and is indistinguishable from
+    the plain objective of that name — a `ChallengeOverlay.GearObjectiveOverride` of "Adventure" was
+    silently handed the profile's whole three-step chain. `AdvisorApply` now keys off "is there an
+    override at all", never off a name comparison.
+  - **`Reset()` clears every `Active*`** (profile reload / rebirth). The mirror describes a
+    breakpoint that is no longer applied, and a stale `ActiveChain` outranks the name the refresh
+    resolves for itself.
+
+  See GearChain.md for the chain layer itself.
+  - Worked example — reserve one respawn accessory, then fill the rest with Adventure:
+
+    ```json
+    "Gear": [
+      {
+        "Time": { "h": 1 },
+        "Priorities": [
+          { "Objective": "Adventure", "Slots": 3 },
+          { "Objective": "Respawn",   "Slots": 1 },
+          { "Objective": "Adventure" }
+        ],
+        "TopRespawn": false
+      }
+    ]
+    ```
+
+    The final step omits `Slots`, so it takes everything still free. The same objective may appear
+    more than once — that is how a reserve is expressed, with no extra grammar. `ProfileModel` writes
+    `Slots` back whenever it is `!= 0`, so an omitted `Slots` round-trips as omitted **and a negative
+    one survives**: `> 0` used to drop a `-1`, and the next load then read the absent key as
+    unlimited — an editor round-trip inverting "claims nothing" into "claims everything".
+  - `Slots == 0`/absent in a `Priorities` step means "all remaining accessory slots"; the profile
+    convention is mapped onto `GearChain.Unlimited` in `ParseSpec` and **nowhere else**. A NEGATIVE
+    `Slots` claims 0 slots — agreeing with the optimizer's own clamp and the validator warning; mapping it
+    to unlimited would let a typo'd `-1` swallow every accessory slot.
+  - A step whose objective name does not resolve is SKIPPED and logged — never mapped onto a
+    near-match (the rule `SpendPlanner` applies to perk names). `ProfileValidator` surfaces those
+    names as editor warnings.
+  - `ApplyGearRefresh`'s changed-objective bypass compares the RENDERED chain
+    (`GearChain.Describe`), not `chain[0].Objective.Name` — otherwise swapping only a chain's tail
+    would never clear the 5 % re-equip bar. Both sides of that bar go through the chain overloads
+    (`CurrentScore(chain)` vs `Optimize(chain, …).Score`) so "priority 0" means the same entry on
+    both sides. The rendered chain carries the DECLARED budget (`Adventure(3) > Respawn(1) >
+    Adventure(all)`) — no live slot read, so it cannot drift and cannot contradict the optimizer.
+- **DiggerBreakpoints** — `ActiveProfileDiggers()` is the Hybrid pool
+  `OptimizationAdvisor.CurrentDiggerSet` consults.
 - **ConsumablesBreakpoints** — token list + `:count`, executed by `ConsumablesManager`.
 - **WandoosBreakpoints / NGUDiffBreakpoints** — OS and NGU track (note: `LevelPlanner` may own the
   NGU track instead in the Ch.5 24 h shape — see LevelPlanner.md).

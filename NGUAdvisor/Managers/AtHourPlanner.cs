@@ -25,6 +25,14 @@ namespace NGUAdvisor.Managers
     //   totalAdvAttack/Defense carry a (1 + 0.1*L^0.4) AT multiplier (slots 1/0), so
     //     projected stat = reference stat * (1 + 0.1*L(t)^0.4) / (1 + 0.1*L0^0.4).
     //
+    // That closed form is UNCAPPED, and using it here was a real over-projection bug: the game does
+    // barProgress[id] = 0f on a level-up, so the overflow is discarded and a slot with
+    // progressPerTick >= 1 gains exactly one level per tick however much energy it holds. LevelAt below
+    // therefore calls AtMath.LevelAtCapped, the canonical piecewise projection (forward twin of
+    // AtMath.SecondsToTarget). When progressPerTick <= 1 that returns the same arithmetic as before, so
+    // only blitz-boosting slots change — which is exactly the bug. The 1 + 0.1*L^0.4 multiplier is
+    // still a private copy of AtMath.StatMultiplier; folding it in is a queued follow-up.
+    //
     // Reference stats (user decision): live P/T projected onto the optimizer's best Power/Toughness
     // gear (OptimizationAdvisor.ProjectedBestGear) — AT HOUR wears AT-speed gear, and thresholds are
     // met in the kill loadout, not in what happens to be equipped. Beast mode is kept for the titan
@@ -125,23 +133,7 @@ namespace NGUAdvisor.Managers
                 return NormalEnd;
             }
 
-            double beast = 1;
-            try { beast = c.adventureController.beastModeBonus(); } catch { }
-            if (double.IsNaN(beast) || beast < 1) beast = 1;
-            OptimizationAdvisor.ProjectedBestGear(out var atkMult, out var defMult);
-
-            // TWO attack references, because the two ladders count beast mode differently and
-            // totalAdvAttack() already includes it:
-            //   titans — the guide's Manual/Idle tables and the game's own AK gate both compare the
-            //            raw totalAdvAttack, i.e. beast ON (see OptimizationAdvisor's TitanGuide
-            //            header, and AdvisorApply/TitansPanel, which pass it through unchanged);
-            //   zones  — ZoneStatHelper divides beast out before FightType, so the zone tables want it OFF.
-            // One reference for both understated attack ~1.5x against the titan ladder and extended
-            // the segment chasing stages the kill loadout already clears. Defense carries no beast bonus.
-            double refAtk = c.totalAdvAttack() * atkMult;   // titan ladder: beast included
-            double refDef = c.totalAdvDefense() * defMult;
-            double zoneAtk = refAtk / beast;                // zone tables: beast divided out
-            if (double.IsNaN(refAtk) || double.IsNaN(refDef) || refAtk <= 0 || refDef <= 0)
+            if (!References(c, out double refAtk, out double refDef, out double zoneAtk))
             {
                 Rec("AT hour ends on time", "no usable reference stats");
                 return NormalEnd;
@@ -257,12 +249,111 @@ namespace NGUAdvisor.Managers
             return NormalEnd;
         }
 
+        // THE two attack references, in one place because they are NOT interchangeable. Live P/T
+        // projected onto the optimizer's best Power/Toughness gear (AT HOUR wears AT-speed gear, but
+        // thresholds are met in the KILL loadout), and then:
+        //   titans — the guide's Manual/Idle tables and the game's own AK gate both compare the raw
+        //            totalAdvAttack, i.e. beast ON (see OptimizationAdvisor's TitanGuide header, and
+        //            AdvisorApply/TitansPanel, which pass it through unchanged);
+        //   zones  — ZoneStatHelper divides beast out before FightType, so the zone tables want it OFF.
+        // One reference for both understated attack ~1.5x against the titan ladder and extended the
+        // segment chasing stages the kill loadout already clears. Defense carries no beast bonus.
+        //
+        // False means "no usable reference stats"; each caller words that in its own terms.
+        private static bool References(Character c, out double refAtk, out double refDef, out double zoneAtk)
+        {
+            refAtk = refDef = zoneAtk = 0;
+
+            double beast = 1;
+            try { beast = c.adventureController.beastModeBonus(); } catch { }
+            if (double.IsNaN(beast) || beast < 1) beast = 1;
+            OptimizationAdvisor.ProjectedBestGear(out var atkMult, out var defMult);
+
+            refAtk = c.totalAdvAttack() * atkMult;   // titan ladder: beast included
+            refDef = c.totalAdvDefense() * defMult;
+            zoneAtk = refAtk / beast;                // zone tables: beast divided out
+            return !double.IsNaN(refAtk) && !double.IsNaN(refDef) && refAtk > 0 && refDef > 0;
+        }
+
+        // ---- read-only accessor: the GOAL levels (no decision, no persistence, no side effects) ----
+
+        // The label handed back when the objective's stats are already covered. A shared constant so the
+        // view can tell that case apart without string-matching this module's prose.
+        public const string GoalMetLabel = "already met";
+
+        // "Up to which AT level does more AT still buy PROGRESS?" — the level at which the next
+        // objective's staged requirement is met, past which AT only makes the number bigger. Same rule
+        // LevelPlanner freezes P/T on, expressed as a level.
+        //
+        // This lives HERE and not in the view because the two references above are not interchangeable
+        // and conflating them was a real ~1.5x understatement of attack. Nothing may recompute them
+        // elsewhere.
+        //
+        // atkLevel/defLevel come back NaN for a slot whose own need is already met. False means there is
+        // no answer at all — no next objective, unreadable requirement or levels, or BOTH needs met; in
+        // that last case label is GoalMetLabel and otherwise null, so the caller can tell "already met"
+        // from "cannot determine" without inventing a level.
+        public static bool GoalLevels(Character c, out double atkLevel, out double defLevel, out string label)
+        {
+            atkLevel = defLevel = double.NaN;
+            label = null;
+            try
+            {
+                if (c == null) return false;
+
+                var obj = OptimizationAdvisor.NextObjective();
+                if (!obj.Known) return false;
+                if (!References(c, out var refAtk, out var refDef, out _)) return false;
+
+                OptimizationAdvisor.StagedRequirementFor(obj.Index, obj.Version, refAtk, refDef,
+                    out var reqA, out var reqD, out _, out var stage);
+
+                double needAtk = reqA / refAtk;
+                double needDef = reqD / refDef;
+                if (double.IsNaN(needAtk) || double.IsNaN(needDef)) return false;
+                if (needAtk <= 1 && needDef <= 1)
+                {
+                    label = GoalMetLabel;
+                    return false;
+                }
+
+                double lvlAtk, lvlDef;
+                try
+                {
+                    lvlAtk = c.advancedTraining.level[1];   // slot 1 -> adventure Power (attack)
+                    lvlDef = c.advancedTraining.level[0];   // slot 0 -> adventure Toughness (defense)
+                }
+                catch { return false; }
+
+                // The slot's stat multiplier has to rise by `need`, so the multiplier to invert is
+                // need * the multiplier it is at now.
+                atkLevel = Threshold(needAtk, lvlAtk);
+                defLevel = Threshold(needDef, lvlDef);
+                label = $"{TitanName(obj.Index, obj.Version)} {stage} stats";
+                return true;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"AT-hour goal levels: {e.Message}");
+                return false;
+            }
+        }
+
+        private static double Threshold(double need, double level)
+        {
+            if (need <= 1) return double.NaN;   // this slot is already there
+            return AtMath.LevelForMultiplier(need * AtMath.StatMultiplier(level)) ?? double.NaN;
+        }
+
         // ---- forecast primitives ----
+
+        private const double TickSeconds = 0.02;   // the game's 50 Hz tick
 
         private struct Slot
         {
             public double L0;    // current level
             public double R;     // level-speed numerator: levels/sec * (L+1); 0 = not growing
+            public double Ppt;   // progressPerTick: >= 1 means one level per tick, overflow discarded
             public long Cap;     // levelTarget: 0 = uncapped, >0 = hard stop
         }
 
@@ -274,6 +365,7 @@ namespace NGUAdvisor.Managers
                 s.L0 = c.advancedTraining.level[id];
                 double ppt = c.advancedTrainingController.getProgressPerTick(id);
                 if (double.IsNaN(ppt) || ppt < 0) ppt = 0;
+                s.Ppt = ppt;
                 s.R = ppt * 50.0 * (s.L0 + 1.0);
                 s.Cap = c.advancedTraining.levelTarget[id];
                 if (s.Cap == -1) s.R = 0;   // -1 = the game treats the slot as paused
@@ -285,7 +377,7 @@ namespace NGUAdvisor.Managers
         private static double LevelAt(Slot s, double t)
         {
             if (s.R <= 0 || t <= 0) return s.L0;
-            double l = Math.Sqrt((s.L0 + 1.0) * (s.L0 + 1.0) + 2.0 * s.R * t) - 1.0;
+            double l = AtMath.LevelAtCapped(s.L0, s.Ppt, t, TickSeconds);
             if (s.Cap > 0 && l > s.Cap) l = s.Cap;
             return l;
         }

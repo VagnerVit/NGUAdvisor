@@ -111,6 +111,9 @@ namespace NGUAdvisor
         private TitansPanel _titansPanel;
         private GoldPanel _goldPanel;
         private PitPanel _pitPanel;
+        private ApPanel _apPanel;
+        private PpPanel _ppPanel;
+        private AtPanel _atPanel;
         private ChallengesPanel _challengesPanel;
         private LightsPanel _lights;
         private ActionsPanel _actions;
@@ -148,6 +151,7 @@ namespace NGUAdvisor
             = new System.Collections.Generic.Dictionary<string, string[]>
             {
                 { "Advisors", new[] { "Overview", "Priorities" } },
+                { "Economy", new[] { "Overview", "Planners" } },
                 { "Systems", new[] { "Yggdrasil", "Quests", "Boosts", "Inventory", "Cooking", "Blood" } },
                 { "Loadouts", new[] { "Titan", "Gold", "Quest", "Yggdrasil", "Cooking", "Loot Hunter", "Shockwave" } },
                 { "Logs", new[] { "Advisor", "Loot", "Session" } },
@@ -411,6 +415,9 @@ namespace NGUAdvisor
                         if (_titansPanel != null) UiLayout.Audit(_titansPanel, "Titans");
                         if (_goldPanel != null) UiLayout.Audit(_goldPanel, "Gold");
                         if (_pitPanel != null) UiLayout.Audit(_pitPanel, "Pit");
+                        if (_apPanel != null) UiLayout.Audit(_apPanel, "AP");
+                        if (_ppPanel != null) UiLayout.Audit(_ppPanel, "PP");
+                        if (_atPanel != null) UiLayout.Audit(_atPanel, "AT");
                         if (_challengesPanel != null) UiLayout.Audit(_challengesPanel, "Challenges");
                         if (_yggPanel != null) UiLayout.Audit(_yggPanel, "Yggdrasil");
                         if (_questsPanel != null) UiLayout.Audit(_questsPanel, "Quests");
@@ -514,6 +521,11 @@ namespace NGUAdvisor
                 combatExtras.Add(new System.Collections.Generic.KeyValuePair<string, Panel>("Titans", _titansPanel));
             }
             catch (Exception titEx) { LogDebug($"Titans section init failed: {titEx.Message}"); }
+            try
+            {
+                _atPanel = new AtPanel(CanvasW);   // full-width row, third on Economy > PLANNERS
+            }
+            catch (Exception atEx) { LogDebug($"AT section init failed: {atEx.Message}"); }
 
             // Gold E1 pipeline + Pit (clean rebuilds): legacy Gold page retires to Advanced.
             var economyExtras = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, Panel>>();
@@ -535,6 +547,16 @@ namespace NGUAdvisor
                 economyExtras.Add(new System.Collections.Generic.KeyValuePair<string, Panel>("Pit", _pitPanel));
             }
             catch (Exception pitEx) { LogDebug($"Pit section init failed: {pitEx.Message}"); }
+            try
+            {
+                _apPanel = new ApPanel(CanvasW);   // full-width row, first on Economy > PLANNERS
+            }
+            catch (Exception apEx) { LogDebug($"AP section init failed: {apEx.Message}"); }
+            try
+            {
+                _ppPanel = new PpPanel(CanvasW);   // full-width row, second on Economy > PLANNERS (below the AP queue)
+            }
+            catch (Exception ppEx) { LogDebug($"PP section init failed: {ppEx.Message}"); }
 
             // Yggdrasil Y1 orchard grid (Systems rebuild #1): legacy page retires to Advanced, and the
             // legacy money-pit page retires too (fully superseded by Economy > PIT).
@@ -655,11 +677,44 @@ namespace NGUAdvisor
                 Math.Max(_titansPanel?.Bottom ?? 0, _adventurePanel?.Bottom ?? 0) + UiTheme.S(12));
             Place(combat, _combatSliver, UiTheme.S(20), combatSliverY, CanvasW, UiTheme.S(130));
 
+            // Economy is split into two rail sub-pages (A1 pattern, same as Advisors): OVERVIEW keeps the
+            // gold/pit columns and the pit log tail exactly as they were; PLANNERS is the new home of the
+            // three read-only advisory readouts (AP, PP, AT). They used to sit at the bottom of the Economy
+            // and Combat canvases, below the fold, where nobody found them — a sub-page is a rail entry, so
+            // they are now nameable and reachable in one click. AT lives here despite being combat-flavoured:
+            // it is the same kind of advisory readout, not a control surface.
             var economy = NewSection("Economy");
-            if (_goldPanel != null) Place(economy, _goldPanel, UiTheme.S(20), UiTheme.S(12), UiTheme.S(520), UiTheme.S(520));
-            if (_pitPanel != null) Place(economy, _pitPanel, UiTheme.S(560), UiTheme.S(12), UiTheme.S(490), UiTheme.S(520));
+            economy.Scrollable = false;   // the sub-pages scroll, not the host
+            // OVERVIEW is the first entry in RailChildren["Economy"], which is what makes it the default
+            // visible child: SelectSectionM1 falls back to RailChildren[name][0] whenever the section has no
+            // remembered _activeChild, so opening Economy still lands on gold/pit exactly as it did before.
+            // Gold/Pit keep routing to the bare "Economy" section (they are not sub-page keys), so the
+            // overview key is spelled literally here.
+            var ecoOverview = NewSubPage(economy, "Economy/Overview");
+            var ecoPlanners = NewSubPage(economy, Destinations.ApPurchases);
+            _childNav["Economy/Overview"] = ShowSubPage("Economy", "Economy/Overview");
+            _childNav[Destinations.ApPurchases] = ShowSubPage("Economy", Destinations.ApPurchases);
+            if (_goldPanel != null) Place(ecoOverview, _goldPanel, UiTheme.S(20), UiTheme.S(12), UiTheme.S(520), UiTheme.S(520));
+            if (_pitPanel != null) Place(ecoOverview, _pitPanel, UiTheme.S(560), UiTheme.S(12), UiTheme.S(490), UiTheme.S(520));
             _pitSliver = new LogSliver("PIT & SPIN LOG — live tail of pitspin.log", "pitspin.log", CanvasW, UiTheme.S(190));
-            Place(economy, _pitSliver, UiTheme.S(20), UiTheme.S(544), CanvasW, UiTheme.S(190));
+            Place(ecoOverview, _pitSliver, UiTheme.S(20), UiTheme.S(544), CanvasW, UiTheme.S(190));
+            // PLANNERS: the three readouts stacked, each asking for its own ContentHeight — none of them
+            // scrolls (the sub-page is the one scroll owner), so a tuned height would clip the AP queue rows,
+            // the PP plan lines or AT's last Time Machine lines at real DPI. Each row chains off the previous
+            // row's Bottom for the same reason: a tuned offset would overlap them.
+            int ecoY = UiTheme.S(12);
+            if (_apPanel != null)
+            {
+                Place(ecoPlanners, _apPanel, UiTheme.S(20), ecoY, CanvasW, _apPanel.ContentHeight);
+                ecoY = _apPanel.Bottom + UiTheme.S(12);
+            }
+            if (_ppPanel != null)
+            {
+                Place(ecoPlanners, _ppPanel, UiTheme.S(20), ecoY, CanvasW, _ppPanel.ContentHeight);
+                ecoY = _ppPanel.Bottom + UiTheme.S(12);
+            }
+            if (_atPanel != null)
+                Place(ecoPlanners, _atPanel, UiTheme.S(20), ecoY, CanvasW, _atPanel.ContentHeight);
 
             // Systems C1 (user pick): one system, one full-canvas page, navigated by rail children.
             var systems = NewSection("Systems");
@@ -1473,7 +1528,13 @@ namespace NGUAdvisor
                 AllowFallthrough.Checked = newSettings.AllowZoneFallback;
 
                 TargetITOPOD.Checked = newSettings.AdventureTargetITOPOD;
-                ITOPODCombatMode.SelectedIndex = newSettings.ITOPODCombatMode;
+                // This RETIRED grid's combo carries only 2 modes (Idle, Snipe) while AdventurePanel's
+                // offers 4 — so an unguarded assignment threw ArgumentOutOfRange for Defensive/Offensive
+                // and aborted the WHOLE deferred UpdateFromSettings, silently stopping every panel after
+                // this line from syncing (seen in debug.log as "Deferred form update failed:
+                // ... Parameter name: SelectedIndex"). Clamp instead of widening the validator's range
+                // back down: the live panel is the real editor, and this page is hidden.
+                ITOPODCombatMode.SelectedIndex = Math.Min(newSettings.ITOPODCombatMode, ITOPODCombatMode.Items.Count - 1);
                 ITOPODOptimizeMode.SelectedIndex = newSettings.ITOPODOptimizeMode;
                 ITOPODBeastMode.Checked = newSettings.ITOPODBeastMode;
                 ITOPODAutoPush.Checked = newSettings.ITOPODAutoPush;
@@ -1562,6 +1623,9 @@ namespace NGUAdvisor
                 _titansPanel?.SyncFromSettings();
                 _goldPanel?.SyncFromSettings();
                 _pitPanel?.SyncFromSettings();
+                _apPanel?.SyncFromSettings();
+                _ppPanel?.SyncFromSettings();
+                _atPanel?.SyncFromSettings();
                 _challengesPanel?.SyncFromSettings();
                 _actions?.SyncFromSettings();
                 _yggPanel?.SyncFromSettings();

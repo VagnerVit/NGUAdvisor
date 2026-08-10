@@ -37,6 +37,22 @@ namespace NGUAdvisor.Managers
         public const string Gold = "Economy";
         public const string Pit = "Economy";
 
+        // The three read-only planner readouts — AP purchases, the perk-point plan, and the Advanced
+        // Training calculator — all live on Economy's PLANNERS rail sub-page. They were at the bottom of
+        // the Economy and Combat canvases, below the fold, where the owner could not find them; a rail
+        // child is a nameable place, so they moved onto one. AT is combat-flavoured (its output is the
+        // adventure Power/Toughness/Block multipliers) but it is the same kind of advisory readout, which
+        // is what decides the home.
+        //
+        // "Economy/Planners" resolves by exactly the same machinery as the other deep links here:
+        // RailChildren (SettingsForm:154) declares Economy's children as { "Overview", "Planners" }, the
+        // rail loop registers each one in _sectionNav (SettingsForm:1004), and NavigateTo looks the path up
+        // there. Three names, one route — and they keep separate names because sharing a route is not being
+        // the same destination.
+        public const string ApPurchases = "Economy/Planners";
+        public const string PerkPoints = "Economy/Planners";
+        public const string AdvancedTraining = "Economy/Planners";
+
         public const string Quests = "Systems/Quests";
         public const string Blood = "Systems/Blood";
         public const string Boosts = "Systems/Boosts";
@@ -48,8 +64,8 @@ namespace NGUAdvisor.Managers
         // Cooking, Wishes and Cast Cards now, so the catalogue has to be able to point at them.
         //
         // These are deep links of exactly the same shape as the four above, and they resolve by exactly the
-        // same machinery: RailChildren (SettingsForm:151,154) declares "Systems/Cooking", "Cards/Cards" and
-        // "Cards/Wishes" as rail children, the rail loop registers each one in _sectionNav (SettingsForm:872),
+        // same machinery: RailChildren (SettingsForm:155,158) declares "Systems/Cooking", "Cards/Cards" and
+        // "Cards/Wishes" as rail children, the rail loop registers each one in _sectionNav (SettingsForm:1004),
         // and NavigateTo looks the path up there. Nothing new was built to make these reachable — they were
         // always reachable, and until now the catalogue simply had no name for them.
         public const string Cooking = "Systems/Cooking";

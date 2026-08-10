@@ -222,6 +222,28 @@ namespace NGUAdvisor
             // Four columns now, not five: COMBAT + ITOPOD emptied out in 7.6B and took its heading with it.
             int bottomY = Math.Max(Math.Max(y0, y1), Math.Max(y2, y4)) + UiTheme.S(14);
 
+            // ---- ALWAYS EQUIP ----
+            // A FIFTH heading, and deliberately not a fifth column: the pinned list is a list, not a
+            // checkbox, so it takes a full-width band below the grid rather than being squeezed into the
+            // MISC stack. The four captions above remain the column contract; this one is a band.
+            var pinsHeader = new Label
+            {
+                Text = "ALWAYS EQUIP",
+                Location = new Point(x0, bottomY),
+                AutoSize = true,
+                Font = UiTheme.ColHeader,
+                ForeColor = UiTheme.Muted,
+                BackColor = UiTheme.Ground
+            };
+            Controls.Add(pinsHeader);
+            _groups.Add(new SettingGroup("ALWAYS EQUIP", pinsHeader));   // exists before Reg, so Reg can find it
+            var pins = BuildPins(x0, bottomY + UiTheme.S(24));
+            Controls.Add(pins);
+            // ONE SURFACE, ONE CONTROL — the band is a container, so the filter moves it whole and there is
+            // no way for the list to appear without its buttons, or a button without the list it edits.
+            Reg("PinnedGearIds", "ALWAYS EQUIP", pins);
+            bottomY = pins.Bottom + UiTheme.S(14);
+
             int footerY = bottomY + UiTheme.S(8);
             var footer = new Label
             {
@@ -551,6 +573,225 @@ namespace NGUAdvisor
             if (Height != h) Height = h;
         }
 
+        // ---- pinned items (Settings.PinnedGearIds) ----
+
+        private ListBox _pinsList;
+        private Label _pinsStatus;
+        private Button _pinsPaste, _pinsCopy, _pinsClear, _pinsUndo;
+        private Action _pinsSync;
+        private int _pinsRowY;
+        // The list as this panel last rendered it. A settings reload is only a FOREIGN change when it
+        // disagrees with this — which is what separates "someone edited settings.json" from the echo of
+        // our own save.
+        private int[] _pinsKnown = new int[0];
+
+        // SINGLE-LEVEL UNDO, same contract as the profile editor's paste (ui-panels.md:65) and the same
+        // mechanism: PLAIN DATA, no timer. These windows have no WinForms message pump — WM_TIMER never
+        // arrives — so the DEADLINE is the only authority and is evaluated when the user reaches for the
+        // button, never on a schedule (GearEditorPanel.cs:178).
+        private const int PinsUndoSeconds = 20;
+        private List<int> _pinsUndoIds;
+        private DateTime _pinsUndoDeadline;
+
+        private static int[] CurrentPins() => Settings?.PinnedGearIds ?? new int[0];
+
+        // The band: a note, the list, and the paste/copy/clear/undo row. Sized from what it holds — the
+        // list in ROWS (a pixel height means a different row count at every scale), the buttons from
+        // BtnWidth, and the container from where its children actually end.
+        private Panel BuildPins(int x, int y)
+        {
+            // S(700), not S(560): the status line below carries variable prose (paste refusals run to ~300px
+            // at the tuning baseline) and it has to fit BESIDE nothing — it gets its own line — but the note
+            // and the list want the room too. The canvas is ~1030 wide and x0 is S(16), so this is well
+            // inside it.
+            int w = UiTheme.S(700);
+            var host = new Panel { Location = new Point(x, y), Width = w, BackColor = UiTheme.Ground };
+
+            var note = new Label
+            {
+                Text = "Kept in every optimized loadout, ahead of the objective's own picks.",
+                Location = new Point(0, 0),
+                AutoSize = true,
+                Font = UiTheme.Ui,
+                ForeColor = UiTheme.Muted,
+                BackColor = UiTheme.Ground
+            };
+            host.Controls.Add(note);
+
+            _pinsList = new ListBox
+            {
+                Location = new Point(0, UiTheme.LinePitch),
+                Size = new Size(w, UiTheme.ListH(4)),
+                Font = UiTheme.Ui,
+                BorderStyle = BorderStyle.FixedSingle,
+                SelectionMode = SelectionMode.None
+            };
+            UiTheme.StyleList(_pinsList);
+            host.Controls.Add(_pinsList);
+
+            _pinsPaste = new Button { Text = "Paste IDs", Width = UiLayout.BtnWidth("Paste IDs"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
+            _pinsCopy = new Button { Text = "Copy IDs", Width = UiLayout.BtnWidth("Copy IDs"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
+            _pinsClear = new Button { Text = "Clear", Width = UiLayout.BtnWidth("Clear"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
+            _pinsUndo = new Button { Text = "Undo paste", Width = UiLayout.BtnWidth("Undo paste") + UiTheme.S(6), Height = UiTheme.SCtl(24), Font = UiTheme.Ui, Visible = false };
+            UiTheme.StyleFlat(_pinsPaste); UiTheme.StyleFlat(_pinsCopy); UiTheme.StyleFlat(_pinsClear);
+            UiTheme.StyleGhost(_pinsUndo);
+            // OWN LINE, and NOT AutoSize. Trailing the button row it started at x≈335 in a 560px band while
+            // the refusal strings measure up to ~304px — the ~79px cut off was exactly the text explaining
+            // why a paste was refused, and it read as a PAST PARENT EDGE audit line too. On its own line,
+            // full band width, it goes through FitOrGrow: it word-wraps rather than ellipsizing.
+            _pinsStatus = new Label
+            {
+                AutoSize = false,
+                Width = w,
+                Height = UiTheme.SText(20),
+                Font = UiTheme.Ui,
+                ForeColor = UiTheme.Faint,
+                BackColor = UiTheme.Ground
+            };
+
+            _pinsPaste.Click += (s, e) => PastePins();
+            _pinsCopy.Click += (s, e) => CopyPins();
+            _pinsClear.Click += (s, e) =>
+            {
+                var before = new List<int>(CurrentPins());
+                if (before.Count == 0 || !ApplyPins(new List<int>())) return;
+                SetPinsUndo(before);
+                RefreshPins($"Cleared — undo for {PinsUndoSeconds}s.");
+            };
+            // Reaching for the button is the moment to find out the window has closed, so the dead
+            // affordance clears itself before it can be clicked; the click re-checks anyway.
+            _pinsUndo.MouseEnter += (s, e) => ExpirePinsUndoIfStale();
+            _pinsUndo.Click += (s, e) => UndoPins();
+
+            foreach (var c in new Control[] { _pinsPaste, _pinsCopy, _pinsClear, _pinsUndo, _pinsStatus }) host.Controls.Add(c);
+            _pinsRowY = _pinsList.Bottom + UiTheme.S(6);
+            _pinsStatus.Location = new Point(0, LayoutPinsRow() + UiTheme.S(2));
+
+            // The band's height is FIXED by construction, not re-derived after a paste: the status is
+            // reserved TWO text lines whatever FitOrGrow does with it (FitOrGrow caps at maxLines = 2, so
+            // its tallest result is 2*LinePitch - S(4) and always lands inside). A band that resized itself
+            // later would contradict the grid snapshot CaptureGrid takes a few lines from here.
+            host.Height = _pinsStatus.Top + UiTheme.SLines(2, 0) + UiTheme.S(4);
+
+            // A settings reload that did NOT change the list must leave both the status message and a live
+            // undo token alone — UpdateFromSettings runs up to once a second (Main.cs:418-424), and our own
+            // save flags it, so an unconditional refresh would wipe the message we just wrote. A reload that
+            // DID change the list is a foreign edit, and then the snapshot is stale: same rule the gear card
+            // enforces with ClearUndo() on every manual edit.
+            _pinsSync = () =>
+            {
+                if (SameIds(CurrentPins(), _pinsKnown)) return;
+                ClearPinsUndo();
+                RefreshPins();
+            };
+            RefreshPins();
+            return host;
+        }
+
+        private static bool SameIds(int[] a, int[] b)
+        {
+            if (a == null || b == null) return a == b;
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+            return true;
+        }
+
+        // Measured left-to-right (overlap impossible by construction), rerun whenever the undo button
+        // appears or disappears so the row closes up instead of leaving a hole. Returns the row's bottom;
+        // the status label sits BELOW it, never in it.
+        private int LayoutPinsRow()
+        {
+            var items = new List<Control> { _pinsPaste, _pinsCopy, _pinsClear };
+            if (_pinsUndo.Visible) items.Add(_pinsUndo);
+            return UiLayout.Row(0, _pinsRowY, UiTheme.S(8), items.ToArray());
+        }
+
+        private void RefreshPins(string message = null)
+        {
+            try
+            {
+                var ids = CurrentPins();
+                _pinsKnown = (int[])ids.Clone();   // what WE last rendered — the change detector's baseline
+                _pinsList.BeginUpdate();
+                _pinsList.Items.Clear();
+                foreach (var id in ids) _pinsList.Items.Add($"{id}  —  {ItemName(id)}");
+                _pinsList.EndUpdate();
+                UiLayout.FitOrGrow(_pinsStatus, message ?? $"{ids.Length} pinned item(s)");
+                LayoutPinsRow();
+            }
+            catch (Exception e) { LogDebug($"Pinned items refresh: {e.Message}"); }
+        }
+
+        // The single mutation path — paste, clear and undo all go through it, so they cannot diverge.
+        private bool ApplyPins(List<int> ids)
+        {
+            if (Settings == null) return false;
+            try { Settings.PinnedGearIds = ids.ToArray(); return true; }
+            catch (Exception e) { LogDebug($"Pinned items apply: {e.Message}"); return false; }
+        }
+
+        // Reuses the profile editor's paste contract verbatim (GearEditorPanel.AskPaste): parse+validate
+        // first, preview the result, change nothing on invalid, empty or cancelled input. No clamp
+        // disclosure — this list has no NumericUpDown ceiling to clamp against.
+        private void PastePins()
+        {
+            var before = new List<int>(CurrentPins());
+            string message;
+            var ids = GearEditorPanel.AskPaste(before.Count, "Paste pinned item IDs", 0, out message);
+            if (ids == null)
+            {
+                if (message != null) RefreshPins(message);   // Cancel is a true no-op and says nothing
+                return;
+            }
+            if (!ApplyPins(ids)) { ClearPinsUndo(); RefreshPins("Could not save — see debug.log."); return; }
+            SetPinsUndo(before);
+            RefreshPins($"Pinned {ids.Count} ID(s) — undo for {PinsUndoSeconds}s.");
+        }
+
+        private void CopyPins()
+        {
+            try
+            {
+                Clipboard.SetText(string.Join(", ", Array.ConvertAll(CurrentPins(), i => i.ToString())));
+                RefreshPins("Copied IDs to clipboard.");
+            }
+            catch (Exception e) { LogDebug($"Pinned items copy: {e.Message}"); }
+        }
+
+        private void SetPinsUndo(List<int> before)
+        {
+            _pinsUndoIds = before;
+            _pinsUndoDeadline = DateTime.UtcNow.AddSeconds(PinsUndoSeconds);
+            _pinsUndo.Visible = true;
+            LayoutPinsRow();
+        }
+
+        private void ClearPinsUndo()
+        {
+            _pinsUndoIds = null;
+            if (_pinsUndo.Visible) { _pinsUndo.Visible = false; LayoutPinsRow(); }
+        }
+
+        // Lazy expiry: nothing schedules, so the deadline is evaluated whenever the user comes near the
+        // control. Returns true if the token was expired and cleared.
+        private bool ExpirePinsUndoIfStale()
+        {
+            if (_pinsUndoIds == null || DateTime.UtcNow <= _pinsUndoDeadline) return false;
+            ClearPinsUndo();
+            RefreshPins("Undo window closed — the change stands.");
+            return true;
+        }
+
+        private void UndoPins()
+        {
+            if (_pinsUndoIds == null) return;
+            if (ExpirePinsUndoIfStale()) return;
+            var snapshot = _pinsUndoIds;
+            ClearPinsUndo();               // consume first: single level, never reusable
+            if (!ApplyPins(snapshot)) { RefreshPins("Undo failed — see debug.log."); return; }
+            RefreshPins($"Undone — {snapshot.Count} pinned item(s) restored.");
+        }
+
         // A measured label+numeric pair for NumRow (inline horizontal layout).
         private Control[] MkPair(string label, int min, int max, Func<int> get, Action<int> set)
         {
@@ -701,6 +942,9 @@ namespace NGUAdvisor
                 }
                 foreach (var ns in _numSyncs)
                     try { ns(); } catch { }
+                // Not a _numSyncs tenant: the pinned list is rebuilt, not clamped, and a settings reload
+                // from disk is exactly when it has to catch up.
+                if (_pinsSync != null) try { _pinsSync(); } catch { }
                 bool on = Settings.GlobalEnabled;
                 _master.Text = on ? "ADVISOR ACTIVE" : "ADVISOR PAUSED";
                 UiTheme.ApplyState(_master, on ? UiTheme.Cap : UiTheme.Danger, Color.White);

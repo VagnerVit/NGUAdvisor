@@ -245,7 +245,7 @@ namespace NGUAdvisor.Managers
             // "routing" would be answering a different question than the one asked.
             e.Add(Sys(SystemIds.Adventure, "Adventure", Destinations.Adventure,
                 "Adventure routing and combat style: the farm zone, ITOPOD, gear hunt, and how it fights. Titan and quest zones run regardless.",
-                "CombatEnabled AdvisorZones SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODAutoPush AllowZoneFallback SnipeBossOnly BeastMode",
+                "CombatEnabled AdvisorZones SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush AllowZoneFallback SnipeBossOnly BeastMode",
                 layers + " adventure combat combat enabled advisor routes zones manual zone farm zone target itopod gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
 
             // No synthetic panel-wide decisions boolean, and — corrected in slice 7.5C — not seven
@@ -300,6 +300,7 @@ namespace NGUAdvisor.Managers
             const string gAuto = "AUTO";
             const string gSwap = "SWAP GEAR FOR";
             const string gMisc = "MISC";
+            const string gPinned = "ALWAYS EQUIP";
 
             e.Add(Set("GlobalEnabled", "Advisor master", gMaster,
                 "The global kill switch. Everything below obeys it. (F2)",
@@ -371,6 +372,12 @@ namespace NGUAdvisor.Managers
             // step back toward a search box that can fire it unarmed.
             e.Add(Set("UnloadAdvisor", "Unload advisor", gMisc, "Detach the advisor from the running game.", "", "detach"));
 
+            // ---- ALWAYS EQUIP (1) ----
+            // A band, not a column: the pinned list is a LIST, so it gets its own heading below the grid.
+            e.Add(Set("PinnedGearIds", "Always equip these items", gPinned,
+                "Item IDs kept in every optimized loadout, ahead of the objective's own picks. Unowned IDs are skipped.",
+                "PinnedGearIds", "pin pinned always equip keep gear items ids lock locked"));
+
             // ---------- references: not a Settings row, not one of the nine systems ----------
 
             // Hotkeys was never a control. It sat in the catalogue as a Setting because Setting was the only
@@ -401,6 +408,39 @@ namespace NGUAdvisor.Managers
                 "ManageWishes",
                 "wishes manage wishes wish automation wish priority spend",
                 Destinations.Wishes));
+
+            // AP purchases is a REFERENCE and deliberately not a tenth system: it owns no setting, has no
+            // automation and no advisor/manual choice to make — the panel only advises, because AP is not
+            // refundable. A System entry would promise state and a gate that do not exist, and the systems
+            // index would have to invent chips for both. Fields are empty because there is no Settings
+            // identifier behind it; the route is the whole answer.
+            e.Add(Ref("ApPurchases", "AP purchases",
+                "What to spend Arbitrary Points on next — advice only, nothing buys for you.",
+                "",
+                "ap arbitrary points arbitrary point ap shop ap purchases what to buy next hearts acc slots tier list",
+                Destinations.ApPurchases));
+
+            // Perk points is a Reference for the same reason AP purchases is: it owns no setting of its
+            // own. Its one control writes AdventureTargetITOPOD and ITOPODOptimizeMode, both of which
+            // AdventurePanel already registers as its own — so the fields stay EMPTY here. Naming them
+            // twice would put two rows behind one switch and trip the duplicate audit, and the panel
+            // that owns the setting is the one the catalogue should route to.
+            e.Add(Ref("PerkPoints", "Perk points",
+                "What to spend perk points on next, and when you can afford it — advice only, nothing buys for you.",
+                "",
+                "pp perk points perks itopod perks next perk perk plan spend pp when can i afford perk eta",
+                Destinations.PerkPoints));
+
+            // Advanced Training is a Reference for the same reason the two above are: the panel is a pure
+            // readout with no control on it at all, so it owns no setting and has no automation or
+            // advisor/manual choice. The AT feed belongs to AdvancedTrainingBP and the level targets to
+            // LevelPlanner. Fields stay EMPTY — naming a setting this panel cannot write would put a
+            // duplicate surface behind it and trip the catalogue's duplicate audit.
+            e.Add(Ref("AdvancedTraining", "Advanced Training",
+                "AT level times, blitz-boost ceilings and the cap it takes to hold them — advice only, nothing feeds energy.",
+                "",
+                "at advanced training blitz boost bb ceiling at calculator level target eta toughness power block wandoos at time machine cap",
+                Destinations.AdvancedTraining));
 
             e.Add(Ref("Cards", "Cards",
                 "Automatic card casting is configured on the Cards page.",

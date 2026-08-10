@@ -333,10 +333,9 @@ namespace NGUAdvisor.Managers
             }
         }
 
-        // Data-driven titan gold: target the HIGHEST autokill-able titan for the next gold bank (its
-        // drop dwarfs all lower titans, so only it matters), and re-bank when its AK version rises.
-        // Replaces hand-picking TitanGoldTargets checkboxes; the existing snapshot/lock machinery does
-        // the actual gold-gear swap on the AK cycle.
+        // Data-driven titan gold: target the most PROFITABLE autokill-able titan for the next gold bank,
+        // and re-bank when its AK version rises. Replaces hand-picking TitanGoldTargets checkboxes; the
+        // existing snapshot/lock machinery does the actual gold-gear swap on the AK cycle.
         private static DateTime _lastTitanGold = DateTime.MinValue;
 
         // Cached: AutokillAvailable for titans 6+ goes through reflection, and this is consulted by
@@ -344,37 +343,100 @@ namespace NGUAdvisor.Managers
         // changes on the scale of minutes, so 30s staleness is free performance.
         private static int _akTitan = -1;
         private static DateTime _akTitanAt = DateTime.MinValue;
+        private static List<int> _akTitans = new List<int>();
+
+        private static void RefreshAkTitans()
+        {
+            if ((DateTime.UtcNow - _akTitanAt).TotalSeconds < 30) return;
+            _akTitanAt = DateTime.UtcNow;
+            var ak = new List<int>();
+            for (int i = 0; i < ZoneHelpers.TitanZones.Length; i++)
+            {
+                try { if (ZoneHelpers.AutokillAvailable(i)) ak.Add(i); }
+                catch { }
+            }
+            _akTitans = ak;
+            _akTitan = ak.Count > 0 ? ak[ak.Count - 1] : -1;
+        }
 
         public static int HighestAkTitan()
         {
-            if ((DateTime.UtcNow - _akTitanAt).TotalSeconds < 30) return _akTitan;
-            _akTitanAt = DateTime.UtcNow;
+            RefreshAkTitans();
+            return _akTitan;
+        }
+
+        // Which AK titan is worth the most gold — NOT the highest one. Titan gold is not monotone in
+        // titan index (GoldDropTables, extracted from the decomp): T2 in zone 8 drops 400 000 while T3
+        // in zone 11 drops only 300 000, and zones 44/45 (BEAST, THE TRAITOR) call no goldDrop at all.
+        // Targeting by height therefore banked 300k where 400k was on offer, and would have banked
+        // nothing at all if a zero-gold titan were ever the top AK one (user-reported: "sniping when it
+        // shouldn't").
+        //
+        // Eligibility is unchanged and still owned by TitanKillWorthGoldGear (auto-killable, not inside
+        // its DenyGoldSwap cooldown, drops gold at all) — this only decides WHICH of the eligible
+        // candidates to target. There is deliberately still no payoff gate against the bank: the
+        // auto-kill happens whether the gold set is equipped or not, so ranking picks which titan, never
+        // whether to go at all (see docs/modules/GoldDropAdvisor.md).
+        public static int BestGoldTitan(out double predicted, out int runnerUp, out double runnerUpPredicted)
+        {
+            RefreshAkTitans();
             int best = -1;
-            for (int i = 0; i < ZoneHelpers.TitanZones.Length; i++)
+            predicted = 0;
+            runnerUp = -1;
+            runnerUpPredicted = 0;
+            for (int k = 0; k < _akTitans.Count; k++)
             {
-                try { if (ZoneHelpers.AutokillAvailable(i)) best = i; }
-                catch { }
+                int i = _akTitans[k];
+                double p, bank;
+                if (!GoldDropAdvisor.TitanKillWorthGoldGear(i, out p, out bank))
+                    continue;
+                if (best < 0 || p > predicted)
+                {
+                    runnerUp = best;
+                    runnerUpPredicted = predicted;
+                    best = i;
+                    predicted = p;
+                }
+                else if (p > runnerUpPredicted)
+                {
+                    runnerUp = i;
+                    runnerUpPredicted = p;
+                }
             }
-            _akTitan = best;
+            if (best < 0)
+                predicted = 0;
             return best;
         }
 
+        // The gold-bank target ApplyTitanGold last picked, for the panels and the advice list: they run on
+        // the WinForms thread and must never re-rank, because PredictedDrop reaches the gear optimizer.
+        // Before the first pass (or with nothing eligible) it degrades to the height pick, which is what
+        // those callers used to show anyway.
+        private static int _goldTitan = -1;
+        private static bool _goldTitanKnown;
+
+        public static int GoldTitanTarget() => _goldTitanKnown && _goldTitan >= 0 ? _goldTitan : HighestAkTitan();
+
         // Why no gold gear on that autokill? Every input of the decision in one debug line, emitted only
         // when the answer changes — "the titan was auto-killed in the wrong gear" is otherwise invisible
-        // after the fact: the deciding values (AK titan, done latch, predicted drop, TM bank) are all
-        // transient. Same idea as [DiggerDbg].
+        // after the fact: the deciding values (AK titan, ranked pick, done latch, predicted drop, TM bank)
+        // are all transient. Same idea as [DiggerDbg].
         private static string _lastTitanGoldDbg;
 
-        private static void LogTitanGoldState(int best, int ver)
+        private static void LogTitanGoldState(int best, int ver, double predicted, bool worth, int runnerUp, double runnerUpPredicted)
         {
             try
             {
-                double predicted = 0, bank = GoldDropAdvisor.Banked();
-                bool worth = best >= 0 && GoldDropAdvisor.TitanKillWorthGoldGear(best, out predicted, out bank);
+                double bank = GoldDropAdvisor.Banked();
                 var done = Main.Settings.TitanMoneyDone;
                 bool isDone = done != null && best >= 0 && best < done.Length && done[best];
-                string line = $"[TitanGoldDbg] ak={(best >= 0 ? "T" + (best + 1) + " v" + ver : "none")}"
+                string beat = runnerUp >= 0
+                    ? $"T{runnerUp + 1}@{NumberFormatter.Abbrev(runnerUpPredicted)}"
+                    : "nothing";
+                string line = $"[TitanGoldDbg] ak={(_akTitan >= 0 ? "T" + (_akTitan + 1) : "none")}"
+                            + $" pick={(best >= 0 ? "T" + (best + 1) + " v" + ver : "none")} beat={beat}"
                             + $" done={isDone} pred={NumberFormatter.Abbrev(predicted)} bank={NumberFormatter.Abbrev(bank)}"
+                            + $" vsBank={GoldDropAdvisor.PctVsBank(predicted, bank)}"
                             + $" worth={worth} gearx={GoldDropAdvisor.GoldGearFactor():0.##}"
                             + $" spawning={ZoneHelpers.SpawningSoonRawCount()}/targeted={ZoneHelpers.SpawningSoonCount()}"
                             + $" goldSwap={ZoneHelpers.ShouldRunGoldLoadout()} lock={LockManager.GetLockTypeName()}"
@@ -396,15 +458,24 @@ namespace NGUAdvisor.Managers
             if ((DateTime.UtcNow - _lastTitanGold).TotalSeconds < 60) return;
             _lastTitanGold = DateTime.UtcNow;
 
-            int best = HighestAkTitan();
+            double predicted, runnerUpPredicted;
+            int runnerUp;
+            int best = BestGoldTitan(out predicted, out runnerUp, out runnerUpPredicted);
+            bool worth = best >= 0;
+            _goldTitan = best;
+            _goldTitanKnown = true;
+            // Nothing eligible (every AK titan denied, or none drops gold): fall back to the height pick so
+            // the clearing pass below still runs — it is what removes a denied titan from TitanGoldTargets.
+            if (!worth)
+                best = HighestAkTitan();
+
             int ver = 1;
             if (best >= 0)
                 try { ver = ZoneHelpers.TitanVersion(best); } catch { }
-            LogTitanGoldState(best, ver);
+            LogTitanGoldState(best, ver, predicted, worth, runnerUp, runnerUpPredicted);
             if (best < 0) return;
 
-            double predicted = 0, bank;
-            bool worth = GoldDropAdvisor.TitanKillWorthGoldGear(best, out predicted, out bank);
+            double bank = GoldDropAdvisor.Banked();
 
             // The "already banked this run" latch does NOT survive here any more (user-reported: an
             // auto-killed titan went down in loot gear because it had banked once already). The kill is
@@ -474,6 +545,8 @@ namespace NGUAdvisor.Managers
                     Main.Settings.GoldSnipeComplete = false;
                     Main.LastSnipeTrigger = "gold drop improved";
                     Main.Log($"Re-snipe: gold drop improved (~{NumberFormatter.Abbrev(pred)} vs {NumberFormatter.Abbrev(bank)} banked)");
+                    Main.LogGoldDecision(bestZone.Zone, pred, bank, "RE-ARM",
+                        $"gold drop improved past RebankMargin x{GoldDropAdvisor.RebankMargin:0.##}");
                 }
 
                 // Starvation trigger: advisor always; manual mode via its S3 toggle.
@@ -484,8 +557,14 @@ namespace NGUAdvisor.Managers
                     // Starving for augments is a reason to re-snipe only if a snipe can actually raise the
                     // TM: with the bank already above every reachable zone the gold has to come from a
                     // titan (or from spending less), never from re-fighting the zone in gold gear.
-                    double predicted, banked;
-                    if (bestZone == null || GoldDropAdvisor.ZoneSnipeBeatsBank(bestZone.Zone, out predicted, out banked))
+                    double predicted = 0, banked = GoldDropAdvisor.Banked();
+                    bool beats = bestZone == null || GoldDropAdvisor.ZoneSnipeBeatsBank(bestZone.Zone, out predicted, out banked);
+                    Main.LogGoldDecision(bestZone != null ? bestZone.Zone : -1, predicted, banked,
+                        beats ? "RE-ARM" : "SKIP",
+                        bestZone == null
+                            ? "gold starvation, no candidate zone"
+                            : beats ? "gold starvation (augments unaffordable)" : "gold starvation, but no zone beats the bank");
+                    if (beats)
                     {
                         Main.Settings.GoldSnipeComplete = false;
                         Main.LastSnipeTrigger = "gold starvation";
@@ -749,47 +828,126 @@ namespace NGUAdvisor.Managers
         // those modes drive SnipeZone dynamically and must win.
         private static DateTime _lastZoneCheck = DateTime.MinValue;
 
+        // WHICH LAYER routed the zone, and what lost. The user-facing "Advisor: farm zone -> …" lines go to
+        // the advisor output log, name only the winner, and never appear at all on the paths that decline to
+        // route — so the precedence between gear hunt, gear farm, boost farm, gold modes and the ITOPOD was
+        // invisible after the fact, and every input of it (rates, demand gate, viability) is transient.
+        //
+        // Discipline is [TitanGoldDbg]'s, unchanged: cadence cap FIRST (so the render never runs on a
+        // suppressed tick), then emit only when the rendered line CHANGES. ApplyZones is throttled to 10
+        // minutes on the farm paths, but the exits ahead of that throttle (combat off, gold modes, gear hunt,
+        // AdvisorZones off) run on every 30 s tick — and a line repeated every 10 minutes for hours buries the
+        // transitions just as effectively, so the change check earns its keep on both.
+        private static string _lastZoneDbg;
+        private static DateTime _lastZoneDbgAt = DateTime.MinValue;
+
+        private static void LogZoneDbg(string layer, Func<string> render)
+        {
+            try
+            {
+                if ((DateTime.UtcNow - _lastZoneDbgAt).TotalSeconds < 60) return;
+                _lastZoneDbgAt = DateTime.UtcNow;
+                int zone = Main.Settings.SnipeZone;
+                string name = zone == 1000
+                    ? "ITOPOD"
+                    : ZoneHelpers.ZoneList.TryGetValue(zone, out var zn) ? zn : $"Zone {zone}";
+                string line = $"[ZoneDbg] layer={layer} zone={zone} ({name})"
+                            + $" combat={BoostFarmAdvisor.ModeName(Main.Settings.CombatMode)} {render()}";
+                if (line == _lastZoneDbg) return;
+                _lastZoneDbg = line;
+                Main.LogDebug(line);
+            }
+            catch (Exception e) { Main.LogDebug($"[ZoneDbg] failed: {e.Message}"); }
+        }
+
+        // Adventure combat mode for the farm park the advisor is about to route to. Idle pays a
+        // full attackSpeed of spawn latency on EVERY kill (AdventureController zeroes
+        // idleAttackTimer when the enemy spawns and only advances it mid-fight), while a manual
+        // mode lands the opening swing on the spawn frame because moveTimer keeps running through
+        // the respawn — up to 2x the kills per hour (ZoneCadence.md). The farm advisors return the
+        // mode their rate was costed at; honouring it is what makes the recommendation real.
+        private static void ApplyFarmCombatMode(int mode, string forWhat)
+        {
+            if (mode < 0 || mode > 3) return;
+            if (Main.Settings.CombatMode == mode) return;
+            Main.Settings.CombatMode = mode;
+            Main.Log($"Advisor: adventure combat -> {BoostFarmAdvisor.ModeName(mode)} (fastest for {forWhat})");
+        }
+
         private static void ApplyZones()
         {
-            if (!Main.Settings.CombatEnabled) return;
-            if (Main.Settings.GoldCBlockMode || Main.Settings.MoneyPitRunMode) return;
+            if (!Main.Settings.CombatEnabled)
+            {
+                LogZoneDbg("none", () => "why=combat automation off");
+                return;
+            }
+            if (Main.Settings.GoldCBlockMode || Main.Settings.MoneyPitRunMode)
+            {
+                LogZoneDbg("gold", () => $"why=gold logic owns zones (cblock={Main.Settings.GoldCBlockMode}"
+                                       + $" pitrun={Main.Settings.MoneyPitRunMode})");
+                return;
+            }
 
             // GEAR HUNT: the user-picked stage outranks the automatic farms. Cheap and outside the
             // 10-minute throttle so flipping the toggle acts on the next tick; an unreachable stage
             // leaves routing alone until it unlocks.
             if (GearHunter.Active)
             {
-                if (!GearHunter.ZoneReachable()) return;
+                if (!GearHunter.ZoneReachable())
+                {
+                    LogZoneDbg("gearhunt", () => $"why=hunt zone {Main.Settings.GearHuntZone} unreachable"
+                                               + " — routing left alone until it unlocks");
+                    return;
+                }
                 int hz = Main.Settings.GearHuntZone;
+                string hn = ZoneHelpers.ZoneList.TryGetValue(hz, out var n) ? n : $"Zone {hz}";
+
+                // A hunt exists purely to farm drops, so its kill rate IS the point — and this layer
+                // used to set no mode at all, so a hunt inherited whatever the previous layer left
+                // (Idle, if the advisor had been parked in the pod), halving the drops it was routed
+                // for. Ask the same source the farm layers ask, so the mode stays MEASURED for the
+                // hunted zone rather than assumed.
+                int hm = ZoneCadence.FastestMode(hz);
+                string hmSrc = "measured (ZoneCadence)";
+                if (hm < 0)
+                {
+                    // No usable cadence estimate for this zone (unreadable, unkillable or not
+                    // survivable at either candidate mode). Manual is never slower than Idle and up
+                    // to 2x faster (ZoneCadence.md), so Offensive is the safe default — but only
+                    // where the regular attack exists at all; before that, Idle is the only mode.
+                    bool manual = false;
+                    try { manual = CombatHelpers.RegularAttackUnlocked(); } catch { }
+                    hm = manual ? 3 : 0;
+                    hmSrc = manual
+                        ? "fallback Offensive (no cadence estimate; manual is never slower)"
+                        : "fallback Idle (regular attack not unlocked)";
+                }
+                ApplyFarmCombatMode(hm, $"the gear hunt in {hn}");
+
                 if (Main.Settings.SnipeZone != hz)
                 {
                     Main.Settings.SnipeZone = hz;
-                    string hn = ZoneHelpers.ZoneList.TryGetValue(hz, out var n) ? n : $"Zone {hz}";
                     Main.Log($"Advisor: farm zone -> {hn} (gear hunt)");
                 }
+                LogZoneDbg("gearhunt", () => $"pick={hz} beat=gear/boost farms (user-picked stage outranks them)"
+                                           + $" wantMode={BoostFarmAdvisor.ModeName(hm)} modeSrc={hmSrc}"
+                                           + $" advisorZones={Main.Settings.AdvisorZones}");
                 return;
             }
-            if (!Main.Settings.AdvisorZones) return;
+            if (!Main.Settings.AdvisorZones)
+            {
+                LogZoneDbg("none", () => "why=AdvisorZones off and no gear hunt active");
+                return;
+            }
 
             if ((DateTime.UtcNow - _lastZoneCheck).TotalMinutes < 10) return;
             _lastZoneCheck = DateTime.UtcNow;
 
-            // Adventure combat mode for the farm park the advisor is about to route to. Idle pays a
-            // full attackSpeed of spawn latency on EVERY kill (AdventureController zeroes
-            // idleAttackTimer when the enemy spawns and only advances it mid-fight), while a manual
-            // mode lands the opening swing on the spawn frame because moveTimer keeps running through
-            // the respawn — up to 2x the kills per hour. The farm advisors return the mode their rate
-            // was costed at; honouring it is what makes the recommendation real.
-            void ApplyFarmCombatMode(int mode, string forWhat)
-            {
-                if (mode < 0 || mode > 3) return;
-                if (Main.Settings.CombatMode == mode) return;
-                Main.Settings.CombatMode = mode;
-                Main.Log($"Advisor: adventure combat -> {BoostFarmAdvisor.ModeName(mode)} (fastest for {forWhat})");
-            }
-
             // Farm Gear Zones outranks the boost farm: every capped item is a PERMANENT item-list
             // bonus, and only zones that finish inside the advisor's time budget qualify.
+            // Why the gear farm did NOT take the routing — carried into the boost line below so one line
+            // explains the whole precedence chain instead of two.
+            string gearFarmWhy = Main.Settings.AdvisorFarmGear ? "?" : "off";
             if (Main.Settings.AdvisorFarmGear)
             {
                 var g = GearFarmAdvisor.Analyze();
@@ -801,12 +959,26 @@ namespace NGUAdvisor.Managers
                         Main.Settings.SnipeZone = g.Best.Zone;
                         Main.Log($"Advisor: farm zone -> {g.Best.ZoneName} (gear: {g.Best.MissingItems.Count} uncapped, ~{g.Best.HoursToCap:0.#}h to cap)");
                     }
+                    var plan = g.Best;
+                    var near = g.Nearest;
+                    LogZoneDbg("gearfarm", () => $"pick={plan.ZoneName} uncapped={plan.MissingItems.Count}"
+                                              + $" hrs={plan.HoursToCap:0.#} wantMode={BoostFarmAdvisor.ModeName(plan.Mode)}"
+                                              + $" beat={(near != null ? $"{near.ZoneName} (needs ~{near.ReqLootFactor * 100:#,0}% DC)" : "boost farm (no non-viable runner-up)")}");
                     return;
                 }
+                gearFarmWhy = !g.Known
+                    ? "verdict unknown"
+                    : g.Nearest != null
+                        ? $"no zone caps in budget, closest {g.Nearest.ZoneName} needs ~{g.Nearest.ReqLootFactor * 100:#,0}% DC"
+                        : "nothing uncapped in budget";
             }
 
             var v = BoostFarmAdvisor.Analyze();
-            if (!v.Known) return;
+            if (!v.Known)
+            {
+                LogZoneDbg("none", () => $"why=boost verdict unknown gearfarm={gearFarmWhy}");
+                return;
+            }
             int target = v.BestZone == -1000 ? 1000 : v.BestZone;
             string name = v.BestName;
             string detail = $"{v.BestRate:0.###} boost/s";
@@ -841,6 +1013,10 @@ namespace NGUAdvisor.Managers
                 Main.Settings.SnipeZone = target;
                 Main.Log($"Advisor: farm zone -> {name} ({detail})");
             }
+            LogZoneDbg(target == 1000 ? "itopod" : "boostfarm",
+                () => $"pick={name} rate={detail} wantMode={BoostFarmAdvisor.ModeName(farmMode)}"
+                    + $" beat={(v.BestZone == -1000 ? "every farmable zone" : $"ITOPOD @{v.ItopodRate:0.###} boost/s")}"
+                    + $" boostDemand={routedForBoosts} gearfarm={gearFarmWhy}");
         }
 
         // EXP balancing (guide ratios): one walk step per minute, waterfilling up to 10% of banked EXP
@@ -861,6 +1037,8 @@ namespace NGUAdvisor.Managers
         // re-optimize the same objective and re-equip if a new drop/merge made a meaningfully better
         // loadout available (>= 5%). Optimize is heavy, so this is throttled well beyond the 30s tick.
         private static DateTime _lastGearCheck = DateTime.MinValue;
+        // What the last resolved pass equipped for: the rendered chain (GearChain.Describe) on the
+        // optimizer path, the bare name on the gear-hunt path. Only ever compared for equality.
         private static string _lastGearObjective;
         // False on every payload load. A reload can leave a lock's TEMP loadout equipped with the
         // restore set lost (Unload doesn't release locks; statics wipe — user-reported: gear stayed
@@ -881,13 +1059,46 @@ namespace NGUAdvisor.Managers
             _lastGearCheck = DateTime.MinValue;
         }
 
+        // WHY gear was or was not re-equipped. The user-facing lines only ever announce an equip, so the far
+        // more common outcome — the 5% bar held the current loadout — left no trace at all, and neither did
+        // the two scores it was measured on. Both sides of the bar and the switch bypass go on one line.
+        //
+        // Same discipline as [TitanGoldDbg]: cadence cap before the render, then emit only on CHANGE. The
+        // scores below are already computed by the decision itself, so the render adds no optimizer work —
+        // but the exits ahead of the 120 s throttle (ManageGear off, quest lock, NOEC, no objective) run on
+        // every 30 s tick and need the cap regardless.
+        private static string _lastGearDbg;
+        private static DateTime _lastGearDbgAt = DateTime.MinValue;
+
+        private static void LogGearDbg(string verdict, Func<string> render)
+        {
+            try
+            {
+                if ((DateTime.UtcNow - _lastGearDbgAt).TotalSeconds < 60) return;
+                _lastGearDbgAt = DateTime.UtcNow;
+                string line = $"[GearDbg] {verdict} {render()}";
+                if (line == _lastGearDbg) return;
+                _lastGearDbg = line;
+                Main.LogDebug(line);
+            }
+            catch (Exception e) { Main.LogDebug($"[GearDbg] failed: {e.Message}"); }
+        }
+
         private static void ApplyGearRefresh()
         {
-            if (!Main.Settings.ManageGear) return;
+            if (!Main.Settings.ManageGear)
+            {
+                LogGearDbg("OFF", () => "why=ManageGear off");
+                return;
+            }
             // CanSwap() allows the quest lock through, but quest gear is equipped then — don't fight it.
-            if (LockManager.HasQuestLock()) return;
+            if (LockManager.HasQuestLock())
+            {
+                LogGearDbg("HELD", () => "why=quest lock owns the loadout");
+                return;
+            }
             // NOEC: there is no equipment — don't churn.
-            try { if (ChallengeDetector.Current() == "NOEC") return; } catch { }
+            try { if (ChallengeDetector.Current() == "NOEC") { LogGearDbg("HELD", () => "why=NOEC challenge, no equipment"); return; } } catch { }
             // The challenge overlay's rotation outranks the profile objective — this is what un-freezes
             // gear during challenges even when the profile's challenge breakpoints are static ID lists.
             // GEAR HUNT sits between them: it replaces the SEGMENT objective (the user is deliberately
@@ -897,10 +1108,22 @@ namespace NGUAdvisor.Managers
             // Loot Hunter loadout was never equipped (user-reported).
             bool inChallenge = false;
             try { inChallenge = ChallengeDetector.Current() != null; } catch { }
-            string objName = !inChallenge && GearHunter.Active
+            string overrideName = !inChallenge && GearHunter.Active
                 ? "LOOT HUNTER"
-                : ChallengeOverlay.GearObjectiveOverride ?? AllocationProfiles.Breakpoints.GearBreakpoints.ActiveObjective;
-            if (string.IsNullOrEmpty(objName)) return;
+                : ChallengeOverlay.GearObjectiveOverride;
+            // The profile's own name is the one its chain was RESOLVED FROM, not the chain's lead objective:
+            // the preset "Adventure + Respawn" leads with "Adventure", and reporting that as the profile's
+            // name is what let a plain "Adventure" override inherit the profile's three-step chain.
+            string objName = overrideName
+                ?? AllocationProfiles.Breakpoints.GearBreakpoints.ActiveChainSource
+                ?? AllocationProfiles.Breakpoints.GearBreakpoints.ActiveObjective;
+            if (string.IsNullOrEmpty(objName))
+            {
+                LogGearDbg("HELD", () => $"why=no active objective (override={overrideName ?? "none"}"
+                                       + $" chainSource={AllocationProfiles.Breakpoints.GearBreakpoints.ActiveChainSource ?? "none"}"
+                                       + $" objective={AllocationProfiles.Breakpoints.GearBreakpoints.ActiveObjective ?? "none"})");
+                return;
+            }
             if ((DateTime.UtcNow - _lastGearCheck).TotalSeconds < 120) return;
             _lastGearCheck = DateTime.UtcNow;
 
@@ -909,12 +1132,18 @@ namespace NGUAdvisor.Managers
                 // Hybrid set (pool accessories + best P/T): no single objective score exists, so the
                 // anti-churn test is set-membership — re-equip only when the resolved set isn't worn.
                 var huntIds = GearHunter.ResolveLoadout(out var what);
-                if (huntIds.Length == 0) return;
+                if (huntIds.Length == 0)
+                {
+                    LogGearDbg("HELD", () => "obj='LOOT HUNTER' why=hunt loadout resolved to nothing");
+                    return;
+                }
                 bool huntChanged = objName != _lastGearObjective;
                 var worn = new HashSet<int>(LoadoutManager.CurrentGearIds());
                 if (_gearAsserted && !huntChanged && huntIds.All(worn.Contains))
                 {
                     _lastGearObjective = objName;
+                    LogGearDbg("HELD", () => $"obj='LOOT HUNTER' set='{what}' switch=false"
+                                           + " why=resolved hunt set already worn (membership test, no 5% bar)");
                     return;
                 }
                 bool firstHunt = !_gearAsserted;
@@ -923,11 +1152,25 @@ namespace NGUAdvisor.Managers
                 LoadoutManager.ChangeGear(huntIds);
                 Main.InventoryController.assignCurrentEquipToLoadout(0);
                 Main.Log($"Advisor: gear hunt loadout equipped — {what}{(firstHunt ? " (startup/reload assert)" : "")}");
+                LogGearDbg("EQUIP", () => $"obj='LOOT HUNTER' set='{what}' switch={huntChanged}"
+                                        + $" assert={firstHunt} why=hunt set not worn (membership test, no 5% bar)");
                 return;
             }
 
-            var obj = GearOptimizer.FindObjective(objName);
-            if (obj == null) return;
+            // The profile's own chain wins whenever nothing OVERRIDES it -- it can carry an explicit
+            // Priorities list that no name can express. An override/hunt name resolves on its own (preset
+            // first, then a plain objective); an unresolved name is refused, not guessed. The test is the
+            // absence of an override and NOT a name comparison: no name can tell "the override asked for
+            // Adventure" apart from "the profile's chain happens to lead with Adventure".
+            var activeChain = AllocationProfiles.Breakpoints.GearBreakpoints.ActiveChain;
+            var chain = overrideName == null && activeChain != null
+                ? activeChain
+                : GearChain.Resolve(objName);
+            if (chain == null || chain.Count == 0)
+            {
+                LogGearDbg("HELD", () => $"obj='{objName}' why=name resolved to no chain (refused, not guessed)");
+                return;
+            }
             // Objective switches (segment/rotation changes) bypass the 5% bar: "wrong gear that's
             // within 5% on the NEW objective" is still wrong gear (user-reported: TM HOUR wearing
             // the push loadout). The threshold only applies to same-objective drop improvements.
@@ -935,32 +1178,70 @@ namespace NGUAdvisor.Managers
             // verified already-optimal) — a no-op pass must NOT consume the bypass (user-reported:
             // segment flipped during a titan lock; the first post-release pass fizzled and the
             // stale AT gear then sat inside the 5% bar forever).
-            bool objectiveChanged = objName != _lastGearObjective;
-            double cur = GearOptimizer.CurrentScore(obj);
-            var best = GearOptimizer.Optimize(obj, AllocationProfiles.Breakpoints.GearBreakpoints.ActiveForceRespawn);
-            if (best == null) return;
+            //
+            // A CHAIN switch is an objective switch, so the marker is the rendered chain, not
+            // chain[0].Objective.Name: swapping only the tail of a chain leaves the lead objective
+            // unchanged and would otherwise never clear the 5% bar. (The hunt path above stores the bare
+            // "LOOT HUNTER" instead, which no rendered chain can equal — so hunt<->chain always counts.)
+            string chainKey = GearChain.Describe(chain);
+            bool objectiveChanged = chainKey != _lastGearObjective;
+            // Both sides of the bar measure the same thing: the chain's own lead objective.
+            double cur = GearOptimizer.CurrentScore(chain);
+            var best = GearOptimizer.Optimize(chain, null, AllocationProfiles.Breakpoints.GearBreakpoints.ActiveForceRespawn);
+            if (best == null)
+            {
+                LogGearDbg("HELD", () => $"obj='{objName}' chain='{chainKey}' switch={objectiveChanged}"
+                                       + " why=optimizer returned no loadout");
+                return;
+            }
+            // One renderer for every outcome of the bar, so a single line carries both scores it was
+            // measured on, their ratio, the bar itself, and whether this pass was a SWITCH (which bypasses
+            // the bar). Reads only locals already computed above — no second optimizer run.
+            bool wasAsserted = _gearAsserted;
+            Func<string, string> gearLine = why =>
+                $"obj='{objName}' chain='{chainKey}' switch={objectiveChanged} asserted={wasAsserted}"
+              + $" cur={cur:0.###e0} best={best.Score:0.###e0}"
+              + $" ratio={(cur > 0 ? (best.Score / cur).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "n/a")}"
+              + $" bar=x1.05 why={why}";
             if (_gearAsserted)
             {
-                if (!objectiveChanged && (cur <= 0 || best.Score < cur * 1.05)) return;
+                if (!objectiveChanged && (cur <= 0 || best.Score < cur * 1.05))
+                {
+                    LogGearDbg("HELD", () => gearLine(cur <= 0
+                        ? "no score for the worn set"
+                        : "same objective and inside the 5% re-equip bar"));
+                    return;
+                }
                 if (objectiveChanged && cur > 0 && best.Score <= cur)
                 {
-                    _lastGearObjective = objName;   // verified: equipped gear IS optimal for the new objective
+                    _lastGearObjective = chainKey;   // verified: equipped gear IS optimal for the new objective
+                    LogGearDbg("HELD", () => gearLine("objective switch, but the worn set is already optimal for it"));
                     return;
                 }
             }
 
             var ids = best.AllIds().Where(x => x > 0).Distinct().ToArray();
-            if (ids.Length == 0) return;
+            if (ids.Length == 0)
+            {
+                LogGearDbg("HELD", () => gearLine("winning loadout had no equippable ids"));
+                return;
+            }
             bool firstAssert = !_gearAsserted;
             _gearAsserted = true;
-            _lastGearObjective = objName;
+            _lastGearObjective = chainKey;
             LoadoutManager.ChangeGear(ids);
             Main.InventoryController.assignCurrentEquipToLoadout(0);
+            string label = $"{objName} [{chainKey}]";
             Main.Log(firstAssert
-                ? $"Advisor: gear asserted for '{obj.Name}' (startup/reload — known-good loadout re-equipped)"
+                ? $"Advisor: gear asserted for '{label}' (startup/reload — known-good loadout re-equipped)"
                 : objectiveChanged
-                    ? $"Advisor: gear switched to '{obj.Name}' loadout (objective change)"
-                    : $"Advisor: re-optimized gear for '{obj.Name}' (+{(best.Score / cur - 1) * 100:0.#}% from new drops)");
+                    ? $"Advisor: gear switched to '{label}' loadout (objective change)"
+                    : $"Advisor: re-optimized gear for '{label}' (+{(best.Score / cur - 1) * 100:0.#}% from new drops)");
+            LogGearDbg("EQUIP", () => gearLine(firstAssert
+                ? "startup/reload assert — bar not applied"
+                : objectiveChanged
+                    ? "objective/chain switch — bar bypassed"
+                    : "cleared the 5% bar on the same objective"));
         }
 
         private static void ApplyWandoosOs(Character c)

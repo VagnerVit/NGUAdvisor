@@ -400,7 +400,7 @@ namespace NGUAdvisor
                 catch { }
 
                 // TITAN BANK.
-                int best = AdvisorApply.HighestAkTitan();
+                int best = AdvisorApply.GoldTitanTarget();
                 bool bankQueued = false;
                 string bankValue = "NONE YET";
                 string bankSub = "NO AK TITAN";

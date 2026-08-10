@@ -21,6 +21,12 @@ Two counting rules that are NOT the same: **one entry per SYSTEM** (Blood matchi
 produce ONE row — terms are how you find an entry, not entries themselves) and **one entry per
 SETTINGS ROW** (a settings row has its own control, so it can't be aggregated).
 
+**A BAND is one row too.** `ALWAYS EQUIP` (`PinnedGearIds`) is a `Set` entry in its own group even
+though the control it points at is a whole `Panel` (list + Paste/Copy/Clear/Undo + status). The panel
+registers the CONTAINER, not the pieces — one surface, one control — so filtering moves the band whole
+and there is no way for the list to appear without its buttons, or a button without the list it edits.
+The band's own layout rules are in ui-panels.md §ALWAYS EQUIP.
+
 ## Activity + ActivityRibbon (`Activity.cs`, `ActivityRibbon.cs`)
 
 One-slot model of "what happened because of the thing I just clicked" (LOGS remains the history).

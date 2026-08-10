@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.27";
+        public const string Version = "1.2.28";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -1344,7 +1344,17 @@ namespace NGUAdvisor
                             }
                             // No fightable zone right now — fall through to normal routing (ITOPOD)
                             // instead of parking in the Safe Zone.
+                            if (_furthestZone < 0)
+                                LogGoldDecisionThrottled(-1, -1, GoldDropAdvisor.Banked(), "IDLE", "no fightable zone to snipe");
                         }
+                    }
+                    else if (Settings.ManageGoldLoadouts)
+                    {
+                        // Deliberately does NOT predict: PredictedDrop reaches the gear optimizer, and this
+                        // is the every-frame steady state of a finished snipe. The bank is the number that
+                        // matters here — a re-arm trigger has to beat it.
+                        LogGoldDecisionThrottled(_furthestZone, -1, GoldDropAdvisor.Banked(), "IDLE",
+                            "snipe latched complete (waiting on a re-arm trigger)");
                     }
                 }
 
@@ -1605,7 +1615,10 @@ namespace NGUAdvisor
         private static bool GoldSnipePays(int zone)
         {
             double predicted, banked;
-            if (GoldDropAdvisor.ZoneSnipeBeatsBank(zone, out predicted, out banked))
+            bool pays = GoldDropAdvisor.ZoneSnipeBeatsBank(zone, out predicted, out banked);
+            LogGoldDecisionThrottled(zone, predicted, banked, pays ? "SNIPE" : "SKIP",
+                predicted <= 0 ? "no drop data for the zone" : pays ? "beats bank" : "below bank (latching complete)");
+            if (pays)
                 return true;
             GoldDropAdvisor.NoteSnipeSkipped(predicted, banked);
             if (zone != _goldPayZone || banked != _goldPayBank)
@@ -1616,6 +1629,44 @@ namespace NGUAdvisor
                 Log($"Gold snipe skipped: {name} pays ~{NumberFormatter.Abbrev(predicted)} gold, the TM already runs on {NumberFormatter.Abbrev(banked)}.");
             }
             return false;
+        }
+
+        // Every gold decision, with its numbers, in debug.log: bank now, what the candidate is expected to
+        // drop, the percentage that would move the Time Machine's basis, the verdict and why. The
+        // user-facing Log line above says only the skip and only once per (zone, bank) pair, so after the
+        // fact there was no evidence of what the advisor decided or on what numbers — the same reason
+        // [TitanGoldDbg] exists on the titan side.
+        //
+        // Callers that fire on a state change (re-snipe triggers, new-zone tests) use this directly.
+        public static void LogGoldDecision(int zone, double predicted, double banked, string verdict, string why)
+        {
+            try
+            {
+                string name = zone >= 0
+                    ? (ZoneHelpers.ZoneList.TryGetValue(zone, out var zn) ? zn : $"Zone {zone}")
+                    : "(no zone)";
+                LogDebug($"[GoldSnipeDbg] {verdict} zone={zone} ({name})"
+                       + $" bank={NumberFormatter.Abbrev(banked)} pred={(predicted > 0 ? NumberFormatter.Abbrev(predicted) : "n/a")}"
+                       + $" vsBank={GoldDropAdvisor.PctVsBank(predicted, banked)} why={why}");
+            }
+            catch (Exception e) { LogDebug($"[GoldSnipeDbg] failed: {e.Message}"); }
+        }
+
+        // The throttled path, for GoldSnipePays and the latch state: SnipeZone runs those EVERY FRAME, so
+        // an unconditional LogDebug there would write tens of thousands of identical lines and bury the
+        // decision the diagnostic was added to expose. Same discipline as [TitanGoldDbg]: a 60 s cadence
+        // cap, and even then only when the rendered line actually CHANGES.
+        private static string _lastGoldDbg;
+        private static DateTime _lastGoldDbgAt = DateTime.MinValue;
+
+        private static void LogGoldDecisionThrottled(int zone, double predicted, double banked, string verdict, string why)
+        {
+            if ((DateTime.UtcNow - _lastGoldDbgAt).TotalSeconds < 60) return;
+            _lastGoldDbgAt = DateTime.UtcNow;
+            string key = $"{verdict}|{zone}|{banked}|{predicted}|{why}";
+            if (key == _lastGoldDbg) return;
+            _lastGoldDbg = key;
+            LogGoldDecision(zone, predicted, banked, verdict, why);
         }
 
         // RvL-style drop-chance advice, once per zone change: how much total drop chance the new farm
@@ -1681,7 +1732,11 @@ namespace NGUAdvisor
                     // already runs on — after a titan bank most zone unlocks cannot (GoldDropAdvisor).
                     // The zone is still recorded as triggered so this does not re-test every second.
                     double predicted, banked;
-                    if (GoldDropAdvisor.ZoneSnipeBeatsBank(best.Zone, out predicted, out banked))
+                    bool beats = GoldDropAdvisor.ZoneSnipeBeatsBank(best.Zone, out predicted, out banked);
+                    // Once per newly-fightable zone (the _lastNewZoneTrigger guard), so no throttle needed.
+                    LogGoldDecision(best.Zone, predicted, banked, beats ? "RE-ARM" : "SKIP",
+                        beats ? "new zone fightable" : "new zone can't beat the bank");
+                    if (beats)
                     {
                         trigger = "new zone fightable";
                         newZone = best.Zone;

@@ -79,6 +79,9 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `ITOPODManager.md` | ITOPODManager + ItopodConstants (**the one-shot floor solve; the defense term is NOT divided by the multiplier**) |
 | `ExpBalancer.md` | ExpBalancer + ExpRatioTables (guide EXP-ratio phase table) |
 | `GoldDropAdvisor.md` | GoldDropAdvisor + GoldDropTables (gold-kill payoff vs. the TM's banked drop) |
+| `ApPurchaseAdvisor.md` | ApPurchaseAdvisor + ApTierTable + ApPanel (**AP = "Arbitrary Points"; ownership is the game's own `shouldDisableBuyButton`, the ordering is one player's opinion — advise-only, never buys**) |
+| `PpAdvisor.md` | PpEta + PpPanel (**computes no plan — SpendPlanner owns the perk order; measured and modelled PP rates never blend; the ITOPOD toggle bypasses zone routing**) |
+| `AtCalculator.md` | AtMath + AtPanel (**the community AT sheet's missing `atcalc`/`bb`/`bbtrue`, re-derived from the decomp; `barProgress` is RESET so overflow is discarded — one level per tick, hence the piecewise ETA; the sheet's BB-level cell is off by one and the decomp wins; `baseTime` is read per slot; the 25 000 floor and wish 190 invalidate every time**) |
 | `reference-gear-optimizer.md` | `external/gear-optimizer/` (the JS oracle) |
 | `gear-optimizer-comparison.md` | native vs reference: validated ports, deliberate divergences, gaps |
 

@@ -24,8 +24,9 @@ website as an oracle.
 
 ## Consumers
 
-- `GearOptimizer` — inner-loop scoring is a dense-array rewrite of `GetRawVals + ScoreVals`
-  (see the `ScoreOf` comment there). **Semantics changes here must be mirrored there.**
+- `GearOptimizer` — inner-loop scoring is a dense-array rewrite of `GetRawVals + ScoreVals`, in the
+  nested `GearOptimizer.ScoreContext` (see the equivalence comment above that class).
+  **Semantics changes here must be mirrored there.**
 - `GearOptimizerDiagnostic` — scores the current loadout per objective for site comparison.
 - `GearOptimizer.CurrentScore` — "how good is my gear now" vs `Optimize().Score`.
 

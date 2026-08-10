@@ -62,7 +62,9 @@ namespace NGUAdvisor.Managers
                 foreach (var obj in GearObjectives.Objectives)
                 {
                     double curScore = GearScorer.ScoreRaw(equip, obj.Stats, obj.Exponents, offhand);
-                    var best = GearOptimizer.Optimize(obj);
+                    // No pins: this is the optimizer's regression baseline, and a baseline that moves with
+                    // the user's pin list cannot show whether a refactor changed the optimizer.
+                    var best = GearOptimizer.Optimize(obj, false, new int[0]);
                     double gain = curScore > 0 ? best.Score / curScore : 0;
                     lines.Add($"  {obj.Name}:  current={curScore:E4}  optimized={best.Score:E4}  (x{gain:0.###})");
                     lines.Add("      W:" + Name(best.MainWeapon) + (best.OffWeapon != 0 ? " / " + Name(best.OffWeapon) : "")

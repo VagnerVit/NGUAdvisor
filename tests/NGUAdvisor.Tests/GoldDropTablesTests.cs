@@ -53,6 +53,34 @@ namespace NGUAdvisor.Tests
             Assert.True(GoldDropTables.BaseGold(42, true) > GoldDropTables.BaseGold(41, true));
         }
 
+        // Titan gold is NOT monotone in titan index, and a picker that assumed it was banked the smaller
+        // drop (user-reported): T2 (zone 8) pays 400 000, T3 (zone 11) only 300 000. The live factors
+        // PredictedDrop applies — totalGoldbonus, the gold-gear ratio — are the same for every candidate,
+        // so this table ordering IS the ranking AdvisorApply.BestGoldTitan produces.
+        [Fact]
+        public void Titan2_out_drops_titan3()
+        {
+            Assert.True(GoldDropTables.BaseGold(8, true) > GoldDropTables.BaseGold(11, true));
+        }
+
+        // Ranking the titan zones by gold must not reproduce their index order, otherwise "pick the highest"
+        // and "pick the most profitable" would be the same choice and the bug would be untestable.
+        [Fact]
+        public void Highest_titan_index_is_not_always_the_most_gold()
+        {
+            int[] titanZones = { 6, 8, 11, 14, 16, 19, 23, 26, 30, 34, 38, 42, 44, 45 };
+            int bestByGold = -1, bestByIndex = -1;
+            double best = -1;
+            for (int i = 0; i < titanZones.Length; i++)
+            {
+                double gold = GoldDropTables.BaseGold(titanZones[i], true);
+                bestByIndex = i;
+                if (gold > best) { best = gold; bestByGold = i; }
+            }
+            Assert.NotEqual(bestByIndex, bestByGold);   // T12 (zone 42) pays; THE TRAITOR (zone 45) pays nothing
+            Assert.Equal(42, titanZones[bestByGold]);
+        }
+
         [Fact]
         public void Unknown_zones_report_no_data_rather_than_zero_gold_certainty()
         {

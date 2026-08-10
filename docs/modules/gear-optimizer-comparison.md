@@ -2,7 +2,8 @@
 
 Comparison of the native C# gear optimizer (`Managers/GearScorer.cs`, `GearObjectives.cs`,
 `GameGearAdapter.cs`, `GearOptimizer.cs`) against the reference JS implementation
-(`external/gear-optimizer/src/`). Audited 2026-07-28 against the cloned source.
+(`external/gear-optimizer/src/`). Audited 2026-07-28 against the cloned source; the chain / pins rows
+and gaps 2–3 revised 2026-08-10 when `GearChain.cs` and `Settings.PinnedGearIds` landed.
 
 ## Identical (validated ports)
 
@@ -13,9 +14,12 @@ Comparison of the native C# gear optimizer (`Managers/GearScorer.cs`, `GearObjec
 | Cube stats | `GameGearAdapter.BuildCubeItem` | `util.js cubeBaseItemData` | Exact tier formulas for Drop/Gold/Hack/Wish |
 | Accessory uniqueness | `accSet` guard + pool dedup | implicit (item DB ids) | Same game rule: one copy per accessory id |
 
-`GearOptimizer.ScoreOf` is a dense-array rewrite of `GetRawVals + ScoreVals` for the hot loop —
-documented as exact (missing stat = 0, NaN folded to 0 at build, literal offhand rule, cube+base
-folded into a constant). Any change to the scoring semantics must be made in BOTH places.
+`GearOptimizer.ScoreContext.ScoreOf` is a dense-array rewrite of `GetRawVals + ScoreVals` for the hot
+loop — documented as exact (missing stat = 0, NaN folded to 0 at build, literal offhand rule,
+cube+base folded into a constant). **Any change to the scoring semantics must be made in BOTH
+places.** The scorer moved into the nested `ScoreContext` class when the priority chain landed (one
+context per priority, over shared candidate pools); the equivalence comment travelled with it and
+sits above `ScoreContext`. `ScoreContext` is **not re-entrant** — see GearOptimizer.md.
 
 ## Different by design (native is game-truth; do not "fix" toward the site)
 
@@ -26,7 +30,9 @@ folded into a constant). Any change to the scoring semantics must be made in BOT
 | Offhand % | Live `weapon2Factor() * 100` (wish 28+45 progress), 30 s cache | User input (`state.offhand * 5`) |
 | Nude base stats | Live `adventureAttackBonus()` / `adventureDefenseBonus()` | User input (`basestats`) |
 | Search | Coordinate ascent over main slots + greedy fill + local swap over accessories, ≤5 alternating rounds. Justified: NGU has no set bonuses → objective near-separable per slot | Per-slot Pareto filter (`dominates`/`pareto`) → cartesian layout expansion with Pareto pruning → accessory worst-replacement loop → alternatives + hardcap-driven drops |
-| Respawn coverage | `forceTopRespawn` pin: if the merit loadout has no respawn, pin the max-respawn item whose pinned loadout scores best | No equivalent; site users add Respawn as an extra priority with `maxslots` |
+| Priority chain | `GearChain` — ≤5 `GearPriority` steps, budget recomputed per step from the slots ACTUALLY filled; priority 0 owns the main slots, later steps are accessory-only. Chains are named presets in `GearChain.Presets`, in the same name namespace as objectives, plus a per-breakpoint `Priorities` list in the profile | `factorslist`/`maxslotslist` (≤5), one `compute_optimal` per priority, `count_accslots` for the budget — carried on a Pareto FRONT of base layouts rather than a single layout |
+| Pins / locked items | ONE global `Settings.PinnedGearIds` list ("always wear these"), placed before every optimization; unowned pins skipped, duplicates refused, over-budget pins truncated — each logged. Dropped entirely on a live titan fight (`ResolveTitanGear`) | `state.locked` fed to `construct_base`, per item, edited in the site UI; plus a per-item disable flag native has no counterpart for |
+| Respawn coverage | `forceTopRespawn` pin: if the merit loadout has no respawn, pin the max-respawn item whose pinned loadout scores best. Since the chain landed, the site's approach is *also* available natively — the `Adventure + Respawn` preset reserves a respawn slot unconditionally, where the pin fires only when there is no respawn at all | No `forceTopRespawn` equivalent; site users add Respawn as an extra priority with `maxslots` |
 
 ## Gaps in native (reference has it, native does not)
 
@@ -35,11 +41,25 @@ folded into a constant). Any change to the scoring semantics must be made in BOT
    Cooldown floor). Native scores raw only; deliberately deferred ("rarely bind",
    `GearOptimizerDiagnostic` note). If a capped stat ever misranks gear, port `hardcap` into
    `GearScorer` and feed live cap stats.
-2. **Multi-priority chains**: the site runs up to 5 factors sequentially (`compute_optimal` per
-   priority, each with a `maxslots` accessory budget); native optimizes ONE objective (multi-stat
-   via exponents). The Yggdrasil objective emulates a priority chain with descending exponents.
-3. **Locked slots / disabled items**: site supports user-locked items (`construct_base`) and a
-   per-item disable flag. Native's only pin is the TopRespawn pin.
+2. ~~**Multi-priority chains**~~ — **CLOSED** (`GearChain` + the `Optimize(chain, pins, force)`
+   overload). Native now runs up to 5 priorities sequentially, each claiming at most its budget of
+   the accessory slots still free, its filled slots frozen for later priorities — the same
+   `construct_base` → `compute_optimal`-per-priority sequence as
+   `sagas/optimize.worker.js:24-40`, with the budget recomputed per priority via the
+   `count_accslots` rule (`Optimizer.js:135`). **Still different:** the search *inside* one priority
+   is native's coordinate ascent + greedy fill + local swap, so a priority hands the next one a
+   SINGLE locked layout, where the reference carries a Pareto FRONT of base layouts forward and only
+   collapses it at the end. Native can therefore lock a slot that a later priority would have
+   preferred differently; the reference can back out of that choice. Also unchanged: the objective's
+   own multi-stat exponents (Yggdrasil's descending 4/4/3/2/1) remain the way to express *soft*
+   weights inside one priority — the chain is for hard slot reservations.
+3. ~~**Locked slots**~~ — **CLOSED** for locked/pinned items: `Settings.PinnedGearIds` is a global
+   "always wear these" list, placed by `PlacePins` before any optimization, the port of
+   `construct_base(state.locked, state.equip)` (`Optimizer.js:26`). **Still different:** the site's
+   locks are per-optimization UI state, native's are one persisted global list applied by every entry
+   point (and deliberately dropped for a live titan fight). The **per-item disable flag** has no
+   native counterpart — native's candidate set is the live inventory, so "disable this item" is not
+   expressible; it remains open.
 4. **Negative exponents**: site has cap-speed factors (`ECAPSPEED` = Cap^-1 × Bars). Native
    `ScoreVals` handles any exponent, but no such objective is defined in `GearObjectives`.
 5. **Alternatives / tie detection** and "drop gear that stops contributing due to hard caps":

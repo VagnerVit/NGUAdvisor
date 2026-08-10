@@ -136,7 +136,9 @@ namespace NGUAdvisor.Managers
                 var obj = GearOptimizer.FindObjective(objName);
                 if (obj == null) { _focus = ""; return _focus; }
                 double cur = GearOptimizer.CurrentScore(obj);
-                double opt = GearOptimizer.Optimize(obj).Score;
+                // No pins on either side of the ratio: CurrentScore does not know about them, so a pin that
+                // costs this objective would otherwise read as "your gear is already optimal".
+                double opt = GearOptimizer.Optimize(obj, false, new int[0]).Score;
                 if (cur > 0 && opt > cur)
                 {
                     double pct = (opt / cur - 1.0) * 100.0;

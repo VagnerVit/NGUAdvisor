@@ -46,14 +46,16 @@ namespace NGUAdvisor.Managers
 
             var keep = new HashSet<int>();
 
-            // Winners of every objective, both with and without the respawn pin.
+            // Winners of every objective, both with and without the respawn pin. No USER pins here (the
+            // new int[0]): pinned items occupy slots and would crowd genuine winners out of the keep set,
+            // and the pins themselves are added unconditionally below.
             foreach (var obj in GearObjectives.Objectives)
             {
                 try
                 {
                     var seen = new HashSet<int>();
-                    foreach (var id in GearOptimizer.OptimizeIds(obj, false) ?? new int[0]) { keep.Add(id); seen.Add(id); }
-                    foreach (var id in GearOptimizer.OptimizeIds(obj, true) ?? new int[0]) { keep.Add(id); seen.Add(id); }
+                    foreach (var id in GearOptimizer.OptimizeIds(obj, false, new int[0]) ?? new int[0]) { keep.Add(id); seen.Add(id); }
+                    foreach (var id in GearOptimizer.OptimizeIds(obj, true, new int[0]) ?? new int[0]) { keep.Add(id); seen.Add(id); }
                     foreach (var id in seen)
                         v.Usage[id] = (v.Usage.TryGetValue(id, out var n) ? n : 0) + 1;
                 }
@@ -64,7 +66,9 @@ namespace NGUAdvisor.Managers
             var s = Main.Settings;
             if (s != null)
             {
-                foreach (var arr in new[] { s.TitanLoadout, s.GoldDropLoadout, s.QuestLoadout, s.YggdrasilLoadout, s.CookingLoadout })
+                // PinnedGearIds is "always wear this" — trashing a pin is the one verdict that can never
+                // be right, and it must not depend on a pin happening to win an objective.
+                foreach (var arr in new[] { s.TitanLoadout, s.GoldDropLoadout, s.QuestLoadout, s.YggdrasilLoadout, s.CookingLoadout, s.PinnedGearIds })
                     if (arr != null)
                         foreach (var id in arr) keep.Add(id);
             }

@@ -361,7 +361,15 @@ namespace NGUAdvisor
             var cmbLbl = MkLbl("Combat");
             _itopodCombat = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodCombat);
-            _itopodCombat.Items.AddRange(new object[] { "Idle", "Snipe", "Defensive", "Offensive" });
+            // ITOPOD combat is BINARY, not four-valued: ITOPODManager reads this setting only as
+            // Convert.ToBoolean(...) (:119) and `== 0` (:95, :125, :526, :706, :727). Snipe, Defensive
+            // and Offensive are literally the same behaviour there — manual — so offering four choices
+            // promised a distinction the pod does not have, and picking one past the retired grid's
+            // 2-item combo also threw out of UpdateFromSettings (see SettingsForm.cs and ui-panels.md).
+            // Manual always wins on cadence anyway: idle pays a full attackSpeed of spawn latency per
+            // kill, manual lands the opening swing on the spawn frame — never slower, up to 2x faster
+            // (ZoneCadence.md, decomp AdventureController).
+            _itopodCombat.Items.AddRange(new object[] { "Idle", "Offensive" });
             _itopodCombat.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.ITOPODCombatMode = _itopodCombat.SelectedIndex; };
             foreach (Control c in new Control[] { optLbl, _itopodOptimize, cmbLbl, _itopodCombat })
                 page.Controls.Add(c);
@@ -513,8 +521,10 @@ namespace NGUAdvisor
                 StyleOnOff(_itopodBeast, Settings.ITOPODBeastMode);
                 int om = Settings.ITOPODOptimizeMode;
                 if (om >= 0 && om < _itopodOptimize.Items.Count) _itopodOptimize.SelectedIndex = om;
-                int icm = Settings.ITOPODCombatMode;
-                if (icm >= 0 && icm < _itopodCombat.Items.Count) _itopodCombat.SelectedIndex = icm;
+                // Any non-zero stored value means "manual" to ITOPODManager, so a legacy 2/3 (Defensive/
+                // Offensive, from when this picker offered four) shows as Offensive rather than leaving
+                // the combo blank.
+                _itopodCombat.SelectedIndex = Settings.ITOPODCombatMode == 0 ? 0 : 1;
 
                 _blackList.BeginUpdate();
                 _blackList.Items.Clear();

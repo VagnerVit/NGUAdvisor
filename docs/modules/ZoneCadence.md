@@ -34,6 +34,11 @@ Idle pays a full `attackSpeed` of spawn latency on every kill; a manual mode lan
 the spawn frame because the advisor runs in `LateUpdate` with `moveTimer` already at zero. Manual is
 therefore **never slower and up to 2× faster** (the ceiling, hit when `respawn ≤ gcd`).
 
+`FastestMode(zone)` is that comparison for ONE zone — the fastest killable *and* survivable of the
+same Idle/Offensive pair the farm advisors rank, on `SecondsPerSpawn`, or −1 when neither mode has a
+usable estimate. It exists so a layer that parks the character without a farm verdict (the gear hunt
+in `AdvisorApply.ApplyZones`) can still pick a MEASURED mode instead of inheriting one.
+
 `attackSpeed` and the global cooldown are the same number, always: `AllItemListController` calls
 `adventure.setFasterIdleAttack()` (1 → 0.8) and sets `itemList.redLiquidComplete` (which `usedMove()`
 reads for the 1 → 0.8 gcd) from the **same** maxxed-Mysterious-Red-Liquid branch. Do not model them as

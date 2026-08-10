@@ -43,9 +43,12 @@ not a framework:
   explicitly so the greedy budget levels high-priority diggers first.
 - **Gear refresh** (`ApplyGearRefresh`, throttle 120 s): objective resolution order is
   challenge rotation > GEAR HUNT ("LOOT HUNTER") > `ChallengeOverlay.GearObjectiveOverride` >
-  profile's `GearBreakpoints.ActiveObjective`. The hunt must be checked FIRST outside challenges —
-  the override is set whenever AutoProfile runs, so `override ?? hunt` never fell through
-  (user-reported). Three anti-churn rules, each from a real bug:
+  profile's `GearBreakpoints.ActiveChainSource ?? ActiveObjective`. The hunt must be checked FIRST
+  outside challenges — the override is set whenever AutoProfile runs, so `override ?? hunt` never
+  fell through (user-reported). The profile's `ActiveChain` is used **iff no override is in play**,
+  which is a flag and deliberately NOT a name comparison: `ActiveObjective` is a chain's lead
+  objective, so an override asking for "Adventure" used to inherit the profile's
+  "Adventure + Respawn" chain. Three anti-churn rules, each from a real bug:
   1. `_gearAsserted=false` on every payload load → first pass equips UNCONDITIONALLY (a reload
      can leave a lock's TEMP loadout worn with the restore set lost — statics wipe).
   2. Objective CHANGES bypass the 5 % improvement bar ("wrong gear within 5 % on the new
@@ -71,17 +74,31 @@ not a framework:
   `SwapTitanLoadouts` (advisor owns titans → snapshot machinery must equip the kill set).
 - **Zones** (`ApplyZones`): CBlock/pit-run gold logic owns zones — stand down. GEAR HUNT
   outranks everything, is cheap, and sits OUTSIDE the 10-min throttle (toggle acts next tick).
+  **Every routing layer that parks the character also sets the combat mode** via
+  `ApplyFarmCombatMode` — including the hunt, which until 2026-08-10 wrote only `SnipeZone` and so
+  inherited the previous layer's mode (Idle, if the advisor had been parked in the pod). That halves
+  the drops the hunt was routed for: idle pays a full `attackSpeed` of spawn latency on EVERY kill
+  while a manual mode lands the opening swing on the spawn frame, so manual is never slower and up
+  to 2× faster (ZoneCadence.md). The hunt's mode comes from the same measured source the farm layers
+  use — `ZoneCadence.FastestMode(zone)`, the fastest survivable of Idle/Offensive for that one zone —
+  and only when no cadence estimate exists at all does it fall back to Offensive on the
+  never-slower rule (Idle if the regular attack is not unlocked yet). `modeSrc=` in the `[ZoneDbg]`
+  line names which of the three it was.
   Then Farm Gear Zones (permanent item-max bonuses) > boost farm > ITOPOD; Farm Best Boost
   falls back to ITOPOD when `BoostDemandExists` says nothing consumes boosts.
   **The fallback picks its combat mode on PP, not on boosts** — routing to the pod *because nothing
   consumes boosts* and then choosing the mode by boost rate is self-contradictory. PP is the currency
   nothing else in the game produces, so it decides; the PP/EXP/AP rates and the floor band go in the
   log line (`ItopodFarmAdvisor`). When ITOPOD wins on boosts outright, the boost mode stands.
-- **Titan gold** (`ApplyTitanGold` + `HighestAkTitan` 30 s cache): auto-targets the HIGHEST
-  AK-able titan (its drop dwarfs all lower ones) **on every AK cycle** — the kill is free, so there is
+- **Titan gold** (`ApplyTitanGold` + `BestGoldTitan`, on the 30 s AK cache): auto-targets the
+  **most profitable** AK-able titan — NOT the highest, titan gold is not monotone in index
+  (GoldDropAdvisor.md, "Ranking, not height") — **on every AK cycle**; the kill is free, so there is
   no payoff gate and the `TitanMoneyDone` latch is re-armed here rather than blocking (see
   GoldDropAdvisor.md, "Why titan gold has no gate"). `[TitanGoldDbg]` in `debug.log` records the whole
-  decision when it changes.
+  decision when it changes. `HighestAkTitan()` stays: other advice reads it, and it is the fallback
+  when nothing is eligible (so the clearing pass still runs). Panels read `GoldTitanTarget()`, the
+  cached pick — they run on the WinForms thread and must never re-rank, since `PredictedDrop` reaches
+  the gear optimizer.
 - **Gold** (`ApplyGold`): auto-CBlock during challenges; gold-starvation re-snipe trigger
   (clears `GoldSnipeComplete` when augs unaffordable despite TM holding gold) — **both the
   starvation trigger and the new "gold drop improved" trigger go through GoldDropAdvisor**, so a
@@ -91,3 +108,46 @@ not a framework:
 - **EXP buys**: one `ExpBalancer.BuyTick(0.10)` walk step per minute.
 - **Blood**: cast timing + single-sink routing from BloodPlanner (60 s throttle); pooling turns
   ALL auto-spells off so the pill can charge.
+
+## Diagnostics (`debug.log`) — grep a tag before adding a fourth channel
+
+All three channels below copy `[TitanGoldDbg]`'s discipline exactly (GoldDropAdvisor.md
+§Diagnostics): a stable greppable tag, a **60 s cadence cap checked BEFORE the line is rendered**,
+then **emit only when the rendered line CHANGED**, and every input of the decision on one line so
+the line alone explains the outcome. Rendering is wrapped per channel — a logging fault can never
+escape into the step it observes. Observation only: none of them changes a decision.
+
+- **`[ZoneDbg]`** (`LogZoneDbg`, called from every exit of `ApplyZones`) — **which LAYER routed the
+  zone and what lost.** The layer field is the point: `none` / `gold` / `gearhunt` / `gearfarm` /
+  `boostfarm` / `itopod`, in the precedence the code actually applies. Carries the applied combat
+  mode, the winner's rate, `beat=` (the runner-up and why it lost — the nearest non-viable gear zone
+  with the drop chance it needs, or the ITOPOD's boost rate), `boostDemand=` (the
+  `BoostDemandExists` gate) and `gearfarm=` (why the gear farm did not take the routing, carried
+  into the boost line so one line explains the whole chain). On the `gearhunt` layer, `wantMode=`
+  plus `modeSrc=` say which mode the hunt applied and whether it was measured or a fallback. The user-facing
+  `Advisor: farm zone -> …` lines go to the advisor output log, name only the winner, and are absent
+  entirely on the paths that decline to route. The cadence cap matters only for the exits ahead of
+  `ApplyZones`' 10-minute throttle (combat off, gold modes, gear hunt, `AdvisorZones` off) — those
+  run on every 30 s tick; the change check matters on all of them, because an unchanged line
+  repeated every 10 minutes for hours buries the transitions.
+
+  ```
+  [ZoneDbg] layer=itopod zone=1000 (ITOPOD) combat=Offensive pick=ITOPOD rate=no boost demand — cube at softcap, no gear needs boosts · 0.0121 PP/s, 3.44 EXP/s (floors 700-1150) wantMode=Offensive beat=every farmable zone boostDemand=False gearfarm=nothing uncapped in budget
+  ```
+
+- **`[GearDbg]`** (`LogGearDbg`, called from every exit of `ApplyGearRefresh`) — **why gear was or
+  was not re-equipped.** Verdict is `EQUIP` / `HELD` / `OFF`, then the active objective, the rendered
+  chain (`GearChain.Describe` — the same key `_lastGearObjective` commits), `switch=` (objective/chain
+  change, which BYPASSES the bar), `asserted=` (the post-load unconditional assert), `cur=` vs
+  `best=` and their `ratio=` against `bar=x1.05`, and `why=`. Only equips were ever announced, so the
+  common outcome — the 5 % bar holding the worn set — left no trace, and neither did the two scores it
+  was measured on. The LOOT HUNTER path logs its membership test instead of a score (it has no single
+  objective score). No extra optimizer work: the renderer reads the scores the decision already
+  computed. The 120 s throttle covers the score path; the cap covers the exits in front of it.
+
+  ```
+  [GearDbg] HELD obj='NGU MARATHON' chain='Energy NGU>Respawn' switch=False asserted=True cur=4.512e6 best=4.663e6 ratio=1.033 bar=x1.05 why=same objective and inside the 5% re-equip bar
+  ```
+
+`[TitanGoldDbg]` (`LogTitanGoldState`) is documented in GoldDropAdvisor.md §Diagnostics;
+`[DiggerDbg]` lives in DiggerManager. `[CapDbg]` is in LevelPlanner.md.

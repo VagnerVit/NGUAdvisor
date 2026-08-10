@@ -15,6 +15,14 @@ selectable objective presets. Pure data, no game references.
   `GearOptimizer.FindObjective` (name match is what profiles/settings store — renaming an
   objective breaks saved configs).
 
+**Objective CHAINS are not here.** Ordered multi-objective presets live in `GearChain.Presets`
+(GearChain.md) — deliberately, because `GearOptimizerDiagnostic` iterates `Objectives` and optimizes
+every entry as the optimizer's regression harness; a chain in this list would change its baseline.
+`GearChain.Resolve(name)` tries a preset first and then an objective, so **a chain name and an
+objective name share ONE namespace**: a preset must never be named after an objective (guarded by
+`GearChainTests.PresetNamesDoNotCollideWithObjectiveNames`), and the never-rename rule below applies
+to chain names exactly as it does to objective names.
+
 ## Divergences from the reference `Factors` (intentional until decided otherwise)
 
 See gear-optimizer-comparison.md §Objective-set divergences for the full table. Highlights:
@@ -33,4 +41,5 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
 1. Use existing `Stat` constants (or add one that matches the site's name exactly).
 2. Express priority as exponents (weights in the product), not stat order.
 3. Beware base-0 stats (Power/Toughness/Respawn) in composites — they dominate at low values.
-4. Name it once and never rename (persisted in settings/profiles).
+4. Name it once and never rename (persisted verbatim in settings/profiles) — and check it does not
+   collide with a `GearChain.Presets` name, which resolves first.

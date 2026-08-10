@@ -45,6 +45,15 @@ namespace NGUAdvisor.Managers
             public int Seconds => TimeSeconds % 60;
         }
 
+        // Gear only: one step of a priority chain. Slots == 0 means "all remaining accessory slots".
+        // Kept as a plain DTO -- ProfileModel has no dependency on GearChain so it stays Unity-free
+        // and round-trip-testable; GearBreakpoints maps these onto GearPriority.
+        public class GearPriorityEntry
+        {
+            public string Objective = "";
+            public int Slots;
+        }
+
         // A breakpoint that carries an ordered list of integer indices (Diggers, Beards).
         public class ListBreakpoint
         {
@@ -55,6 +64,8 @@ namespace NGUAdvisor.Managers
             // Gear only: when optimizing, always pin the single best Respawn item into the loadout.
             public bool ForceRespawn = false;
             public string Challenge = "";
+            // Gear only: an ordered objective chain. When non-empty it supersedes Objective.
+            public readonly List<GearPriorityEntry> Priorities = new List<GearPriorityEntry>();
             public readonly List<KeyValuePair<string, JSONNode>> Extras = new List<KeyValuePair<string, JSONNode>>();
 
             public int Hours => TimeSeconds / 3600;
@@ -217,6 +228,17 @@ namespace NGUAdvisor.Managers
                         if (kv.Key == "Objective") { b.Objective = kv.Value.Value; continue; }
                         if (kv.Key == "TopRespawn") { b.ForceRespawn = kv.Value.AsBool; continue; }
                         if (kv.Key == "Challenge") { b.Challenge = kv.Value.Value ?? ""; continue; }
+                        if (kv.Key == "Priorities")
+                        {
+                            if (kv.Value != null && kv.Value.IsArray)
+                                foreach (var step in kv.Value.AsArray.Children)
+                                    b.Priorities.Add(new GearPriorityEntry
+                                    {
+                                        Objective = step["Objective"]?.Value ?? "",
+                                        Slots = step["Slots"]?.AsInt ?? 0,
+                                    });
+                            continue;
+                        }
                         if (IsCommentKey(kv.Key)) continue;
                         b.Extras.Add(new KeyValuePair<string, JSONNode>(kv.Key, kv.Value));
                     }
@@ -451,6 +473,22 @@ namespace NGUAdvisor.Managers
                 if (!string.IsNullOrEmpty(b.Objective)) o["Objective"] = b.Objective;
                 if (b.ForceRespawn) o["TopRespawn"] = b.ForceRespawn;
                 if (!string.IsNullOrEmpty(b.Challenge)) o["Challenge"] = b.Challenge;
+                if (b.Priorities.Count > 0)
+                {
+                    var steps = new JSONArray();
+                    foreach (var p in b.Priorities)
+                    {
+                        var step = new JSONObject();
+                        step["Objective"] = p.Objective;
+                        // != 0, not > 0. Omitting the key means "all remaining slots", so dropping a
+                        // NEGATIVE Slots would rewrite the profile's "claims nothing"
+                        // (GearBreakpoints.cs:64) into Unlimited on the next load -- an editor round-trip
+                        // inverting the meaning of a value it only ever displayed.
+                        if (p.Slots != 0) step["Slots"] = p.Slots;
+                        steps.Add(step);
+                    }
+                    o["Priorities"] = steps;
+                }
                 foreach (var kv in b.Extras) o[kv.Key] = kv.Value;
                 arr.Add(o);
             }

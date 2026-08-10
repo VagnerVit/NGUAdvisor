@@ -28,6 +28,7 @@ namespace NGUAdvisor
         [SerializeField] private bool _manageBeards;
         [SerializeField] private bool _manageYggdrasil;
         [SerializeField] private int[] _titanLoadout;
+        [SerializeField] private int[] _pinnedGearIds;
         [SerializeField] private int[] _yggdrasilLoadout;
         [SerializeField] private bool _manageInventory;
         [SerializeField] private bool _autoFight;
@@ -433,6 +434,7 @@ namespace NGUAdvisor
             _swapTitanDiggers = other?.SwapTitanDiggers ?? false;
             _swapTitanBeards = other?.SwapTitanBeards ?? false;
             AssignValues(ref _titanLoadout, other?.TitanLoadout, (id) => IsEquipment(id));
+            AssignValues(ref _pinnedGearIds, other?.PinnedGearIds, (id) => IsEquipment(id));
             AssignValue(ref _titanCombatMode, other?.TitanCombatMode, (mode) => mode >= 0 && mode <= 4);
             AssignValues(ref _titanSwapTargets, other?.TitanSwapTargets, Consts.MAX_TITAN);
 
@@ -444,7 +446,7 @@ namespace NGUAdvisor
             _allowZoneFallback = other?.AllowZoneFallback ?? false;
 
             _adventureTargetItopod = other?.AdventureTargetITOPOD ?? false;
-            AssignValue(ref _itopodCombatMode, other?.ITOPODCombatMode, (mode) => mode >= 0 && mode <= 1);
+            AssignValue(ref _itopodCombatMode, other?.ITOPODCombatMode, (mode) => mode >= 0 && mode <= 4);
             _titanBeastMode = other?.TitanBeastMode ?? false;
             _itopodBeastMode = other?.ITOPODBeastMode ?? false;
             AssignValue(ref _itopodOptimizeMode, other?.ITOPODOptimizeMode, (mode) => mode >= 0 && mode <= 3);
@@ -706,6 +708,18 @@ namespace NGUAdvisor
             set
             {
                 _titanLoadout = value;
+                SaveSettings();
+            }
+        }
+
+        // Items to always keep equipped, regardless of which breakpoint/objective is optimizing gear.
+        // One global list ("Ring of Greed should be in every inventory") rather than per-breakpoint.
+        public int[] PinnedGearIds
+        {
+            get => _pinnedGearIds;
+            set
+            {
+                _pinnedGearIds = value;
                 SaveSettings();
             }
         }

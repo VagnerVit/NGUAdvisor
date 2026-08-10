@@ -51,7 +51,7 @@ titan zones and the titan-beats-zone ordering.
 | `Main.SetResnipe` ("new zone fightable") | a higher zone only re-arms the snipe if its boss beats the bank; the zone is still recorded so it doesn't re-test every second |
 | `AdvisorApply.ApplyGold` (starvation) | starving for augments is no reason to re-snipe when the bank is already out of reach — that gold must come from a titan |
 | `AdvisorApply.ApplyGold` ("gold drop improved") | re-arms a latched snipe once the grown gold bonus clears `RebankMargin` × bank, with no new zone needed |
-| `AdvisorApply.ApplyTitanGold` | **no payoff gate at all** — `TitanKillWorthGoldGear` says yes for any AK titan that drops gold and is not deny-listed |
+| `AdvisorApply.ApplyTitanGold` | **no payoff gate at all** — `TitanKillWorthGoldGear` says yes for any AK titan that drops gold and is not deny-listed; which of those to target is ranked by gold (below) |
 
 `RebankMargin = 1.25` applies to the ZONE snipe only: re-arming it means fighting a zone in loot gear
 for a while, so a sliver of predicted gain is not worth it.
@@ -63,6 +63,36 @@ produce false negatives, and it did: a titan that had already banked once stayed
 rest of the run. The `TitanMoneyDone` latch therefore no longer gates targeting either — it records
 that a bank was collected (for `ZoneHelpers`' kill detection) and `ApplyTitanGold` re-arms it for the
 next spawn. Every AK cycle is another shot at a bigger drop as the gold bonus grows.
+
+## Ranking, not height (`AdvisorApply.BestGoldTitan`)
+
+**Titan gold is not monotone in titan index**, so "the highest AK titan" is the wrong target — it was
+the original `ApplyTitanGold` rule and it silently banked the smaller drop (user-reported "snipes when
+it shouldn't"). From `GoldDropTables`:
+
+| Titan | Zone | baseGold |
+|---|---|---|
+| T2 | 8 | 400 000 |
+| T3 | 11 | **300 000** — less than T2 |
+| T4 | 14 | 500 000 |
+| BEAST / THE TRAITOR | 44 / 45 | **0 — no `goldDrop` call at all** |
+
+With T3 as the highest AK titan the advisor banked 300k where 400k was on offer; a zero-gold titan at
+the top would have banked nothing. `BestGoldTitan` ranks the eligible candidates by
+`PredictedDrop(zone, bossOnly: true)` instead and returns the winner plus the runner-up (for the log).
+
+- **Eligibility is unchanged** and still belongs to `TitanKillWorthGoldGear`: auto-killable (the same
+  `ZoneHelpers.AutokillAvailable` sweep `HighestAkTitan` uses, one 30 s cache for both), not inside its
+  `DenyGoldSwap` cooldown, and `baseGold > 0`. Zero-gold titans therefore can never win a gold ranking,
+  which is the point.
+- **Ranking picks WHICH titan, never WHETHER** — there is still no payoff gate against the bank, for the
+  reasons in the next section.
+- The live factors (`totalGoldbonus`, `GoldGearFactor`) are common to every candidate and cannot reorder
+  them, which is why the ordering is unit-testable straight off the table
+  (`GoldDropTablesTests.Titan2_out_drops_titan3`).
+- Nothing eligible → fall back to `HighestAkTitan()` with `worth = false`, so the pass that CLEARS a
+  denied titan out of `TitanGoldTargets` still runs. `GoldTitanTarget()` hands the panels the cached
+  pick: they run on the WinForms thread and `PredictedDrop` reaches the gear optimizer.
 
 ## Gold gear vs. the autokill (safety)
 
@@ -85,6 +115,31 @@ bank, verdict, gear factor, spawning/targeted counts, gold-swap flag, lock, and 
 (`snipeComplete`, `adv`, `global`, `tmOn`). It exists because all of those are transient — after a titan
 has been auto-killed in the wrong gear there is otherwise nothing left to inspect. It is what identified
 the 4.0-roll error above.
+
+`[GoldSnipeDbg]` in `debug.log` is the ZONE side, added because the only evidence of a snipe decision
+used to be `Main.Log`'s single user-facing skip line (advisor output log, once per `(zone, bank)` pair) —
+so "it snipes constantly when it shouldn't" was unfalsifiable. Every line carries the bank
+(`machine.realBaseGold`), the candidate's predicted drop, **`vsBank=` — the percentage the drop would move
+the TM's basis** (`PctVsBank`; `new-bank` when the bank is 0), a verdict (`SNIPE` / `SKIP` / `RE-ARM` /
+`IDLE`) and the reason:
+
+```
+[GoldSnipeDbg] SKIP zone=21 (Jake From Accounting) bank=22.50M pred=14.50M vsBank=-35.6% why=below bank (latching complete)
+```
+
+Decision points: `GoldSnipePays`, the latched-complete steady state and "no fightable zone" in
+`Main.SnipeZone`; the new-zone test in `SetResnipe`; the `RebankMargin` re-arm and the starvation trigger
+in `AdvisorApply.ApplyGold`.
+
+**Cadence discipline is mandatory here**: `GoldSnipePays` and the latch state run from `SnipeZone` EVERY
+FRAME, so those go through `LogGoldDecisionThrottled` — a 60 s cap plus emit-only-when-the-line-CHANGES,
+exactly `[TitanGoldDbg]`'s rule. An unconditional log there buries the decision it was added to show. The
+rare, event-driven call sites (re-arm triggers, new-zone test) call `LogGoldDecision` directly. The
+`IDLE` lines deliberately do NOT predict: `PredictedDrop` reaches the gear optimizer.
+
+`[TitanGoldDbg]` additionally carries `pick=` (the ranked winner), `beat=` (the runner-up and its
+predicted drop) and `vsBank=`; `ak=` still shows the height pick, so a disagreement between the two is
+visible in one line.
 
 `ResetRun()` (called from the rebirth branch in `Main.SnipeZone`, next to the `TitanMoneyDone` wipe)
 clears the denies and the cached gear factor: a rebirth wipes `realBaseGold` and re-grows the stats

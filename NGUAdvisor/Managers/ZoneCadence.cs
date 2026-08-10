@@ -254,6 +254,29 @@ namespace NGUAdvisor.Managers
             catch { return false; }
         }
 
+        // The measured fastest of the modes worth comparing for a farm park in this zone: Idle vs
+        // Offensive, the same pair BoostFarmAdvisor and GearFarmAdvisor compare, ranked on
+        // SecondsPerSpawn and required to be killable AND survivable at that mode. Returns -1 when
+        // no mode has a usable estimate — the caller decides what to do with an unmeasurable zone.
+        public static int FastestMode(int zone)
+        {
+            int best = -1;
+            double bestSeconds = double.MaxValue;
+            try
+            {
+                int[] modes = CombatHelpers.RegularAttackUnlocked() ? new[] { 0, 3 } : new[] { 0 };
+                foreach (int mode in modes)
+                {
+                    Estimate e = For(zone, mode);
+                    if (!e.Known || !e.Killable || e.SecondsPerSpawn <= 0.0) continue;
+                    if (!Survivable(zone, mode, e)) continue;
+                    if (e.SecondsPerSpawn < bestSeconds) { bestSeconds = e.SecondsPerSpawn; best = mode; }
+                }
+            }
+            catch (Exception ex) { Main.LogDebug($"ZoneCadence.FastestMode({zone}): {ex.Message}"); }
+            return best;
+        }
+
         public static Estimate For(int zone, int combatMode)
         {
             Estimate est = new Estimate();

@@ -409,13 +409,13 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
 
-            // GOLD — titan gold banking status. Auto mode targets the highest AK-able titan itself
-            // (its drop dwarfs all lower titans) and re-banks when the AK version rises.
+            // GOLD — titan gold banking status. Auto mode ranks the AK-able titans by predicted gold
+            // (titan gold is NOT monotone in index) and re-banks when the AK version rises.
             try
             {
                 if (Main.Settings != null && Main.Settings.ManageGoldLoadouts)
                 {
-                    int best = AdvisorApply.HighestAkTitan();
+                    int best = AdvisorApply.GoldTitanTarget();
                     if (best >= 0)
                     {
                         int ver = 1;
@@ -563,7 +563,15 @@ namespace NGUAdvisor.Managers
 
         public class TitanObjective
         {
-            public bool Known;      // false = everything at this difficulty is AK'd
+            public bool Known;      // false = no objective was produced — see LadderComplete for WHY
+            // Only meaningful when Known == false, and the two cases are NOT interchangeable:
+            //   true  = the whole ladder was walked and every titan+version at this difficulty is
+            //           already auto-killed. There is genuinely nothing left to beat.
+            //   false = the answer could not be read (an AK-table miss on a still-un-AK'd version, or
+            //           an exception). "No objective" here means "unknown", not "done".
+            // Callers that treat Known == false as "requirements met" (LevelPlanner's P/T freeze) MUST
+            // branch on this, or a lookup failure silently reads as sufficiency.
+            public bool LadderComplete;
             public int Index;
             public int Version;     // the first un-AK'd version — the actual chase
             public string Stage;    // "first kill" -> "idle" -> "auto-kill" (user's kill ladder)
@@ -623,8 +631,10 @@ namespace NGUAdvisor.Managers
                     var tou = GearOptimizer.FindObjective("Toughness");
                     double curP = GearOptimizer.CurrentScore(pow);
                     double curT = GearOptimizer.CurrentScore(tou);
-                    var bestP = GearOptimizer.Optimize(pow);
-                    var bestT = GearOptimizer.Optimize(tou);
+                    // No pins: these are projection MULTIPLIERS against CurrentScore, which knows nothing
+                    // about pins, so both sides must measure the same unconstrained best.
+                    var bestP = GearOptimizer.Optimize(pow, false, new int[0]);
+                    var bestT = GearOptimizer.Optimize(tou, false, new int[0]);
                     _projAtkMult = curP > 0 && bestP != null && bestP.Score > curP ? bestP.Score / curP : 1;
                     _projDefMult = curT > 0 && bestT != null && bestT.Score > curT ? bestT.Score / curT : 1;
                 }
@@ -682,6 +692,10 @@ namespace NGUAdvisor.Managers
             var o = new TitanObjective();
             try
             {
+                // A skipped candidate is NOT the same as no candidate: a version that is still
+                // un-AK'd but has no readable AK requirement is an unknown, and the loop running out
+                // afterwards must not be reported as "the ladder is finished".
+                bool lookupFailed = false;
                 int ceiling = Math.Min(DifficultyMaxTitanIndex(), TitanAk.Length - 1);
                 for (int i = 0; i <= ceiling; i++)
                 {
@@ -691,7 +705,7 @@ namespace NGUAdvisor.Managers
                         bool ak = false;
                         try { ak = ZoneHelpers.AutokillAvailable(i, v); } catch { }
                         if (ak) continue;
-                        if (!TryAkRequirementFor(i, v, out _, out _, out _)) continue;
+                        if (!TryAkRequirementFor(i, v, out _, out _, out _)) { lookupFailed = true; continue; }
                         StagedRequirementFor(i, v, out var ra, out var rd, out var rr, out var stage);
                         o.Known = true;
                         o.Index = i;
@@ -703,6 +717,9 @@ namespace NGUAdvisor.Managers
                         return o;
                     }
                 }
+                // Walked the entire ladder without returning: every version was auto-killed unless a
+                // requirement lookup failed on the way. An exception leaves LadderComplete false.
+                o.LadderComplete = !lookupFailed;
             }
             catch { }
             return o;
