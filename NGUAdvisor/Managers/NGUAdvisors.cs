@@ -48,6 +48,15 @@ namespace NGUAdvisor.Managers
             public string Summary = "";
         }
 
+        // Why the measured levels/hr can read 0 while the plan predicts more. The plan says what
+        // SHOULD run; this says what the game is actually doing with it.
+        public class Stall
+        {
+            public bool Any;
+            public string Short;    // one tile line
+            public string Detail;   // tooltip + debug log
+        }
+
         public static readonly string[] ENames = { "Augs", "Wandoos", "Respawn", "Gold", "Adv-α", "Power-α", "DropCh", "Magic", "PP" };
         public static readonly string[] MNames = { "Ygg", "EXP", "Power-β", "Number", "TM", "Energy", "Adv-β" };
 
@@ -264,6 +273,103 @@ namespace NGUAdvisor.Managers
                 keep = hot;
             }
             return keep.OrderByDescending(x => x.Rating).Select(x => x.Id).ToArray();
+        }
+
+        // Total levels on the track being leveled. The measured GROWTH rate is compared against a
+        // prediction computed from THESE levels, so it has to count the same track: on Evil the
+        // normal `level` field only moves with beast quirk 14, so summing it would read a flat 0
+        // while the run is in fact climbing.
+        public static long TrackedLevelTotal(Character c)
+        {
+            long total = 0;
+            if (c == null || c.NGU == null) return 0;
+            for (int i = 0; i < c.NGU.skills.Count; i++)
+            {
+                try { total += Level(c, false, i); } catch { }
+            }
+            for (int i = 0; i < c.NGU.magicSkills.Count; i++)
+            {
+                try { total += Level(c, true, i); } catch { }
+            }
+            return total;
+        }
+
+        // Game truth (decomp NGUController.updateNGU): a lane ticks ONLY while it holds allocation
+        // and is under its target — with nothing allocated the tick returns immediately, and at the
+        // target `autoAdvance` moves the energy off it instead of leveling. Neither state is
+        // visible in the plan, which is why a predicted rate can face a measured zero.
+        public static Stall Diagnose(Plan plan)
+        {
+            Stall st = new Stall();
+            try
+            {
+                Character c = Main.Character;
+                if (c == null || c.NGU == null || plan == null || !plan.Known) return st;
+
+                List<string> starved = new List<string>();
+                List<string> atTarget = new List<string>();
+                List<string> unplanned = new List<string>();
+                long plannedHeld = 0, nguHeld = 0;
+
+                for (int pass = 0; pass < 2; pass++)
+                {
+                    bool magic = pass == 1;
+                    string[] names = magic ? MNames : ENames;
+                    int[] targets = magic ? plan.MagicTargets : plan.EnergyTargets;
+                    int count = magic ? c.NGU.magicSkills.Count : c.NGU.skills.Count;
+                    for (int id = 0; id < count && id < names.Length; id++)
+                    {
+                        long held = 0;
+                        bool done = false;
+                        try { held = magic ? c.NGU.magicSkills[id].magic : c.NGU.skills[id].energy; } catch { }
+                        try { done = magic ? c.NGUController.reachedMagicTarget(id) : c.NGUController.reachedTarget(id); } catch { }
+                        nguHeld += held;
+                        bool planned = targets.Contains(id);
+                        if (planned) plannedHeld += held;
+                        if (planned && held <= 0) starved.Add(names[id]);
+                        else if (planned && done) atTarget.Add(names[id]);
+                        else if (!planned && held > 0 && !done) unplanned.Add(names[id]);
+                    }
+                }
+
+                if (starved.Count == 0 && atTarget.Count == 0) return st;
+
+                st.Any = true;
+                if (plannedHeld <= 0 && nguHeld <= 0)
+                {
+                    st.Short = "no NGU allocation";
+                    st.Detail = "Nothing is allocated to ANY NGU — the energy/magic is going to other systems "
+                              + "(AT, augments, Wandoos, TM, wishes) or sitting idle. The prediction assumes the "
+                              + "plan's lanes are funded; check the active profile's Energy/Magic priorities.";
+                }
+                else if (plannedHeld <= 0)
+                {
+                    st.Short = "fed elsewhere: " + Join(unplanned, 2);
+                    st.Detail = "The plan's lanes (" + Join(starved, 99) + ") hold nothing; the allocation is in "
+                              + Join(unplanned, 99) + " instead. The profile is funding different NGUs than the plan picked.";
+                }
+                else if (atTarget.Count > 0)
+                {
+                    st.Short = "at target: " + Join(atTarget, 2);
+                    st.Detail = Join(atTarget, 99) + " reached the level target set in-game, so the energy is "
+                              + "auto-advanced off them instead of leveling. Raise or clear the target.";
+                }
+                else
+                {
+                    st.Short = "partly unfunded: " + Join(starved, 2);
+                    st.Detail = "Only part of the plan is funded — " + Join(starved, 99) + " hold nothing, so the "
+                              + "measured rate falls short of the prediction.";
+                }
+            }
+            catch (Exception e) { Main.LogDebug($"NGUAdvisors.Diagnose: {e.Message}"); }
+            return st;
+        }
+
+        private static string Join(List<string> names, int max)
+        {
+            if (names.Count == 0) return "-";
+            if (names.Count <= max) return string.Join(", ", names.ToArray());
+            return string.Join(", ", names.Take(max).ToArray()) + $" +{names.Count - max}";
         }
     }
 }

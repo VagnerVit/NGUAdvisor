@@ -45,6 +45,17 @@ the editor; the JSON accepts both a plain number and the `{h,m,s}` object form.
 and on load so the editor can refuse a malformed profile rather than letting SimpleJSON's very lenient
 parse misread it silently. It reports the FIRST structural problem; it does not check token grammar.
 
+**`Validate` runs on the RUNTIME load too** (`CustomAllocation.ReloadAllocation`), not just in the
+editor. A profile can be edited by hand or by another tool, and the lenient SimpleJSON parse that
+path uses does not throw on a structural error — it misparses, and the run allocates to something
+the file never said. The runtime check **reports and still loads**: SimpleJSON produced something,
+and refusing would leave the run with no allocation at all. The editor is still the one place that
+refuses outright.
+
+Its tolerances are deliberate and documented at `ProfileValidator.cs:12` — **trailing commas are
+accepted**, as are leading zeros and a bare leading decimal point, because the SimpleJSON path
+accepts them too. "Strict" here means strict about what SimpleJSON would MISREAD, not RFC-pedantic.
+
 `ProfileValidator.Warnings` is a separate, semantic pass that returns **advice and never blocks**: today
 it flags an energy breakpoint funding more than one augment out of the shared pool (augment boosts stack
 additively — `docs/AUGMENTS.md`). It skips CAP tokens, which are bounded reservations rather than splits,
@@ -63,6 +74,18 @@ is something the UI reads anyway. Powers the GROWTH tiles/graph.
 carries cumulative positive deltas (`G*` fields) and the rate walks read those. A failed read
 carries the PREVIOUS value, not 0 — with cumulative gains a one-tick dip to 0 would register the
 whole balance as a fresh gain next minute.
+
+**NGU levels are counted on the track being leveled** (`NGUAdvisors.TrackedLevelTotal`) — the
+measured rate is shown against a prediction computed from those same levels, so summing the plain
+`level` field would read 0 on the Evil track while the run climbs.
+
+**A SAVE LOAD IS A DISCONTINUITY, NOT A GAIN.** `Character` is one instance for the whole process
+and the save deserializes into it, so on the title screen every balance reads as a fresh character's
+zero — and the sample after the load jumps the entire account. Measured on a live run 2026-08-12:
+`NGU +10.1K/hr` against a predicted `44.9`, i.e. 22402 %. It is caught the same way a rebirth is —
+the run clock disagreeing with the wall clock, backwards for a rebirth and far forwards for a load
+(0 → 91619 s) — and that sample carries the gain counters forward untouched as a new baseline,
+logging `[GrowthDbg] discontinuity`.
 
 **Rebirth is the only reset the chips see**: NGU levels reset on rebirth, so `Rate(...)` and
 `RunDelta(...)` stop walking at a run boundary (detected as `RunSec` going backwards) for per-run

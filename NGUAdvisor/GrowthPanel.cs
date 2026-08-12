@@ -179,6 +179,7 @@ namespace NGUAdvisor
                 // tick-rate constant (predicted = the plan's levels/hr at each target's share).
                 bool nguHasRate = GrowthTracker.Rate(s => s.GNgu, win, true, out r);
                 string nguSub = "resets each rebirth";
+                string nguTip = null;
                 try
                 {
                     var plan = NGUAdvisors.Compute(
@@ -188,16 +189,40 @@ namespace NGUAdvisor
                     {
                         double pred = plan.Energy.Where(x => plan.EnergyTargets.Contains(x.Id)).Sum(x => x.Lph)
                                     + plan.Magic.Where(x => plan.MagicTargets.Contains(x.Id)).Sum(x => x.Lph);
-                        if (pred > 0 && nguHasRate && r > 0)
+                        // A prediction facing a measured zero is the alarm the user had to decode by
+                        // hand from the profile JSON — so the tile names the CAUSE, read live from the
+                        // game (which lanes hold nothing / sit at their target), not the symptom.
+                        var stall = NGUAdvisors.Diagnose(plan);
+                        if (pred > 0 && stall.Any)
+                        {
+                            nguSub = $"predicted {Fmt(pred)}/hr — {stall.Short}";
+                            nguTip = $"{nguSub}\r\n\r\n{stall.Detail}";
+                            LogStall(stall);
+                        }
+                        else if (pred > 0 && nguHasRate && r > 0)
                             nguSub = $"predicted {Fmt(pred)}/hr — {r / pred:0%}";
                         else if (pred > 0)
                             nguSub = $"predicted {Fmt(pred)}/hr";
+                        if (!stall.Any) _lastStall = null;
                     }
                 }
                 catch { }
                 Set(4, Fmt(newest.Ngu), nguHasRate ? r : (double?)null, nguSub);
+                _tiles[4].Sub.ForeColor = nguTip != null ? UiTheme.Energy : UiTheme.Faint;
+                if (nguTip != null) UiLayout.Tip(_tiles[4].Sub, nguTip);
             }
             catch (Exception ex) { LogDebug($"Growth panel: {ex.Message}"); }
+        }
+
+        // The tile refreshes every 5s; log the cause once per change so debug.log carries WHEN the
+        // divergence started without repeating the same line hundreds of times.
+        private string _lastStall;
+
+        private void LogStall(NGUAdvisors.Stall stall)
+        {
+            if (_lastStall == stall.Short) return;
+            _lastStall = stall.Short;
+            LogDebug($"[GrowthDbg] NGU measured vs predicted diverges: {stall.Short} — {stall.Detail}");
         }
 
         private static string FmtEta(double seconds)

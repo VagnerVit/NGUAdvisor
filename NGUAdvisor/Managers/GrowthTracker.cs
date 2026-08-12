@@ -23,6 +23,11 @@ namespace NGUAdvisor.Managers
         private static DateTime _lastSample = DateTime.MinValue;
         private const int MaxSamples = 150;
 
+        // Two samples 60 s apart should see the run clock advance ~60 s. This much disagreement means
+        // they describe different states, not elapsed play — generous enough that a frame-rate stall or
+        // a slow status pump never trips it.
+        private const double DiscontinuitySeconds = 120;
+
         // Called every frame from the status pump (main thread); samples once a minute, always —
         // history builds even while another section is open.
         public static void Tick()
@@ -43,15 +48,33 @@ namespace NGUAdvisor.Managers
                 s.Pp = Read(() => c.adventure.itopod.perkPoints, prev?.Pp ?? 0);
                 s.CubeP = Read(() => c.inventoryController.cubePower(), prev?.CubeP ?? 0);
                 s.CubeT = Read(() => c.inventoryController.cubeToughness(), prev?.CubeT ?? 0);
-                s.Ngu = Read(() =>
-                {
-                    long total = 0;
-                    for (int i = 0; i < c.NGU.skills.Count; i++) total += c.NGU.skills[i].level;
-                    for (int i = 0; i < c.NGU.magicSkills.Count; i++) total += c.NGU.magicSkills[i].level;
-                    return total;
-                }, prev?.Ngu ?? 0);
+                // Track-aware (NGUAdvisors owns the track rule): on Evil/Sadistic the normal
+                // `level` field barely moves, so summing it read a flat 0 against a nonzero
+                // prediction — the two numbers have to count the same levels to be comparable.
+                s.Ngu = Read(() => NGUAdvisors.TrackedLevelTotal(c), prev?.Ngu ?? 0);
                 s.RunSec = Read(() => c.rebirthTime.totalseconds, prev?.RunSec ?? 0);
-                if (prev != null)
+
+                // A SAVE LOAD IS A DISCONTINUITY, NOT A GAIN. Character is one instance for the whole
+                // process (Main.cs's caching invariant) and the save deserializes INTO it, so while the
+                // game sits on its title screen every balance reads as a fresh character's zero. The
+                // moment the save loads, the next sample jumps the entire account — measured 2026-08-12
+                // as "NGU +10.1K/hr" against a predicted 44.9, i.e. 22402%.
+                //
+                // Detected the same way a rebirth is: the run clock disagreeing with the wall clock.
+                // A rebirth runs it BACKWARDS; a save load runs it far FORWARD (0 -> 91619s). Either
+                // way the two samples describe different states and no delta between them is real, so
+                // this one carries the gain counters forward untouched and becomes the new baseline.
+                bool sameRun = prev != null &&
+                    Math.Abs((s.RunSec - prev.RunSec) - (s.T - prev.T).TotalSeconds) < DiscontinuitySeconds;
+                if (prev != null && !sameRun)
+                {
+                    s.GExp = prev.GExp; s.GAp = prev.GAp; s.GPp = prev.GPp;
+                    s.GCubeP = prev.GCubeP; s.GCubeT = prev.GCubeT; s.GNgu = prev.GNgu;
+                    Main.LogDebug($"[GrowthDbg] discontinuity — run clock moved {s.RunSec - prev.RunSec:0}s "
+                                + $"over {(s.T - prev.T).TotalSeconds:0}s of wall clock (save load or rebirth); "
+                                + "this sample is a new baseline, no gain counted");
+                }
+                else if (prev != null)
                 {
                     // Positive deltas only: spending drops the balance but never the gain counters.
                     // (An NGU rebirth reset is a big negative delta — ignored, counters stay flat.)

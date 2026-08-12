@@ -33,3 +33,27 @@ belong in MORE lanes, not deeper ones.
 Cached 30 s. Candidates come from `ChallengeOverlay.ChapterNguIds(resource)`. Consumers:
 allocation (auto profile NGU targets), OptimizationAdvisor's NGUs row, GrowthPanel (Lph = the
 predicted rate shown).
+
+## `Diagnose` — why the measured rate can face a nonzero prediction
+
+The plan describes what SHOULD run. `Diagnose(plan)` reads what the game is DOING with it, so a
+`NGU LEVELS +0/hr` against `predicted 44,2/hr` names its cause instead of leaving the user to
+decode the profile JSON by hand (which is exactly what happened 2026-08-12).
+
+Game truth — decomp `NGUController.updateNGU` (energy) / its magic twin: a lane ticks **only**
+while `NGU.skills[id].energy > 0` (`magicSkills[id].magic` for magic) **and** `reachedTarget(id)`
+is false. With nothing allocated the tick returns immediately; at the target `autoAdvance` moves
+the energy off the lane rather than leveling it. Four verdicts, in order:
+
+| Condition | Short | Meaning |
+|---|---|---|
+| no lane anywhere holds anything | `no NGU allocation` | energy is in AT/augments/Wandoos/TM/wishes or idle |
+| planned lanes hold nothing, others do | `fed elsewhere: …` | the profile funds different NGUs than the plan picked |
+| a planned lane is at its in-game target | `at target: …` | auto-advance, not leveling — raise or clear the target |
+| some planned lanes hold nothing | `partly unfunded: …` | measured rate falls short, not to zero |
+
+The hard cap (`hardCapNormalLevel() == 1e9`) is deliberately NOT checked — unreachable in practice.
+
+`TrackedLevelTotal(c)` is the same track rule applied to the whole tree, and exists because
+`GrowthTracker` must count the levels the prediction is about: on Evil the normal `level` field
+only moves with beast quirk 14, so summing it read a flat 0 while the run was climbing.
