@@ -31,6 +31,7 @@ namespace NGUAdvisor
         private Label _srcLine;      // read-only: allocation source
         private Label _fileLine;     // read-only: active/standby file
         private Label _recProfile;   // read-only: recommendation
+        private Panel _divider;      // vertical rule between the two zones; height follows the card's
         private readonly ToolTip _tips = new ToolTip();
         private readonly int _planW;    // left zone width
         private readonly int _stripX;   // right zone x inside the card
@@ -60,7 +61,8 @@ namespace NGUAdvisor
             _stripX = _card.Width * 3 / 5 + UiTheme.S(20);
             _planW = _stripX - UiTheme.S(30);
             int stripW = _card.Width - _stripX - UiTheme.S(10);
-            _card.Controls.Add(new Panel { Location = new Point(_stripX - UiTheme.S(10), UiTheme.S(6)), Size = new Size(1, UiTheme.S(150)), BackColor = UiTheme.Border, Tag = "exclusive" });
+            _divider = new Panel { Location = new Point(_stripX - UiTheme.S(10), UiTheme.S(6)), Size = new Size(1, UiTheme.S(150)), BackColor = UiTheme.Border, Tag = "exclusive" };
+            _card.Controls.Add(_divider);
 
             _title = new Label { Text = "…", AutoSize = false, Size = new Size(_planW, UiTheme.TextH), Font = UiTheme.Bold, ForeColor = UiTheme.Accent, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(10), UiTheme.S(6)) };
             _card.Controls.Add(_title);
@@ -290,6 +292,11 @@ namespace NGUAdvisor
                 _note2.Top = _note1.Bottom + UiTheme.S(4);
 
                 _card.Height = Math.Max(_rLine.Bottom, _note2.Bottom) + UiTheme.S(10);
+                // Derived from the card, not fixed at construction: a fixed-height divider on a card
+                // that shrinks/grows with its content (window width reflows the chip wrap) ran past the
+                // card's bottom edge whenever the content settled shorter than the built-in placeholder
+                // (audit: "PAST PARENT BOTTOM 'Panel' bottom=156 parent=152"). Same inset as its top (6px).
+                _divider.Height = Math.Max(UiTheme.S(1), _card.Height - UiTheme.S(12));
                 Height = _card.Bottom + UiTheme.S(8);
             }
             catch (Exception ex) { LogDebug($"Autopilot reflow: {ex.Message}"); }
