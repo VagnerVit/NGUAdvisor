@@ -11,6 +11,22 @@ namespace NGUAdvisor.Managers
     {
         private const string Prefix = "NGUAdvisor.Presets.";
 
+        // Is this profile name one WE ship? Asked by ProfileScout so a recommendation can say whether it
+        // picked the user's own file or fell back to a preset. Read off the embedded resource names — the
+        // same list InstallMissing writes from — rather than a second hand-kept list of names.
+        public static bool IsPreset(string profileName)
+        {
+            if (string.IsNullOrEmpty(profileName)) return false;
+            try
+            {
+                string res = Prefix + profileName + ".json";
+                foreach (var name in Assembly.GetExecutingAssembly().GetManifestResourceNames())
+                    if (string.Equals(name, res, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            catch (Exception e) { Main.LogDebug($"PresetInstaller.IsPreset: {e.Message}"); }
+            return false;
+        }
+
         public static void InstallMissing(string profilesDir)
         {
             try

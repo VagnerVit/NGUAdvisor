@@ -34,6 +34,22 @@ namespace NGUAdvisor.AllocationProfiles
                 try
                 {
                     string raw = File.ReadAllText(_allocationPath);
+
+                    // VALIDATE AT THE BOUNDARY. A profile can be edited outside the editor — by hand, by
+                    // another tool, or by an older build — and SimpleJSON is extremely lenient: it treats
+                    // } and ] as interchangeable and ignores stray or missing commas, so a structural
+                    // error does not throw, it MISPARSES, and the run then allocates to something the
+                    // file never said. The editor has always refused a malformed profile; this path,
+                    // which is the one the game actually runs, never checked at all.
+                    //
+                    // It reports and still loads, deliberately: SimpleJSON produced SOMETHING, and
+                    // refusing here would leave the run with no allocation at all — a worse outcome than
+                    // a flagged one. The point is that it can no longer happen silently.
+                    ProfileValidator.Result structure = ProfileValidator.Validate(raw);
+                    if (!structure.Ok)
+                        Log($"Profile '{_profileName}' is not valid JSON (line {structure.Line}, col {structure.Col}): "
+                          + $"{structure.Message} — loading it anyway, but what runs may not be what the file says.");
+
                     _wrapper = new BreakpointWrapper(JSON.Parse(raw)["Breakpoints"]);
 
                     Log(_wrapper.BuildAllocationString(_profileName));

@@ -34,3 +34,9 @@ In a challenge block → keep the current profile. Non-Normal → `Goal-NGU` (di
 pending). Normal: LRB when push-in-reach, `Goal-Adventure` ≤ Ch.2, else `Normal-24hr` (the
 guide's daily cadence). Activity string: current challenge > lock-mode name > challenge block >
 "Farming / idle". `MilestoneGoal` strings are sized to the status strip's NEXT GOAL cell.
+
+**The preset is the FALLBACK, not the answer.** It decides which KIND of run this is (no-rebirth
+push vs. cadence); `ProfileScout` then looks on disk for a file of that same kind funding more of
+the plan's NGU lanes, and its name wins when it finds one — with the lane count in the reason. A tie
+leaves the preset standing (ProfileScout.md). The old `PresetOnlyCaveat` constant was a stand-in for
+this and is gone.

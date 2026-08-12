@@ -208,32 +208,45 @@ namespace NGUAdvisor.Managers
         // recommended when the next titan kill is actually in reach (see TitanPushInReach).
         // Evil/Sadistic default to NGU-focused until difficulty-specific presets are authored
         // (they'll be added as the user reaches those stages, where they're testable).
-        // This picks from INSTALLED PRESETS only — hand-authored profiles in the profiles dir are
-        // never candidates. Saying so matters: a user running their own LRB profile read
-        // "Recommended: Normal-24hr" as a verdict ON that profile, when it had not been considered
-        // at all. Until the analyzer can score arbitrary profile files, the caveat rides along.
-        private const string PresetOnlyCaveat = "(Chosen from installed presets — your own profile files are not evaluated.)";
-
+        // THE PRESET IS THE FALLBACK, NOT THE ANSWER. The preset below decides WHICH KIND of run this
+        // is (a no-rebirth push vs. the timed cadence); ProfileScout then looks for a file on disk of
+        // that same kind that funds more of the plan's NGU lanes, and its name wins when it finds one.
+        // Before that existed, a user running their own LRB profile read "Recommended: Normal-24hr" as
+        // a verdict ON that profile when it had never been considered at all (user-reported
+        // 2026-08-12); the caveat that used to ride along here was a stand-in for this.
         private static string RecommendProfile(difficulty diff, int chapter, out string reason)
         {
+            string preset;
+            bool wantLrb = false;
             if (diff != difficulty.normal)
             {
                 reason = "Best-fit farm preset for your stage.";
-                return "Goal-NGU";
+                preset = "Goal-NGU";
             }
-            if (TitanPushInReach(out var target))
+            else if (TitanPushInReach(out var target))
             {
                 reason = $"{target} in reach — one long push, no auto-rebirth; rebirth manually after the kill.";
-                return "Normal-LRB";
+                preset = "Normal-LRB";
+                wantLrb = true;
             }
-            if (chapter <= 2)
+            else if (chapter <= 2)
             {
                 reason = "Early game: push adventure zones and boss EXP.";
-                return "Goal-Adventure";
+                preset = "Goal-Adventure";
             }
-            reason = "Daily cadence: number push + fruit/seed harvest + beard banking + NGU marathon."
-                   + " " + PresetOnlyCaveat;
-            return "Normal-24hr";
+            else
+            {
+                reason = "Daily cadence: number push + fruit/seed harvest + beard banking + NGU marathon.";
+                preset = "Normal-24hr";
+            }
+
+            // The scout answers only when a file on disk BEATS this preset at funding the plan's NGU
+            // lanes; a tie or a miss leaves the preset standing.
+            var scouted = ProfileScout.Best(wantLrb, preset, out string why);
+            if (scouted == null) return preset;
+
+            reason = $"{reason} {why}";
+            return scouted.Name;
         }
 
         // Kill-readiness gate for the LRB recommendation. In reach = we CAN'T clear the next

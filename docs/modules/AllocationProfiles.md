@@ -34,6 +34,12 @@ single time-0 breakpoint would never re-apply after rebirth (user-reported: digg
 `ReloadAllocation` writes a template profile when the file is missing, and on a parse error keeps
 an EMPTY wrapper + "Resave to reload" (never a half-parsed profile).
 
+It also runs `ProfileValidator.Validate` on the raw text **before** parsing — the boundary check the
+runtime path never had. SimpleJSON does not throw on a structural error, it misparses silently, so
+without this a hand-edited profile could allocate to something the file never said. The check logs
+and then loads anyway: a flagged allocation beats no allocation. See ProfileModel.md for the
+validator's deliberate tolerances (trailing commas are legal here).
+
 ## Resource token engine (`ResourceBreakpoints/`)
 
 One class per token family: `NGUBP`, `AdvancedTrainingBP`, `AugmentBP`, `BestAug`, `BasicTrainingBP`,
