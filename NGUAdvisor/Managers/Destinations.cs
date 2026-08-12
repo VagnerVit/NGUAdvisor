@@ -49,6 +49,7 @@ namespace NGUAdvisor.Managers
         // rail loop registers each one in _sectionNav (SettingsForm:1004), and NavigateTo looks the path up
         // there. Three names, one route — and they keep separate names because sharing a route is not being
         // the same destination.
+        public const string NextBuy = "Economy/Planners";
         public const string ApPurchases = "Economy/Planners";
         public const string PerkPoints = "Economy/Planners";
         public const string AdvancedTraining = "Economy/Planners";

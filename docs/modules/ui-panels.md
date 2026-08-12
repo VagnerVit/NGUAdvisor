@@ -59,15 +59,16 @@ non-scrolling panel has no scrollbar to reach the overflow with.
 |---|---|
 | `StatusPanel` | `ProgressionAnalyzer`, `ChallengeOverlay`, `LockManager`, `GrowthTracker` |
 | `AutopilotPanel`, `ActionsPanel` | `OptimizationAdvisor` rec list + AdvisorApply toggles |
-| `GrowthPanel` | `GrowthTracker` samples, `NGUAdvisors` predicted rates |
+| `GrowthPanel` | `GrowthTracker` samples, `NGUAdvisors` predicted rates + `Diagnose` (the NGU tile's sub-line names the CAUSE when measurement diverges from prediction — highlighted, full text in the tooltip, logged once per change as `[GrowthDbg]`) |
 | `ChallengesPanel` | `ChallengeOverlay.Feed` / `Block()` / `AllocationStatus` |
 | `ProfilePanel` | profile list, switch/apply (via request), `PresetInstaller` output |
 | `AdventurePanel`, `TitansPanel` | zone routing, `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner) |
+| `SpendPanel` | `SpendOverview` — one row per currency, each naming the module that owns the ordering (it owns none itself) |
 | `GoldPanel`, `PitPanel` | gold snipe state, `MoneyPitManager.AdvisorPlan`/`PredictNext` |
 | `YggPanel`, `QuestsPanel`, `BloodPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |
 | `BoostsPanel` + `BoostPickerForm` | `InventoryManager.GetBoostSlots` (live readout), `InventoryAdvisor`, `TransformManager` |
 | `SystemIndexPanel`, `BasicSettingsPanel` | `SettingsIndex` (+ the search box), `SystemCatalog` |
-| `LogsPanel`, `LogSliver` | `LogTail` / in-memory feeds |
+| `LogsPanel`, `LogSliver` | `LogTail` / in-memory feeds; the EXPORT STATE chip **requests** a dump (`Main.RequestStateExport`) — see StateExport.md, it must never call the exporter directly |
 | `ProfileEditorForm` + `*EditorPanel` (Resource/Gear/List/Misc/WanDiff) | `ProfileModel` + `ProfileValidator` + `PriorityCatalog` |
 
 `SettingsForm.Designer.cs` (233 KB) is designer-generated — edit the form in a designer and let the

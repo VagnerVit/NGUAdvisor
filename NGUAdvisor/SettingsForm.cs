@@ -111,6 +111,7 @@ namespace NGUAdvisor
         private TitansPanel _titansPanel;
         private GoldPanel _goldPanel;
         private PitPanel _pitPanel;
+        private SpendPanel _spendPanel;
         private ApPanel _apPanel;
         private PpPanel _ppPanel;
         private AtPanel _atPanel;
@@ -415,6 +416,7 @@ namespace NGUAdvisor
                         if (_titansPanel != null) UiLayout.Audit(_titansPanel, "Titans");
                         if (_goldPanel != null) UiLayout.Audit(_goldPanel, "Gold");
                         if (_pitPanel != null) UiLayout.Audit(_pitPanel, "Pit");
+                        if (_spendPanel != null) UiLayout.Audit(_spendPanel, "Spend");
                         if (_apPanel != null) UiLayout.Audit(_apPanel, "AP");
                         if (_ppPanel != null) UiLayout.Audit(_ppPanel, "PP");
                         if (_atPanel != null) UiLayout.Audit(_atPanel, "AT");
@@ -549,7 +551,12 @@ namespace NGUAdvisor
             catch (Exception pitEx) { LogDebug($"Pit section init failed: {pitEx.Message}"); }
             try
             {
-                _apPanel = new ApPanel(CanvasW);   // full-width row, first on Economy > PLANNERS
+                _spendPanel = new SpendPanel(CanvasW);   // full-width row, first on Economy > PLANNERS (the cross-currency rail above the per-currency detail)
+            }
+            catch (Exception spendEx) { LogDebug($"Spend section init failed: {spendEx.Message}"); }
+            try
+            {
+                _apPanel = new ApPanel(CanvasW);   // full-width row, second on Economy > PLANNERS
             }
             catch (Exception apEx) { LogDebug($"AP section init failed: {apEx.Message}"); }
             try
@@ -703,6 +710,11 @@ namespace NGUAdvisor
             // the PP plan lines or AT's last Time Machine lines at real DPI. Each row chains off the previous
             // row's Bottom for the same reason: a tuned offset would overlap them.
             int ecoY = UiTheme.S(12);
+            if (_spendPanel != null)
+            {
+                Place(ecoPlanners, _spendPanel, UiTheme.S(20), ecoY, CanvasW, _spendPanel.ContentHeight);
+                ecoY = _spendPanel.Bottom + UiTheme.S(12);
+            }
             if (_apPanel != null)
             {
                 Place(ecoPlanners, _apPanel, UiTheme.S(20), ecoY, CanvasW, _apPanel.ContentHeight);
@@ -1623,6 +1635,7 @@ namespace NGUAdvisor
                 _titansPanel?.SyncFromSettings();
                 _goldPanel?.SyncFromSettings();
                 _pitPanel?.SyncFromSettings();
+                _spendPanel?.SyncFromSettings();
                 _apPanel?.SyncFromSettings();
                 _ppPanel?.SyncFromSettings();
                 _atPanel?.SyncFromSettings();

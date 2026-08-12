@@ -570,8 +570,15 @@ namespace NGUAdvisor
                 // a BoostSinks snapshot, and the boost advisor already shows them.
                 var rates = ItopodFarmAdvisor.ForMode(Settings?.CombatMode ?? 0);
                 if (rates.Known)
+                {
                     text += $"\nAt {BoostFarmAdvisor.ModeName(rates.CombatMode)}, floors {rates.DefaultFloor}-{rates.PeakFloor}:"
                           + $" {rates.PpPerSecond:0.####} PP/s · {rates.ExpPerSecond:0.##} EXP/s";
+                    // PP/s only means something once it is a purchase — there is no honest scalar
+                    // converting it against boosts or EXP (ItopodFarmAdvisor.md).
+                    string buys = SpendOverview.Buys(SpendOverview.RowFor(SpendOverview.CurrencyPp),
+                                                     rates.PpPerSecond * 3600.0);
+                    if (buys != null) text += $"\nThat pays for {buys}";
+                }
                 // Direct assignment, NOT FitOrGrow: this label is AutoSize (MkLbl) and was never given
                 // a Width, so FitOrGrow measured against the width of the empty string it was created
                 // with and wrapped every line into "Optimal / idle f...". FitOrGrow is for labels that

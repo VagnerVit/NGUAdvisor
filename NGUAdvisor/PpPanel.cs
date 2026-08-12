@@ -339,19 +339,8 @@ namespace NGUAdvisor
             UiLayout.WrapInto(_toggleNote, string.Join(" ", notes.ToArray()), 4);
         }
 
-        // Local on purpose: the only other duration formatter in the codebase is private to
-        // ProfileValidator, and one caller does not justify a public utility.
-        private static string Duration(double hours)
-        {
-            if (hours >= 24 * 365) return "over a year";
-            long minutes = (long)Math.Round(hours * 60.0);
-            if (minutes < 1) return "<1m";
-            if (minutes < 60) return $"{minutes}m";
-            long h = minutes / 60, m = minutes % 60;
-            if (h < 48) return m > 0 ? $"{h}h {m}m" : $"{h}h";
-            long d = h / 24;
-            h %= 24;
-            return h > 0 ? $"{d}d {h}h" : $"{d}d";
-        }
+        // Moved to NumberFormatter when SpendOverview became the second caller — one renderer, so the
+        // two surfaces cannot quote the same wait differently.
+        private static string Duration(double hours) => NumberFormatter.Duration(hours);
     }
 }

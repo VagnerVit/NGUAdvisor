@@ -409,6 +409,16 @@ namespace NGUAdvisor.Managers
                 "wishes manage wishes wish automation wish priority spend",
                 Destinations.Wishes));
 
+            // Next buy is a Reference for the same reason the three below it are, and for one more: it
+            // owns no ORDERING either. Every row on it is fetched from the module that decides, so it
+            // could never be the thing a search for "what to buy" should route to instead of them —
+            // it routes to the same page, one row above.
+            e.Add(Ref("NextBuy", "Next buy",
+                "What every currency is saving for and which module decided — one row each for AP, PP, QP, seeds and EXP.",
+                "",
+                "next buy spend overview what to buy next currencies save for banked ap pp qp seeds exp who decides owner",
+                Destinations.NextBuy));
+
             // AP purchases is a REFERENCE and deliberately not a tenth system: it owns no setting, has no
             // automation and no advisor/manual choice to make — the panel only advises, because AP is not
             // refundable. A System entry would promise state and a gate that do not exist, and the systems

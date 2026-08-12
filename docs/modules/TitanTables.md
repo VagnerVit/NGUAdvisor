@@ -41,6 +41,10 @@ and pure → unit-tested (`NumberFormatterTests`).
   No) — it rolls up a tier so it reads "1De".
 - Named `NumberFormatter`, not `NumberFormat`, to avoid colliding with the game's global
   `NumberFormat` type that the UI panels also reference.
+- `Duration(hours)` renders a wait the same way everywhere ("45m", "3h 20m", "2d 4h"). It was private
+  to `PpPanel` while there was one caller; `SpendOverview.Buys` is the second. **It refuses to quote
+  what it cannot state**: `<1m` under a minute, `over a year` past one, `?` for NaN/Infinity — a
+  rendered "0h" beside a purchase reads as "buy it now", which is the same rule `PpEta` follows.
 - **Exception**: `GoldPanel` formats via the game's own `Character.display()` FIRST (to honor the
   player's in-game number-display setting) and only falls back here — that special case lives at
   GoldPanel's call site, not here.

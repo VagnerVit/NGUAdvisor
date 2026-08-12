@@ -48,5 +48,24 @@ namespace NGUAdvisor.Tests
             var s = NumberFormatter.Abbrev(1e36);
             Assert.Contains("e", s);   // beyond "De" (1e33) -> scientific notation
         }
+
+        [Theory]
+        [InlineData(0.5, "30m")]
+        [InlineData(3.0, "3h")]
+        [InlineData(3.5, "3h 30m")]
+        [InlineData(50.0, "2d 2h")]
+        [InlineData(48.0, "2d")]
+        public void Duration_renders_the_largest_useful_units(double hours, string expected) =>
+            Assert.Equal(expected, NumberFormatter.Duration(hours));
+
+        // A wait too short or too long to state honestly must not render as a number: "0h" beside a
+        // purchase reads as "buy it now", and a year-plus figure implies a precision it does not have.
+        [Theory]
+        [InlineData(0.0, "<1m")]
+        [InlineData(1e6, "over a year")]
+        [InlineData(double.NaN, "?")]
+        [InlineData(double.PositiveInfinity, "?")]
+        public void Duration_refuses_to_quote_what_it_cannot_state(double hours, string expected) =>
+            Assert.Equal(expected, NumberFormatter.Duration(hours));
     }
 }

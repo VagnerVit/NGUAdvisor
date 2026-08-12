@@ -1015,6 +1015,11 @@ namespace NGUAdvisor.Managers
                     farmMode = rates.CombatMode;
                     detail += $" · {rates.PpPerSecond:0.####} PP/s, {rates.ExpPerSecond:0.##} EXP/s"
                             + $" (floors {rates.DefaultFloor}-{rates.PeakFloor})";
+                    // The PP/s figure decided this, so say what it BUYS: a rate is only a decision
+                    // once it is in the unit the decision is in (SpendOverview.Buys).
+                    string buys = SpendOverview.Buys(SpendOverview.RowFor(SpendOverview.CurrencyPp),
+                                                     rates.PpPerSecond * 3600.0);
+                    if (buys != null) detail += $" -> {buys}";
                 }
             }
             ApplyFarmCombatMode(farmMode, name);

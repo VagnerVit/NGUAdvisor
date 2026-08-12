@@ -40,6 +40,24 @@ namespace NGUAdvisor.Managers
             return sign + mant + Suffixes[i];
         }
 
+        // Hours -> a short human duration ("45m", "3h 20m", "2d 4h"). It lives here, with Abbrev, because
+        // it has the same job: rendering one number the same way everywhere. It was private to PpPanel
+        // while there was one caller; SpendOverview is the second, and a second copy would be free to
+        // drift from this one.
+        public static string Duration(double hours)
+        {
+            if (double.IsNaN(hours) || double.IsInfinity(hours)) return "?";
+            if (hours >= 24 * 365) return "over a year";
+            long minutes = (long)Math.Round(hours * 60.0);
+            if (minutes < 1) return "<1m";
+            if (minutes < 60) return $"{minutes}m";
+            long h = minutes / 60, m = minutes % 60;
+            if (h < 48) return m > 0 ? $"{h}h {m}m" : $"{h}h";
+            long d = h / 24;
+            h %= 24;
+            return h > 0 ? $"{d}d {h}h" : $"{d}d";
+        }
+
         // ~3 significant figures for a mantissa in [0, 1000), trailing zeros trimmed (so 5 -> "5", not "5.00").
         // InvariantCulture on every path: on a comma-decimal locale (cs-CZ, de-DE) the default culture
         // rendered "1,5K", which broke the abbreviation tests and displayed the wrong separator in-game.
