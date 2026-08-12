@@ -72,12 +72,25 @@ namespace NGUAdvisor.Managers
 
             // Only ask for what can actually run: leveled diggers, at most one per slot. A set that
             // names locked/unleveled diggers (advisor or profile) must not fail forever over them.
-            var usable = diggers.Where(d => d >= 0 && d < Diggers.Count && Diggers[d].maxLevel > 0)
-                                .Distinct()
-                                .Take(_dc.maxDiggerSlots())
-                                .ToArray();
+            int[] unlocked = diggers.Where(d => d >= 0 && d < Diggers.Count && Diggers[d].maxLevel > 0)
+                                    .Distinct()
+                                    .ToArray();
+            int slots = _dc.maxDiggerSlots();
+            int[] usable = unlocked.Take(slots).ToArray();
+            // Name WHICH shortfall it is: "locked/unleveled" sends the user to EXP, "over slot count"
+            // to an AP/perk slot purchase, and the old single message covered both (user-reported a
+            // set of six owned diggers reading as "0/2" with one active slot).
             if (usable.Length < diggers.Length)
-                Main.LogDebug($"EquipDiggers: using {usable.Length}/{diggers.Length} of requested set (rest locked/unleveled or over slot count)");
+            {
+                int lockedCount = diggers.Distinct().Count() - unlocked.Length;
+                int slotCapped = unlocked.Length - usable.Length;
+                string why = lockedCount > 0 && slotCapped > 0
+                    ? $"{lockedCount} locked/unleveled, {slotCapped} over slot count (slots={slots})"
+                    : lockedCount > 0
+                        ? $"{lockedCount} locked/unleveled"
+                        : $"{slotCapped} over slot count (slots={slots}) — the diggers are owned, the SLOTS are the cap";
+                Main.LogDebug($"EquipDiggers: using {usable.Length}/{diggers.Length} of requested set — {why}");
+            }
             if (usable.Length == 0)
                 return false;
 
@@ -255,7 +268,15 @@ namespace NGUAdvisor.Managers
                 var parts = ordered
                     .Select(d => $"{d}:L{Diggers[d].curLevel}/{Diggers[d].maxLevel}(drain {_dc.drain(d, 0, true):0.##e0})")
                     .ToArray();
-                Main.LogDebug($"[DiggerDbg] gross={_character.grossGoldPerSecond():0.##e0} budget={budget:0.##e0} "
+                // src= names WHO chose this order. AdvisorDiggers routes through
+                // OptimizationAdvisor and the profile's digger List never reaches the game, so a
+                // user editing that List sees nothing change and no line says why (cost a session's
+                // debugging: the profile was edited, re-applied, and order= stayed put). Same
+                // disclosure ZoneDbg makes about Target ITOPOD overriding SnipeZone.
+                string src = Main.Settings.AdvisorDiggers
+                    ? "advisor (OptimizationAdvisor — profile digger List is NOT consulted)"
+                    : "profile";
+                Main.LogDebug($"[DiggerDbg] src={src} gross={_character.grossGoldPerSecond():0.##e0} budget={budget:0.##e0} "
                             + $"order=[{string.Join(" ", ordered.Select(d => d.ToString()).ToArray())}] -> {string.Join(", ", parts)}");
             }
             catch { }

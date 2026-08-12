@@ -1396,13 +1396,7 @@ namespace NGUAdvisor
                 if (!Settings.CombatEnabled)
                     return;
 
-                // GEAR HUNT outranks ITOPOD targeting (user-reported: Target ITOPOD silently
-                // overrode the hunted stage — the hunt toggle IS the routing intent while on).
-                int tempZone = GearHunter.Active && GearHunter.ZoneReachable()
-                    ? Settings.GearHuntZone
-                    : Settings.AdventureTargetITOPOD ? 1000 : Settings.SnipeZone;
-                if (tempZone < 1000 && !CombatManager.IsZoneUnlocked(tempZone))
-                    tempZone = Settings.AllowZoneFallback ? ZoneHelpers.GetMaxReachableZone(false) : 1000;
+                int tempZone = ResolveAdventureZone(out _);
 
                 // EVIL CLIMB pushes boss numbers to unlock T7 — that means adventuring the highest clearable
                 // zone (bosses + gold + the digger/aug income they feed), NEVER the ITOPOD, which pushes no
@@ -1452,6 +1446,43 @@ namespace NGUAdvisor
                 LogDebug(e.Message);
                 LogDebug(e.StackTrace);
             }
+        }
+
+        // The adventure routing rule, in one place because two callers need the SAME answer:
+        // Update() to route, and AdvisorApply's [ZoneDbg] to report where routing actually goes.
+        // Re-deriving it in the logger is how the line came to advertise the advisor's pick while
+        // Target ITOPOD quietly sent the character to the pod (user-caught).
+        //
+        // GEAR HUNT outranks ITOPOD targeting (user-reported: Target ITOPOD silently overrode the
+        // hunted stage — the hunt toggle IS the routing intent while on).
+        //
+        // The EVIL CLIMB and gold-starved detours in Update() sit AFTER this and are not modelled
+        // here: both resolve through UpdateFurthestZone(), which the logger must not drive.
+        internal static int ResolveAdventureZone(out string overriddenBy)
+        {
+            overriddenBy = null;
+            int zone;
+            if (GearHunter.Active && GearHunter.ZoneReachable())
+            {
+                overriddenBy = "gear hunt";
+                zone = Settings.GearHuntZone;
+            }
+            else if (Settings.AdventureTargetITOPOD)
+            {
+                overriddenBy = "Target ITOPOD";
+                zone = 1000;
+            }
+            else
+            {
+                zone = Settings.SnipeZone;
+            }
+
+            if (zone < 1000 && !CombatManager.IsZoneUnlocked(zone))
+            {
+                overriddenBy = "zone locked";
+                zone = Settings.AllowZoneFallback ? ZoneHelpers.GetMaxReachableZone(false) : 1000;
+            }
+            return zone;
         }
 
         private void DumpEquipped()

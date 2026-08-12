@@ -208,6 +208,12 @@ namespace NGUAdvisor.Managers
         // recommended when the next titan kill is actually in reach (see TitanPushInReach).
         // Evil/Sadistic default to NGU-focused until difficulty-specific presets are authored
         // (they'll be added as the user reaches those stages, where they're testable).
+        // This picks from INSTALLED PRESETS only — hand-authored profiles in the profiles dir are
+        // never candidates. Saying so matters: a user running their own LRB profile read
+        // "Recommended: Normal-24hr" as a verdict ON that profile, when it had not been considered
+        // at all. Until the analyzer can score arbitrary profile files, the caveat rides along.
+        private const string PresetOnlyCaveat = "(Chosen from installed presets — your own profile files are not evaluated.)";
+
         private static string RecommendProfile(difficulty diff, int chapter, out string reason)
         {
             if (diff != difficulty.normal)
@@ -225,7 +231,8 @@ namespace NGUAdvisor.Managers
                 reason = "Early game: push adventure zones and boss EXP.";
                 return "Goal-Adventure";
             }
-            reason = "Daily cadence: number push + fruit/seed harvest + beard banking + NGU marathon.";
+            reason = "Daily cadence: number push + fruit/seed harvest + beard banking + NGU marathon."
+                   + " " + PresetOnlyCaveat;
             return "Normal-24hr";
         }
 

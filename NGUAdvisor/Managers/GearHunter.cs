@@ -175,6 +175,19 @@ namespace NGUAdvisor.Managers
                 var pool = OwnedAccessories(poolIds.Length > 0 ? new HashSet<int>(poolIds) : null);
                 bool poolIsAll = poolIds.Length == 0;   // empty pool: the whole inventory is the pool
 
+                // A pool id that is not an OWNED ACCESSORY is dropped silently by OwnedAccessories —
+                // and a pool of gear ids therefore looks configured while contributing nothing, which
+                // is worse than an empty pool (empty means "whole inventory"). A user-reported pool
+                // held five head/chest/pants/boots/weapon ids; the two survivors filled the DC quota,
+                // so the fallback to the full inventory never fired and Ring of Greed never equipped.
+                if (!poolIsAll)
+                {
+                    int[] unusable = poolIds.Where(id => !pool.ContainsKey(id)).ToArray();
+                    if (unusable.Length > 0)
+                        Main.LogDebug($"[GearHuntDbg] Loot Hunter pool: {unusable.Length}/{poolIds.Length}"
+                                    + $" id(s) ignored — not an owned accessory: {string.Join(", ", unusable.Select(x => x.ToString()).ToArray())}");
+                }
+
                 // Per-type QUOTAS (user rule): Respawn count first (ranked by Respawn), then Drop
                 // Chance count (ranked by DC). Both 0 = auto (optimizer subset search). The pool is
                 // the PREFERRED list — quota shortfalls fall back to the whole owned inventory

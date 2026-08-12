@@ -119,7 +119,16 @@ escape into the step it observes. Observation only: none of them changes a decis
 
 - **`[ZoneDbg]`** (`LogZoneDbg`, called from every exit of `ApplyZones`) — **which LAYER routed the
   zone and what lost.** The layer field is the point: `none` / `gold` / `gearhunt` / `gearfarm` /
-  `boostfarm` / `itopod`, in the precedence the code actually applies. Carries the applied combat
+  `boostfarm` / `itopod`, in the precedence the code actually applies.
+
+  **`zone=` is where `Main.Update()` will send the character, NOT this layer's pick.** ApplyZones only
+  writes `Settings.SnipeZone`; `Main.ResolveAdventureZone()` then overrides it with the gear hunt,
+  Target ITOPOD or the locked-zone fallback. Both callers ask that ONE method — the line used to
+  re-derive nothing at all and reported the pick, so with Target ITOPOD on it named a farm zone
+  nobody was in while the character sat in the pod (user-caught). When the two differ the line adds
+  `advised=<n> (<name>) overriddenBy=<gear hunt|Target ITOPOD|zone locked>`. The EVIL CLIMB and
+  gold-starved detours resolve through `UpdateFurthestZone()` and stay out of it — a logger must not
+  drive that. Carries the applied combat
   mode, the winner's rate, `beat=` (the runner-up and why it lost — the nearest non-viable gear zone
   with the drop chance it needs, or the ITOPOD's boost rate), `boostDemand=` (the
   `BoostDemandExists` gate) and `gearfarm=` (why the gear farm did not take the routing, carried

@@ -841,17 +841,27 @@ namespace NGUAdvisor.Managers
         private static string _lastZoneDbg;
         private static DateTime _lastZoneDbgAt = DateTime.MinValue;
 
+        private static string ZoneDbgName(int zone) => zone == 1000
+            ? "ITOPOD"
+            : ZoneHelpers.ZoneList.TryGetValue(zone, out string zn) ? zn : $"Zone {zone}";
+
         private static void LogZoneDbg(string layer, Func<string> render)
         {
             try
             {
                 if ((DateTime.UtcNow - _lastZoneDbgAt).TotalSeconds < 60) return;
                 _lastZoneDbgAt = DateTime.UtcNow;
-                int zone = Main.Settings.SnipeZone;
-                string name = zone == 1000
-                    ? "ITOPOD"
-                    : ZoneHelpers.ZoneList.TryGetValue(zone, out var zn) ? zn : $"Zone {zone}";
-                string line = $"[ZoneDbg] layer={layer} zone={zone} ({name})"
+
+                // zone= is where Main.Update() will actually send the character, NOT what this layer
+                // picked: the advisor only writes SnipeZone, and Target ITOPOD / the gear hunt / a
+                // locked zone override it downstream. The line used to report the pick and stayed
+                // silent about the override, so it named a zone nobody was farming (user-caught).
+                int advised = Main.Settings.SnipeZone;
+                int zone = Main.ResolveAdventureZone(out string overriddenBy);
+                string line = $"[ZoneDbg] layer={layer} zone={zone} ({ZoneDbgName(zone)})"
+                            + (zone == advised
+                                ? ""
+                                : $" advised={advised} ({ZoneDbgName(advised)}) overriddenBy={overriddenBy}")
                             + $" combat={BoostFarmAdvisor.ModeName(Main.Settings.CombatMode)} {render()}";
                 if (line == _lastZoneDbg) return;
                 _lastZoneDbg = line;
