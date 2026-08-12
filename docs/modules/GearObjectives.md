@@ -31,8 +31,14 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
   `ECap^1`. Omitted deliberately (decided 2026-07-28): the advisor's allocator BBs AT (full
   bars), where extra cap adds no training speed; ECap only matters under manual, under-fed play.
 - **Augments / Beards / Wandoos** score raw speed only; the site mixes in E/M cap/power/bars.
-- **Adventure** (`Power × Toughness`) and **Yggdrasil** (descending-exponent harvest priority
-  4/4/3/2/1) are native extensions with no site counterpart.
+- **Adventure** (`Power^1 × Toughness^0.5`) and **Yggdrasil** (descending-exponent harvest priority
+  4/4/3/2/1) are native extensions with no site counterpart. The 0.5 is deliberate: damage is
+  `(attack − enemyDefense/2) × multiplier`, so kill rate is linear in Power and Toughness adds
+  nothing to it — Toughness only clears a survival threshold. The game's own bars agree (autokill
+  gates UUG `800K/400K`, Walderp `13M/7M`; Beardverse manual gate `1.3M/550K` = 2.36:1). Equal
+  exponents mean "+1 % Power == +1 % Toughness", which at a typical 2.5:1 stat spread prices a
+  *point* of Toughness ~2.5× above a point of Power — backwards. A threshold model would be
+  correct and a product cannot express one; 0.5 is the closest this form gets.
 - **Adventure excludes Respawn on purpose**: base-0 stats explode the product at low totals
   (16→36 respawn would "double" the score). Respawn coverage is the TopRespawn pin's job.
 

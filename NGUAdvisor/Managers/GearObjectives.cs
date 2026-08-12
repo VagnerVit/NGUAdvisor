@@ -97,7 +97,18 @@ namespace NGUAdvisor.Managers
             // base-zero stat it explodes the score at low totals (16->36 respawn would "double" the score),
             // making the optimizer stack respawn items that are mostly wasted in-game. Respawn coverage is
             // the TopRespawn pin's job (exactly one, best-scoring item), not the objective's.
-            new Objective("Adventure", new[]{ Stat.Power, Stat.Toughness }),
+            // Power carries TWICE the weight of Toughness, because the game does not value them
+            // equally: damage is (attack - enemyDefense/2) x multiplier, so kill rate - and with it
+            // every drop, every gold pickup, every boss push - is linear in Power while Toughness
+            // contributes nothing to it. Toughness only has to clear a survival threshold, and the
+            // game's own bars sit near 2:1 in Power's favour (autokill gates: UUG 800K/400K,
+            // Walderp 13M/7M; the Beardverse manual gate 1.3M/550K is 2.36:1). An equal-exponent
+            // product says "+1% Power == +1% Toughness", which at a typical 2.5:1 stat spread prices
+            // a POINT of Toughness ~2.5x above a point of Power - backwards. The honest model is a
+            // threshold (Toughness to the zone gate, rest to Power), which a product cannot express;
+            // 0.5 is the closest this form gets to the ratio the game actually asks for.
+            new Objective("Adventure", new[]{ Stat.Power, Stat.Toughness },
+                new[]{ 1.0, 0.5 }),
 
             // Single-priority production sets (the guide's GO advice: run a loadout per priority + a couple
             // respawn items). Each targets one raw-speed spec so the optimizer packs the best items for it.
