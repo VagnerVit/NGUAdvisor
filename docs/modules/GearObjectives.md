@@ -39,6 +39,15 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
   exponents mean "+1 % Power == +1 % Toughness", which at a typical 2.5:1 stat spread prices a
   *point* of Toughness ~2.5× above a point of Power — backwards. A threshold model would be
   correct and a product cannot express one; 0.5 is the closest this form gets.
+
+  **Status 2026-08-12**: the threshold machinery now exists — `GearScorer.CapValue` clamps a stat
+  total before scoring, which IS a threshold model (see GearScorer.md). It is used for Respawn and
+  **not** for Toughness, on purpose: the respawn threshold is a game constant (80), while the
+  survival threshold is a property of the ZONE BEING FOUGHT, which the scorer is never told. Wiring
+  a zone into scoring would make an objective's score depend on routing state — so until a caller
+  can supply the target zone's requirement, Adventure keeps the 0.5 approximation. Do not "finish
+  the job" by inventing a constant Toughness cap; a wrong threshold is worse than a known
+  approximation.
 - **Adventure excludes Respawn on purpose**: base-0 stats explode the product at low totals
   (16→36 respawn would "double" the score). Respawn coverage is the TopRespawn pin's job.
 

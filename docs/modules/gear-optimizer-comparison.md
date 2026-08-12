@@ -81,20 +81,25 @@ Reference factors live in `external/gear-optimizer/src/assets/ItemAux.js` (`sing
 | NGUs, Wishes, Hacks, E/M NGU, TM variants, Blood Rituals | match | match | Exponents identical (NGUs ½/½/½/½/1; Wishes 0.17×6/1). |
 | not in native | — | NGUSHACK, NGUWISH, WISHHACK, E/M/X CAPSPEED, EMPC, E/M Beards | Add on demand. |
 
-## Respawn cap — a game rule NEITHER optimizer models in generic scoring (found 2026-07-28)
+## Respawn cap — a game rule native models and the site does not (found 2026-07-28, closed 2026-08-12)
 
-The game floors the gear respawn factor at **0.2** (decomp `AdventureController.respawnTime`:
-factor = `1 − bonuses[Respawn]`, min 0.2) — gear respawn past 80% total reduction is wasted.
+The game floors the gear respawn factor at **0.2** (decomp `AdventureController.respawnTime` and
+`NGUController.respawnBonus`: factor = `1 − bonuses[Respawn]`, min 0.2) — gear respawn past 80% total
+reduction is wasted.
 
 - Reference site: does NOT model it (`capstats` has no Respawn entry; respawn scored linearly).
-- Native `GearScorer`/"Respawn" objective: also linear, no floor.
-- Native `GearHunter` (Loot Hunter set): DOES model it — set-level score
+- Native `GearHunter` (Loot Hunter set): has always modelled it — set-level score
   `(100+ΣDC) / (attack + nonGear × max(0.2, 1−ΣRespawn/100))`, see GearHunter.md.
+- Native `GearScorer`/`GearOptimizer`: **now clamps the Respawn total at 80** —
+  `GearScorer.CapValue`, applied in `GetRawVals` and mirrored in `ScoreContext.ScoreOf`. It is an
+  ABSOLUTE cap keyed on the game read, not the site's nude-total-relative `hardcap`.
 
-**Improvement candidate**: clamp the Respawn stat total at the floor in scoring (a `hardcap`-style
-clamp keyed on the game read, not on site capstats). Matters for any composite objective carrying
-Respawn and for multi-respawn accessory sets (the guide recommends ⅓ of acc slots respawn for PP
-farming from Evil on); the single-item TopRespawn pin is unaffected.
+**This is a DELIBERATE DIVERGENCE from the oracle**: a native score for an objective carrying
+Respawn will read lower than the site's whenever the total exceeds 80, and the two loadouts can
+differ. That is native being right and the site being linear, not a port defect — do not "fix" it
+back by removing the clamp when comparing against the site. It matters for any composite objective
+carrying Respawn and for multi-respawn accessory sets (the guide recommends ⅓ of acc slots respawn
+for PP farming from Evil on); the single-item TopRespawn pin is unaffected.
 
 ## GO hardcap data point (confirms "rarely bind")
 

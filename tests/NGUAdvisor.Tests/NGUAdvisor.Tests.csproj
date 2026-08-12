@@ -35,6 +35,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\GoldDropTables.cs" Link="Linked\GoldDropTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ExpRatioTables.cs" Link="Linked\ExpRatioTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\GearObjectives.cs" Link="Linked\GearObjectives.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\GearScorer.cs" Link="Linked\GearScorer.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\GearChain.cs" Link="Linked\GearChain.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ApTierTable.cs" Link="Linked\ApTierTable.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\PpEta.cs" Link="Linked\PpEta.cs" />

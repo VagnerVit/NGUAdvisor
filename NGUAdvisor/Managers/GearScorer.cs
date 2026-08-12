@@ -26,6 +26,23 @@ namespace NGUAdvisor.Managers
         // scorer starts from the same baseline as GetRawVals instead of restating the rule.
         public static double BaseValue(string stat) => BaseZero(stat) ? 0.0 : 100.0;
 
+        // The game floors the respawn factor at 0.2 (decomp AdventureController.respawnTime and
+        // NGUController.respawnBonus, both: factor = 1 - bonuses[Respawn], clamped up to 0.2), so a gear
+        // Respawn total past 80% buys NOTHING IN GAME. GameGearAdapter feeds displayed percents, so the
+        // threshold is 80 here.
+        public const double RespawnCapPercent = 80.0;
+
+        // A stat's maximum SCOREABLE total. This is a GAME THRESHOLD, not a scoring preference: scoring
+        // Respawn linearly told the search that the 81st point was worth as much as the first, and it
+        // paid real accessory slots for it. Only Respawn has one — the cap belongs to the stat, so it
+        // must never be widened into a per-objective knob.
+        //
+        // DELIBERATE DIVERGENCE from the reference optimizer, which scores Respawn linearly with no
+        // floor (gear-optimizer-comparison.md §Respawn cap). It is also NOT the site's `hardcap`, which
+        // clamps relative to the nude total; this one is absolute, because the game's floor is.
+        public static double CapValue(string stat) =>
+            stat == "Respawn" ? RespawnCapPercent : double.PositiveInfinity;
+
         // Port of get_raw_vals. `equip` is in slot order (weapons first: 1st weapon = mainhand, 2nd = offhand).
         // offhandPercent is the offhand weapon's contribution (0..100).
         public static double[] GetRawVals(IReadOnlyList<Item> equip, IReadOnlyList<string> stats, double offhandPercent)
@@ -53,6 +70,8 @@ namespace NGUAdvisor.Managers
                     if (double.IsNaN(val)) continue;
                     vals[i] += val;
                 }
+                double cap = CapValue(stat);
+                if (vals[i] > cap) vals[i] = cap;
             }
             return vals;
         }

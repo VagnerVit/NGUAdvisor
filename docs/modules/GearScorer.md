@@ -21,6 +21,27 @@ website as an oracle.
    The mainhand flag flips on the first weapon **even if it doesn't carry the scored stat**
    (matches JS, where every item carries every stat as 0).
 3. Missing stats contribute 0; `NaN` values are skipped.
+4. **`CapValue(stat)` clamps the raw total before scoring.** Only `Respawn` has a cap (80). This is a
+   GAME threshold, not a scoring preference — see below — and it is a deliberate divergence from the
+   JS oracle, which has none.
+
+## Thresholds are modelled as thresholds, not as exponents
+
+The game floors the respawn factor at **0.2** (decomp `AdventureController.respawnTime` and
+`NGUController.respawnBonus`, both `factor = 1 − bonuses[Respawn]` clamped up to `0.2`), so a gear
+Respawn total past **80 %** buys nothing. `GameGearAdapter` feeds displayed percents
+(`getBonusFactor(...) × 100`), so the threshold is the literal number 80.
+
+Scoring it linearly told the search that the 81st point was worth as much as the first, and it paid
+real accessory slots for it. The clamp is applied in `GetRawVals` (before `ScoreVals`) and mirrored
+in `GearOptimizer.ScoreContext.ScoreOf` (before the exponent) — **both paths or neither**.
+
+The cap belongs to the STAT, not to an objective: a per-objective knob would let one objective price
+respawn above the game's own ceiling. It is also **not** the site's `hardcap`, which clamps relative
+to the nude total; this one is absolute, because the game's floor is.
+
+Pinned by `GearScorerTests` (`Respawn_total_is_capped_at_the_games_floor`,
+`Respawn_below_the_cap_still_scores_linearly`, `Other_stats_are_not_capped`).
 
 ## Consumers
 

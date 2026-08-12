@@ -232,6 +232,7 @@ namespace NGUAdvisor.Managers
         {
             private readonly string[] _statNames;
             private readonly double[] _exponents;
+            private readonly double[] _caps;
             private readonly double[] _constVals;
             private readonly Dictionary<int, double[]> _idToVec;
             private readonly double[] _scratch;
@@ -247,6 +248,12 @@ namespace NGUAdvisor.Managers
                 var statCount = _statNames.Length;
 
                 // Base + the two fixed items (cube, nude base) — identical for every loadout considered.
+                // Caps are read once per objective, from the same rule GetRawVals uses — the scoring
+                // semantics of the two paths must stay identical (see the equivalence comment above).
+                _caps = new double[statCount];
+                for (var i = 0; i < statCount; i++)
+                    _caps[i] = GearScorer.CapValue(_statNames[i]);
+
                 _constVals = new double[statCount];
                 for (var i = 0; i < statCount; i++)
                     _constVals[i] = GearScorer.BaseValue(_statNames[i]);
@@ -302,7 +309,10 @@ namespace NGUAdvisor.Managers
                 double res = 1.0;
                 for (var i = 0; i < statCount; i++)
                 {
-                    var v = _scratch[i] / 100.0;
+                    // Clamp before the exponent, exactly as GetRawVals clamps before ScoreVals.
+                    var total = _scratch[i];
+                    if (total > _caps[i]) total = _caps[i];
+                    var v = total / 100.0;
                     if (_exponents != null && _exponents.Length > i)
                         v = Math.Pow(v, _exponents[i]);
                     res *= v;
