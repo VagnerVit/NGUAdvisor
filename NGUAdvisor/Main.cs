@@ -92,6 +92,11 @@ namespace NGUAdvisor
         // Unity thread (user-reported: dashboard Switch crash). They request; Update() drains.
         public static void RequestAllocationReload() => _reloadAllocationPending = true;
 
+        // Same rule for the state dump: StateExport reads live Character/scene objects for every
+        // section, so the LOGS button requests and Update() runs it.
+        private static volatile bool _stateExportPending;
+        public static void RequestStateExport() => _stateExportPending = true;
+
         public static FileSystemWatcher ConfigWatcher;
         public static FileSystemWatcher AllocationWatcher;
         public static FileSystemWatcher ZoneWatcher;
@@ -413,6 +418,12 @@ namespace NGUAdvisor
                 _reloadAllocationPending = false;
                 try { LoadAllocation(); }
                 catch (Exception e) { LogDebug($"Deferred allocation reload failed: {e.Message}"); }
+            }
+            if (_stateExportPending)
+            {
+                _stateExportPending = false;
+                try { Managers.StateExport.Write(); }
+                catch (Exception e) { LogDebug($"Deferred state export failed: {e.Message}"); }
             }
 
             _formUpdateCooldown -= Time.deltaTime;

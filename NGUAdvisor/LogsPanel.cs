@@ -25,6 +25,7 @@ namespace NGUAdvisor
         private ListBox _list;
         private Button _pause;
         private Button _openFile;
+        private Button _export;
         private int _active;              // 0 advisor · 1 loot · 2 session (rail children)
         private string _filter = "ALL";
         private bool _paused;
@@ -56,6 +57,12 @@ namespace NGUAdvisor
                 catch (Exception ex) { LogDebug($"Logs open: {ex.Message}"); }
             };
 
+            // MAIN-THREAD RULE: StateExport reads live Character and scene objects for every section,
+            // so this handler only REQUESTS — Main.Update() runs the dump on the Unity thread and the
+            // "State exported to ..." line lands in this very panel's ADVISOR feed.
+            _export = MkChip("EXPORT STATE");
+            _export.Click += (s, e) => RequestStateExport();
+
             _list = new ListBox
             {
                 Bounds = new Rectangle(0, UiTheme.S(34), canvasW - UiTheme.S(20), UiTheme.ListH(24)),   // the tuned S(600) at the 25px line height
@@ -69,6 +76,7 @@ namespace NGUAdvisor
             Controls.Add(_list);
             Controls.Add(_pause);
             Controls.Add(_openFile);
+            Controls.Add(_export);
 
             Height = _list.Bottom + UiTheme.S(6);
             BuildChips();
@@ -103,6 +111,7 @@ namespace NGUAdvisor
             }
             _openFile.Location = new Point(_list.Right - _openFile.Width, UiTheme.S(2));
             _pause.Location = new Point(_openFile.Left - _pause.Width - UiTheme.S(6), UiTheme.S(2));
+            _export.Location = new Point(_pause.Left - _export.Width - UiTheme.S(6), UiTheme.S(2));
             StyleChips();
         }
 

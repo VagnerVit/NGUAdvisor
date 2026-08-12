@@ -21,9 +21,11 @@ namespace NGUAdvisor.Managers
             public string AutoKey;   // "gear" | "wandoos" | "diggers" | "beards" | null
         }
 
-        private static readonly string[] DiggerNames =
+        // internal, not private: StateExport labels the same indices and a second copy of these lists
+        // would be free to drift from the ones the advice rows use.
+        internal static readonly string[] DiggerNames =
             { "Drops", "Wandoos", "Stats", "Adv", "E-NGU", "M-NGU", "E-Beard", "M-Beard", "PP", "Daycare", "Blood", "EXP" };
-        private static readonly string[] BeardNames =
+        internal static readonly string[] BeardNames =
             { "Stats", "Drops", "Number", "NGU", "Wandoos", "Adv", "Golden" };
         private static readonly string[] WandoosOsNames = { "98", "MEH", "XL" };
 
