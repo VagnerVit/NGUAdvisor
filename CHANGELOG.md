@@ -4,6 +4,70 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.29] - 2026-08-12
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+This release is about a single theme: **when the advisor decides something, you can now see who
+decided it and why.** Every gap below came from a real session where the advice was right but its
+basis was invisible — or where advice was given from outside the module that owns the answer, and
+was simply wrong.
+
+### Added
+
+- **NEXT BUY (Economy > Planners)** — one row per currency (AP, PP, QP, seeds, EXP): what it is
+  saving for, what that costs, whether you can afford it, and **which module decided**. The page
+  holds no ordering of its own; every row is fetched from the owner. This exists because advice
+  sourced from the guide instead of the owning module recommended a digger slot for 100k AP, while
+  the AP planner's queue said a heart was next and the digger slot was in fact a **25 PP perk** —
+  wrong currency, wrong price by four orders of magnitude.
+- **Farm rates are stated as the purchase they bring forward.** "1.2k PP/hr" becomes "Faster NGU
+  Energy in ~3h" on the Adventure panel and in the routing log. There is deliberately no scalar
+  converting PP against boosts and EXP — the exchange rate between them is phase-dependent, so any
+  constant would be wrong for half a run.
+- **EXPORT STATE (Logs page)** — dumps the live game state to `state-export.txt`: progression,
+  balances, NGU levels *with their allocation*, AT, augments, diggers, beards, and the owned perks,
+  quirks and fruits **by name**. Those names live in the Unity scene, not in code and not in the
+  save file, so no external save reader can produce them.
+- **The profile recommendation now considers your own profile files**, not only installed presets.
+  The preset decides which *kind* of run this is; a file on disk of the same kind that funds more of
+  the plan's NGU lanes wins, and the recommendation carries the lane count. It has to beat the
+  preset, not tie with it.
+
+### Fixed
+
+- **Gear respawn past 80% was scored as if it still helped.** The game floors the respawn factor at
+  0.2, so it does not. The optimizer was paying real accessory slots for points that do nothing in
+  game. (A deliberate divergence from the reference optimizer, which also scores it linearly.)
+- **NGU levels were counted on the wrong difficulty track.** The growth chip summed the plain level
+  field, so on the Evil track it read a flat `+0/hr` against a nonzero prediction while the run was
+  in fact climbing.
+- **Loading a save registered as a gain.** On the title screen every balance reads as a fresh
+  character's zero, so the first sample after a load jumped the entire account into the rate —
+  measured as `NGU +10.1K/hr` against a predicted `44.9`. It is now caught the way a rebirth already
+  was, by the run clock disagreeing with the wall clock.
+- **A profile edited outside the editor was never structurally checked** on the path the game
+  actually loads from. SimpleJSON does not throw on a malformed profile, it misparses silently, so
+  the run could allocate to something the file never said. It now reports and still loads.
+- **The autopilot divider ran past the bottom of its card** whenever the content settled shorter
+  than its fixed height.
+
+### Changed
+
+- **`NGU LEVELS +0/hr` now names its cause.** Read live from the game rather than inferred: a lane
+  only ticks while it holds allocation and is under its target, so the tile says which of those is
+  failing ("no NGU allocation", "fed elsewhere: …", "at target: …") instead of printing a prediction
+  the measurement plainly contradicts.
+- **Decisions that override other decisions say so.** The zone line reports the layer that actually
+  decided and what it overrode; the digger line says whether the order came from the advisor or the
+  profile (the profile's digger list is *not* consulted while the advisor owns diggers); the Loot
+  Hunter pool logs the ids it discarded. New `[SpendDbg]`, `[ProfileDbg]` and `[GrowthDbg]` channels
+  follow the same rule — including when the answer is "nothing changed", because a silent module is
+  indistinguishable from one that never ran.
+- **Adventure gear scoring halves the Toughness weight** (`Power¹ × Toughness⁰·⁵`). Kill rate is
+  linear in Power and Toughness only has to clear a survival threshold; equal exponents priced a
+  point of Toughness about 2.5× above a point of Power, which is backwards.
+
 ## [1.2.27] - 2026-08-07
 
 Existing settings and profile files remain compatible with version 1.1.0.
