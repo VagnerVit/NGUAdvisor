@@ -49,7 +49,6 @@ namespace NGUAdvisor
             this.AutoFightBosses = new System.Windows.Forms.CheckBox();
             this.AutoBuyConsumables = new System.Windows.Forms.CheckBox();
             this.ConsumeIfRunning = new System.Windows.Forms.CheckBox();
-            this.AutoBuyEM = new System.Windows.Forms.CheckBox();
             this.AutoBuyAdv = new System.Windows.Forms.CheckBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
@@ -613,7 +612,6 @@ namespace NGUAdvisor
             this.tableLayoutPanel2.Controls.Add(this.AutoFightBosses, 0, 2);
             this.tableLayoutPanel2.Controls.Add(this.AutoBuyConsumables, 0, 4);
             this.tableLayoutPanel2.Controls.Add(this.ConsumeIfRunning, 1, 4);
-            this.tableLayoutPanel2.Controls.Add(this.AutoBuyEM, 0, 3);
             this.tableLayoutPanel2.Controls.Add(this.AutoBuyAdv, 1, 3);
             this.tableLayoutPanel2.Name = "tableLayoutPanel2";
             // 
@@ -701,14 +699,7 @@ namespace NGUAdvisor
             this.ConsumeIfRunning.Name = "ConsumeIfRunning";
             this.ConsumeIfRunning.UseVisualStyleBackColor = true;
             this.ConsumeIfRunning.CheckedChanged += new System.EventHandler(this.ConsumeIfRunning_CheckedChanged);
-            // 
-            // AutoBuyEM
-            // 
-            resources.ApplyResources(this.AutoBuyEM, "AutoBuyEM");
-            this.AutoBuyEM.Name = "AutoBuyEM";
-            this.AutoBuyEM.UseVisualStyleBackColor = true;
-            this.AutoBuyEM.CheckedChanged += new System.EventHandler(this.AutoBuyEM_CheckedChanged);
-            // 
+            //
             // AutoBuyAdv
             // 
             resources.ApplyResources(this.AutoBuyAdv, "AutoBuyAdv");
@@ -4033,7 +4024,6 @@ namespace NGUAdvisor
         private System.Windows.Forms.CheckBox UnloadSafety;
         private System.Windows.Forms.Button UnloadButton;
         private System.Windows.Forms.Label VersionLabel;
-        private System.Windows.Forms.CheckBox AutoBuyEM;
         private System.Windows.Forms.CheckBox MasterEnable;
         private System.Windows.Forms.CheckBox AutoFightBosses;
         private System.Windows.Forms.TabPage tabPage2;

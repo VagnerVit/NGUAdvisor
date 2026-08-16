@@ -65,7 +65,6 @@ namespace NGUAdvisor
         [SerializeField] private bool _ironPillOnRebirth;
         [SerializeField] private bool _bloodMacGuffinAOnRebirth;
         [SerializeField] private bool _bloodMacGuffinBOnRebirth;
-        [SerializeField] private bool _autoBuyEm;
         [SerializeField] private bool _autoBuyAdventure;
         [SerializeField] private double _bloodNumberThreshold;
         // AT HOUR extension decision, persisted so an advisor reload cannot cancel an extension already
@@ -109,6 +108,8 @@ namespace NGUAdvisor
         [SerializeField] private int _itopodOptimizeMode;
         [SerializeField] private bool _itopodBeastMode;
         [SerializeField] private bool _itopodAutoPush;
+        [SerializeField] private int _itopodFloorMode;
+        [SerializeField] private int _itopodTargetFloor;
         [SerializeField] private bool _adventureTargetItopod;
         [SerializeField] private int _titanCombatMode;
         [SerializeField] private bool _titanBeastMode;
@@ -201,6 +202,7 @@ namespace NGUAdvisor
         [SerializeField] private int[] _transformAutoClimb;
         [SerializeField] private int[] _transformKeepMax;
         [SerializeField] private int[] _transformFilter;
+        [SerializeField] private int _boostTransformMode;
 
         private readonly string _savePath;
         private bool _disableSave;
@@ -377,7 +379,6 @@ namespace NGUAdvisor
             _disableOverlay = other?.DisableOverlay ?? false;
             _moneyPitRunMode = other?.MoneyPitRunMode ?? false;
             _autoFight = other?.AutoFight ?? false;
-            _autoBuyEm = other?.AutoBuyEM ?? false;
             _autoBuyAdventure = other?.AutoBuyAdventure ?? false;
             _autoBuyConsumables = other?.AutoBuyConsumables ?? false;
             _consumeIfAlreadyRunning = other?.ConsumeIfAlreadyRunning ?? false;
@@ -451,6 +452,13 @@ namespace NGUAdvisor
             _itopodBeastMode = other?.ITOPODBeastMode ?? false;
             AssignValue(ref _itopodOptimizeMode, other?.ITOPODOptimizeMode, (mode) => mode >= 0 && mode <= 3);
             _itopodAutoPush = other?.ITOPODAutoPush ?? false;
+            AssignValue(ref _itopodFloorMode, other?.ITOPODFloorMode, (mode) => mode >= 0 && mode <= 2);
+            AssignValue(ref _itopodTargetFloor, other?.ITOPODTargetFloor,
+                (floor) => floor >= 1 && floor <= ItopodConstants.MaxFloor, 1);
+            // Legacy files predate the floor mode and carry the push decision in the checkbox alone.
+            // Optimal always stores AutoPush false, so (Optimal + push on) can only be one of those.
+            if (_itopodFloorMode == 0 && _itopodAutoPush)
+                _itopodFloorMode = 2;
 
             AssignValues(ref _blacklistedBosses, other?.BlacklistedBosses, (id) => IsAdvEnemy(id));
             CombatManager.UpdateBlacklists();
@@ -570,6 +578,7 @@ namespace NGUAdvisor
                 _transformAutoClimb = new[] { 1, 1, 1, 1, 1 };
             AssignValues(ref _transformKeepMax, other?.TransformKeepMax, 5);
             AssignValues(ref _transformFilter, other?.TransformFilter, 5);
+            AssignValue(ref _boostTransformMode, other?.BoostTransformMode, (mode) => mode >= 0 && mode <= 4);
         }
 
         public int SnipeZone
@@ -1174,17 +1183,6 @@ namespace NGUAdvisor
             }
         }
 
-        public bool AutoBuyEM
-        {
-            get => _autoBuyEm;
-            set
-            {
-                if (value == _autoBuyEm) return;
-                _autoBuyEm = value;
-                SaveSettings();
-            }
-        }
-
         public bool AutoBuyAdventure
         {
             get => _autoBuyAdventure;
@@ -1640,6 +1638,31 @@ namespace NGUAdvisor
             {
                 if (value == _itopodAutoPush) return;
                 _itopodAutoPush = value;
+                SaveSettings();
+            }
+        }
+
+        // 0 = Optimal (advisor picks the floor), 1 = Fixed (ITOPODTargetFloor), 2 = Max (climb as
+        // high as the rotation one-shots). ITOPODAutoPush stays the separate "pushing is allowed"
+        // flag: a death during a push clears it without discarding the mode the user chose.
+        public int ITOPODFloorMode
+        {
+            get => _itopodFloorMode;
+            set
+            {
+                if (value == _itopodFloorMode) return;
+                _itopodFloorMode = value;
+                SaveSettings();
+            }
+        }
+
+        public int ITOPODTargetFloor
+        {
+            get => _itopodTargetFloor;
+            set
+            {
+                if (value == _itopodTargetFloor) return;
+                _itopodTargetFloor = value;
                 SaveSettings();
             }
         }
@@ -2268,6 +2291,20 @@ namespace NGUAdvisor
         {
             get => _transformFilter;
             set { _transformFilter = value; SaveSettings(); }
+        }
+
+        // Boost auto-transform (game: PlayerSettings.autoTransform, 0 none / 1 power / 2 toughness /
+        // 3 special). 0 = Advisor picks, 1..3 = the same three types, 4 = None. The game keeps one of
+        // its four toggles selected at all times, so there is no "leave it alone" value.
+        public int BoostTransformMode
+        {
+            get => _boostTransformMode;
+            set
+            {
+                if (value == _boostTransformMode) return;
+                _boostTransformMode = value;
+                SaveSettings();
+            }
         }
 
         public int[] TitanGoldVersionBanked

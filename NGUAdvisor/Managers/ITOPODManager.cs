@@ -422,11 +422,19 @@ namespace NGUAdvisor.Managers
 
         private static void OptimizeFloor()
         {
-            if (Settings.ITOPODOptimizeMode == 0)
+            if (Settings.ITOPODOptimizeMode == 0 && !FixedFloor)
                 return;
 
             if (mode == CombatMode.Push)
                 return;
+
+            // A fixed floor is an instruction, not a guess: no per-kill re-optimization, no buff-aware
+            // shifting. UpdateMaxFloor has already clamped the target to what we can actually reach.
+            if (FixedFloor)
+            {
+                SetFloor(maxFloor);
+                return;
+            }
 
             float time = RemainingRespawnTime();
             if (nextBuffs.Count > 0 && nextBuffs.First() != Buff.None)
@@ -621,10 +629,15 @@ namespace NGUAdvisor.Managers
 
         }
 
+        // Settings.ITOPODFloorMode == 1: the user names the floor, so the solve is skipped entirely.
+        // It still owns the floor even with optimization disabled — the whole point is to sit where
+        // the user said, and the game's own Lazy ITOPOD would otherwise drift off it.
+        private static bool FixedFloor => Settings.ITOPODFloorMode == 1;
+
         public static void UpdateMaxFloor()
         {
             // Floor optimization is disabled
-            if (Settings.ITOPODOptimizeMode == 0)
+            if (Settings.ITOPODOptimizeMode == 0 && !FixedFloor)
                 return;
 
             _character.arbitrary.lazyITOPODOn = false;
@@ -642,29 +655,41 @@ namespace NGUAdvisor.Managers
                 else
                 {
                     Settings.ITOPODAutoPush = false;
+                    // Max mode is nothing BUT the push, so leaving it selected would show a mode that
+                    // no longer does anything. A fixed target survives — it just stops climbing and
+                    // farms the highest floor reached instead.
+                    if (Settings.ITOPODFloorMode == 2)
+                        Settings.ITOPODFloorMode = 0;
                 }
             }
 
-            float buffs = 1f;
+            if (FixedFloor)
+            {
+                maxFloor = Math.Min(Math.Max(1, Settings.ITOPODTargetFloor), ItopodConstants.MaxFloor);
+            }
+            else
+            {
+                float buffs = 1f;
 
-            if (OffensiveBuffUnlocked())
-                buffs *= 1.2f;
+                if (OffensiveBuffUnlocked())
+                    buffs *= 1.2f;
 
-            if (ChargeUnlocked())
-                buffs *= _character.chargePower();
+                if (ChargeUnlocked())
+                    buffs *= _character.chargePower();
 
-            if (UltimateBuffUnlocked())
-                buffs *= 1.3f;
+                if (UltimateBuffUnlocked())
+                    buffs *= 1.3f;
 
-            if (MegaBuffUnlocked())
-                buffs *= 1.2f;
+                if (MegaBuffUnlocked())
+                    buffs *= 1.2f;
 
-            maxFloor = FloorFor(ChooseMaxAttack(), buffs);
+                maxFloor = FloorFor(ChooseMaxAttack(), buffs);
 
-            if (Settings.ITOPODOptimizeMode == 2)
-                maxFloor -= maxFloor % 10;
-            else if (Settings.ITOPODOptimizeMode == 3)
-                maxFloor -= maxFloor % 50;
+                if (Settings.ITOPODOptimizeMode == 2)
+                    maxFloor -= maxFloor % 10;
+                else if (Settings.ITOPODOptimizeMode == 3)
+                    maxFloor -= maxFloor % 50;
+            }
 
             // Need to push
             if (maxFloor > Adventure.highestItopodLevel - 1)

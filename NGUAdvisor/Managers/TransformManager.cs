@@ -245,6 +245,7 @@ namespace NGUAdvisor.Managers
             if (st == null || c == null) return;
 
             ActiveClimb(c, st);
+            ApplyBoostTransform(c, st);
 
             var filtered = new List<int>();
             for (int i = 0; i < Chains.Length; i++)
@@ -272,6 +273,109 @@ namespace NGUAdvisor.Managers
                     Main.Log($"Transform chains: filtered lower tiers {key} from loot");
                 }
             }
+        }
+
+        // Boost auto-transform. The game rerolls every dropped BOOST into the chosen type
+        // (ItemNameDesc.autoTransform, called from all four loot paths when settings.autoTransform is
+        // 1..3), which is why this belongs to the advisor at all: the right type is the one whose
+        // sinks still have room, and that changes as gear fills up.
+        //
+        // Settings.BoostTransformMode: 0 = Advisor (BoostSinks.BestType), 1..3 = the game's own
+        // Power/Toughness/Special, 4 = None. The game's four toggles are hidden until the 100-level
+        // challenge is fully completed (InventoryController.updateTransformToggles) -- before that the
+        // setting does nothing and writing it would be invisible, so we stay out.
+        private static DateTime _lastBoostTransform = DateTime.MinValue;
+
+        // The advisor's own answer, and the ONLY one — InventoryManager.ManageBoostConversion used to
+        // decide this too and the two overwrote each other every pass.
+        //
+        // A padlocked, unfinished boost outranks the value math: the padlock is the user saying "finish
+        // this one", and drops of its type are what finish it. That rule is carried over verbatim from
+        // ManageBoostConversion (ids 1-13 Power, 14-26 Toughness, 27-39 Special; a level-100 copy is done
+        // and no longer counts). Everything else is BoostSinks: where a boost can still land.
+        // The type drops are ACTUALLY being rerolled into: the user's forced choice when there is one,
+        // the advisor's answer otherwise. Callers that ask "which boost id am I farming" want this,
+        // not the raw setting.
+        public static int EffectiveBoostType(Character c)
+        {
+            int mode = Main.Settings?.BoostTransformMode ?? 0;
+            if (mode == 0) return AdvisedType(c);
+            return mode == 4 ? BoostSinks.TypeNone : mode;
+        }
+
+        public static int AdvisedType(Character c)
+        {
+            int locked = LockedBoostType(c);
+            return locked != BoostSinks.TypeNone ? locked : BoostSinks.BestType(BoostSinks.Current());
+        }
+
+        // Why the advisor picked what it picked. Throttled to once a minute: the pick is re-evaluated
+        // every 5s, but the inputs move slowly and this line exists to answer "why T when my gear
+        // clearly wants S", not to narrate.
+        private static DateTime _lastTypeDbg = DateTime.MinValue;
+
+        private static void LogTypeDbg(Character c, SavedSettings st, int want)
+        {
+            if ((DateTime.UtcNow - _lastTypeDbg).TotalSeconds < 60) return;
+            _lastTypeDbg = DateTime.UtcNow;
+            try
+            {
+                var sinks = BoostSinks.Current();
+                var gear = BoostSinks.GearScores(sinks);
+                var score = BoostSinks.TypeScores(sinks);
+                int locked = LockedBoostType(c);
+                Main.LogDebug($"[BoostTypeDbg] mode={st.BoostTransformMode} pick={BoostSinks.TypeName(want)}"
+                    + $" locked={BoostSinks.TypeName(locked)}"
+                    + $" gearScores P={gear[0]:0.##} T={gear[1]:0.##} S={gear[2]:0.##}"
+                    + $" withCube P={score[0]:0.##} T={score[1]:0.##} S={score[2]:0.##}"
+                    + $" gearHeadroom P={sinks.PowerGearHeadroom:0.##} T={sinks.ToughnessGearHeadroom:0.##} S={sinks.SpecialGearHeadroom:0.##}"
+                    + $" cube usable={sinks.CubeUsable} P={sinks.CubePowerRaw:0.##}/{sinks.CubePowerSoftcap:0.##}"
+                    + $" T={sinks.CubeToughnessRaw:0.##}/{sinks.CubeToughnessSoftcap:0.##}");
+            }
+            catch (Exception e) { Main.LogDebug($"[BoostTypeDbg] failed: {e.Message}"); }
+        }
+
+        private static int LockedBoostType(Character c)
+        {
+            int minId = int.MaxValue;
+            var inv = c.inventory.inventory;
+            for (int i = 0; i < inv.Count; i++)
+            {
+                var e = inv[i];
+                if (e == null || e.id < 1 || e.id > 39) continue;
+                if (e.removable || e.level >= 100) continue;   // not padlocked, or already finished
+                if (e.id < minId) minId = e.id;
+            }
+            if (minId == int.MaxValue) return BoostSinks.TypeNone;
+            return minId <= 13 ? BoostSinks.TypePower
+                : minId <= 26 ? BoostSinks.TypeToughness
+                : BoostSinks.TypeSpecial;
+        }
+
+        private static void ApplyBoostTransform(Character c, SavedSettings st)
+        {
+            if ((DateTime.UtcNow - _lastBoostTransform).TotalSeconds < 5) return;
+            _lastBoostTransform = DateTime.UtcNow;
+
+            if (c.challenges.levelChallenge10k.curCompletions < c.allChallenges.level100Challenge.maxCompletions)
+                return;
+
+            int want = st.BoostTransformMode == 0
+                ? AdvisedType(c)
+                : st.BoostTransformMode == 4 ? BoostSinks.TypeNone : st.BoostTransformMode;
+
+            LogTypeDbg(c, st, want);
+
+            int had = c.settings.autoTransform;
+            if (had == want) return;
+            c.settings.autoTransform = want;
+            // Unity's overloaded == is the only check that sees a destroyed object; ?. does not.
+            if (Main.InventoryController != null)
+                Main.InventoryController.updateTransformToggles();
+            // The PREVIOUS value is in the message on purpose: a write that keeps repeating means
+            // something else is putting it back, and only "was X" says what that something wants.
+            Main.Log($"Boost auto-transform: {BoostSinks.TypeName(had)} -> {BoostSinks.TypeName(want)}"
+                + (st.BoostTransformMode == 0 ? " (advisor: most boost value delivered)" : ""));
         }
 
         // Active climb (user-reported: 3x unlocked Sir Looty at level 100 sat forever). The game only

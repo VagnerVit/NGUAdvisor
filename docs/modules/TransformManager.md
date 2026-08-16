@@ -75,6 +75,38 @@ user's explicit veto, and the game itself honours it on every other path.
 Note the KeepOne designation picks by SLOT INDEX (equipped first, else lowest inventory slot), not by
 level or lock — so the padlock is the only way to pin a specific copy.
 
+## Boost auto-transform (`ApplyBoostTransform`)
+
+A second, unrelated meaning of "transform" that the same manager owns: the game's **Auto Transform**
+strip (`P | T | S | X` in the inventory screen) rerolls every dropped BOOST into the chosen type.
+Game truth: `PlayerSettings.autoTransform` — `0` none, `1` power, `2` toughness, `3` special — read
+by `ItemNameDesc` in all four loot paths (`autoTransform(equipment, type)` when the value is 1..3 and
+`equipment.isBoost()`), and hidden entirely by `InventoryController.updateTransformToggles` until
+`challenges.levelChallenge10k.curCompletions >= allChallenges.level100Challenge.maxCompletions`.
+Before that completion the setting does nothing, so the advisor does not write it.
+
+`Settings.BoostTransformMode`: `0` Advisor, `1..3` the game's own Power/Toughness/Special, `4` None.
+**There is no "leave it alone" value** — the game always has one of its four toggles selected, so a
+sixth "off" state would mean nothing on screen.
+
+**This manager is the ONLY writer of `settings.autoTransform`.** `InventoryManager.ManageBoostConversion`
+used to own the same setting through the game's `selectAuto*Transform()` setters — nothing named it,
+so the two overwrote each other every ~30 s once this feature landed (user-reported: "T jumps for a
+moment, then P overrides it"). Its decision rules moved here; what stayed there is the level-100
+unlock, which is about conversion rather than type. Do not reintroduce a second writer.
+
+Advisor mode is `AdvisedType(c)`: a padlocked UNFINISHED boost wins (ids 1-13 Power, 14-26 Toughness,
+27-39 Special — carried over from `ManageBoostConversion`, on the reasoning that a padlock is the user
+saying "finish this one"), otherwise `BoostSinks.BestType(BoostSinks.Current())`, which prices one
+boost of the TOP tier into each type's sinks and takes the argmax. The top tier is deliberate: a boost that fits inside
+every channel's headroom delivers its full value whatever its type, so lower tiers answer "all equal"
+and the pick would be arbitrary. Only overflow — which the game DESTROYS — reveals which sink still
+has room. `TypeNone` therefore comes back only when nothing can absorb a boost at all; the cube is a
+soft sink that never saturates, so while it is usable Power or Toughness always beats None.
+
+Written at most every 5 s from `Tick()`, and only when the value actually differs, followed by
+`updateTransformToggles()` so the game's own buttons match.
+
 `ChainItem(id)` is the membership test `InventoryAdvisor` uses to exempt chain tiers from TRASH.
 `Tick()` is driven from `AdvisorApply` (always, unthrottled by the toggle — the per-chain settings
 are the gate).

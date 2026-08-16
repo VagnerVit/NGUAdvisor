@@ -99,6 +99,25 @@ order: Charge → OffBuff(×1.2) → UltBuff(×1.3) → combinations → MegaBuf
 combos (`chargePower()` is the game read). Floors ≥ 1550 or tier ≥ 20 with fast respawn skip the
 dance.
 
+## Floor modes (`Settings.ITOPODFloorMode`)
+
+An axis of its own, orthogonal to the optimize mode above: WHICH floor, not how it is solved.
+
+| Mode | Behavior |
+|---|---|
+| 0 Optimal | the solve above owns the floor; `ITOPODAutoPush` is false, so it never climbs past `highestItopodLevel − 1` |
+| 1 Fixed | `ITOPODTargetFloor` IS the floor. `UpdateMaxFloor` skips the attack solve, `OptimizeFloor` writes the target and returns — no per-kill re-optimization, no buff-aware shifting. Works even with `ITOPODOptimizeMode == 0`: it is an instruction, and the game's Lazy ITOPOD would otherwise drift off it |
+| 2 Max | the solve above, pushing as high as the rotation one-shots (`ITOPODAutoPush` true) |
+
+`ITOPODAutoPush` survives as the underlying **permission** flag rather than a UI control, because the
+push-death rule needs to revoke permission without discarding the mode the user chose. On a death
+during a push it clears, and mode 2 falls back to Optimal (Max is nothing but the push, so leaving it
+selected would show a mode that no longer does anything). A **fixed** target survives that death: it
+stops climbing and farms the highest floor reached.
+
+A fixed target above `highestItopodLevel − 1` pushes to the TARGET, not to the solved maximum — the
+"need to push" branch in `UpdateMaxFloor` reads `maxFloor`, which Fixed has already set to the target.
+
 ## Push mode
 
 Entered when `maxFloor > highestItopodLevel − 1` and `ITOPODAutoPush`: sets range

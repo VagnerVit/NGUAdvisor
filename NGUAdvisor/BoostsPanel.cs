@@ -84,6 +84,9 @@ namespace NGUAdvisor
         private Label _xformNote1;
         private Label _xformNote2;
         private Label _xformEmpty;
+        private readonly Button[] _boostXform = new Button[5];
+        private Label _boostXformNote;
+        private int _xformTop;
 
         private bool _syncing;
         private readonly int _w;
@@ -418,6 +421,44 @@ namespace NGUAdvisor
             _xformPage.Controls.Add(_xformContent);
 
             int Measure(string t) => UiLayout.MeasureText(t, UiTheme.Ui) + UiTheme.S(20);
+
+            // Boost auto-transform: the game keeps exactly one of Power/Toughness/Special/None
+            // selected, so this strip has no off state — "Advisor" is just the fifth choice, the one
+            // that re-picks as gear and cube headroom fill up.
+            var xformLbl = new Label
+            {
+                Text = "Auto Transform",
+                Location = new Point(UiTheme.S(10), UiTheme.S(10)),
+                AutoSize = true,
+                Font = UiTheme.Bold,
+                ForeColor = UiTheme.Accent,
+                BackColor = UiTheme.Ground
+            };
+            _xformContent.Controls.Add(xformLbl);
+            int bx = UiTheme.S(10) + UiLayout.MeasureText(xformLbl.Text, UiTheme.Bold) + UiTheme.S(12);
+            string[] modeNames = { "Advisor", "P", "T", "S", "X" };
+            for (int m = 0; m < modeNames.Length; m++)
+            {
+                int wm = Measure(modeNames[m]);
+                _boostXform[m] = MkBoostTransformToggle(modeNames[m], bx, UiTheme.S(6), wm, m);
+                bx += wm + UiTheme.S(6);
+            }
+            // Its OWN line, full content width: beside the five buttons this label had ~90px left and
+            // FitInto clipped it to "forced...". The TRANSFORMS column is too narrow to hold a label
+            // and a five-button strip on one row, and the no-ellipsis rule outranks the compact row.
+            _boostXformNote = new Label
+            {
+                Location = new Point(UiTheme.S(10), UiTheme.S(6) + UiTheme.SCtl(24) + UiTheme.S(4)),
+                AutoSize = false,
+                Width = _xformContent.Width - UiTheme.S(20),
+                Height = UiTheme.TextH,
+                Font = UiTheme.Ui,
+                ForeColor = UiTheme.Muted,
+                BackColor = UiTheme.Ground
+            };
+            _xformContent.Controls.Add(_boostXformNote);
+            _xformTop = _boostXformNote.Bottom + UiTheme.S(12);
+
             int wClimb = Measure("Climb");
             int wKeep = Measure("Keep Max");
             // Filter swaps text; size to the longer so it never moves or clips.
@@ -515,6 +556,27 @@ namespace NGUAdvisor
             };
             _xformContent.Controls.Add(_xformNote2);
             UiLayout.FitOrGrow(_xformNote2, "Keep Max + Climb keeps one maxed copy; extras climb. Filter drops lower-tier loot.");
+        }
+
+        private Button MkBoostTransformToggle(string text, int x, int y, int w, int mode)
+        {
+            var b = new Button
+            {
+                Text = text,
+                Location = new Point(x, y),
+                Size = new Size(w, UiTheme.SCtl(24)),
+                Font = UiTheme.Ui,
+                FlatStyle = FlatStyle.Flat
+            };
+            b.FlatAppearance.BorderColor = UiTheme.Border;
+            b.Click += (s, e) =>
+            {
+                if (Settings == null) return;
+                Settings.BoostTransformMode = mode;
+                RefreshChains();
+            };
+            _xformContent.Controls.Add(b);
+            return b;
         }
 
         private Button MkChainToggle(string text, int x, int w, int idx, Func<int[]> get, Action<int[]> set)
@@ -829,7 +891,12 @@ namespace NGUAdvisor
             try
             {
                 if (Main.Character == null || Settings == null) return;
-                int y = UiTheme.S(6);
+
+                RefreshBoostTransform();
+
+                // The note may have grown to two lines, so the chains start below its REAL bottom.
+                _xformTop = Math.Max(_xformTop, _boostXformNote.Bottom + UiTheme.S(12));
+                int y = _xformTop;
                 {
                     for (int i = 0; i < _chains.Count; i++)
                     {
@@ -865,7 +932,7 @@ namespace NGUAdvisor
                         y += UiTheme.S(54);
                     }
                 }
-                _xformEmpty.Visible = y == UiTheme.S(6);
+                _xformEmpty.Visible = y == _xformTop;
                 _xformNote1.Top = Math.Max(y + UiTheme.S(8), UiTheme.S(60));
                 // Both notes may have grown to two lines, so chain off their real bottoms.
                 _xformNote2.Top = _xformNote1.Bottom + UiTheme.S(2);
@@ -875,6 +942,31 @@ namespace NGUAdvisor
                 _xformPage.Height = _xformContent.Height;
             }
             catch (Exception ex) { LogDebug($"Chain status: {ex.Message}"); }
+        }
+
+        // The strip mirrors Settings, and the note says what the setting resolves to right now: in
+        // Advisor mode that is a live answer, and without it the user cannot tell which type is
+        // actually being written into the game.
+        private void RefreshBoostTransform()
+        {
+            int mode = Settings.BoostTransformMode;
+            for (int m = 0; m < _boostXform.Length; m++)
+                StyleOnOff(_boostXform[m], m == mode);
+
+            bool unlocked = Main.Character.challenges.levelChallenge10k.curCompletions
+                >= Main.Character.allChallenges.level100Challenge.maxCompletions;
+            if (!unlocked)
+            {
+                UiLayout.FitOrGrow(_boostXformNote, "Locked until the 100-level challenge is fully completed.");
+                return;
+            }
+
+            int type = mode == 0
+                ? TransformManager.AdvisedType(Main.Character)
+                : mode == 4 ? BoostSinks.TypeNone : mode;
+            UiLayout.FitOrGrow(_boostXformNote, mode == 0
+                ? $"Advisor picks {BoostSinks.TypeName(type)} — most boost value delivered right now."
+                : $"Forced to {BoostSinks.TypeName(type)}; the advisor will not change it.");
         }
 
         private static void StyleOnOff(Button b, bool on)

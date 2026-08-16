@@ -94,6 +94,8 @@ namespace NGUAdvisor
 
         // Same rule for the state dump: StateExport reads live Character/scene objects for every
         // section, so the LOGS button requests and Update() runs it.
+        private float _lastUnloadCheck;
+
         private static volatile bool _stateExportPending;
         public static void RequestStateExport() => _stateExportPending = true;
 
@@ -296,6 +298,15 @@ namespace NGUAdvisor
                     Log($"Created default settings");
                 }
 
+                // WinForms swallows an unhandled exception in a UI handler by tearing the window down,
+                // and Mono's driver leaves NOTHING behind — the advisor keeps running, the window is
+                // simply gone, and the log has no trace of why (user-reported 2026-08-14: "spadlo UI,
+                // jinak to funguje", with a clean log). These two handlers are the only way that
+                // failure ever gets a stack trace.
+                // Fully qualified: bare `Application` here is UnityEngine's.
+                System.Windows.Forms.Application.ThreadException += (s, e) => LogDebug($"UI THREAD EXCEPTION: {e.Exception}");
+                AppDomain.CurrentDomain.UnhandledException += (s, e) => LogDebug($"UNHANDLED EXCEPTION: {e.ExceptionObject}");
+
                 settingsForm = new SettingsForm();
 
                 Settings.SetSaveDisabled(true);
@@ -399,6 +410,20 @@ namespace NGUAdvisor
 
         public void Update()
         {
+            // Operator-requested unload, polled here because the Unity thread is the ONLY place the
+            // teardown may run (see Loader.UnloadRequestPath — two crashes taught this). Once a second:
+            // File.Exists on a missing file is cheap, but not 60x a second cheap.
+            if (Time.realtimeSinceStartup - _lastUnloadCheck >= 1f)
+            {
+                _lastUnloadCheck = Time.realtimeSinceStartup;
+                if (Loader.UnloadRequested())
+                {
+                    Log("Unload requested from disk — shutting down");
+                    Loader.Unload();
+                    return;
+                }
+            }
+
             // Drain deferred file-watcher work on the main thread (see the watcher handlers). Doing this
             // off-thread previously crashed the game (e.g. digger menu UI refresh from a background thread).
             if (_reloadSettingsPending)
@@ -1055,7 +1080,10 @@ namespace NGUAdvisor
                 // Before the AutoBuy block, which can return early.
                 AdvisorApply.Tick();
 
-                if (Settings.AutoBuyEM || Settings.AutoBuyAdventure)
+                // EXP on energy/magic/R3 is ExpBalancer's job alone now (AdvisorApply, "EXP buys"): the
+                // custom-amount path that used to live here bought with amounts ExpBalancer itself
+                // writes, and its toggle did not gate the advisor — see BasicSettingsPanel.
+                if (Settings.AutoBuyAdventure)
                 {
                     // We haven't unlocked custom purchases yet (a PERMANENT unlock — does NOT re-lock on
                     // Evil, so gate on all-time highestBoss, not the difficulty-local boss).
@@ -1064,39 +1092,10 @@ namespace NGUAdvisor
 
                     long total = 0;
 
-                    var buyEnergy = false;
-                    var buyR3 = false;
-                    var buyMagic = false;
-
                     var buyPower = false;
                     var buyToughness = false;
                     var buyHP = false;
                     var buyRegen = false;
-
-                    var ePurchase = Character.energyPurchases;
-                    var mPurchase = Character.magicPurchases;
-                    var r3Purchase = Character.res3Purchases;
-
-                    if (Settings.AutoBuyEM)
-                    {
-                        var energy = ePurchase.customAllCost() > 0;
-                        var r3 = Character.res3.res3On && r3Purchase.customAllCost() > 0;
-                        // magic RESOURCE is permanent (only Augs/AT/TM/Blood re-lock on Evil) — highestBoss.
-                        var magic = Character.highestBoss >= 37 && mPurchase.customAllCost() > 0;
-
-                        if (energy)
-                            total += ePurchase.customAllCost();
-
-                        if (magic)
-                            total += mPurchase.customAllCost();
-
-                        if (r3)
-                            total += r3Purchase.customAllCost();
-
-                        buyEnergy = energy;
-                        buyR3 = r3;
-                        buyMagic = magic;
-                    }
 
                     var aPurchase = Character.adventurePurchases;
                     long power = aPurchase.customPowerCost(Character.settings.customPowerInput);
@@ -1125,15 +1124,6 @@ namespace NGUAdvisor
                         if (numPurchases > 0)
                         {
                             var t = string.Empty;
-                            if (buyEnergy)
-                                t += "/exp";
-
-                            if (buyMagic)
-                                t += "/magic";
-
-                            if (buyR3)
-                                t += "/res3";
-
                             if (buyPower)
                                 t += "/power";
 
@@ -1151,15 +1141,6 @@ namespace NGUAdvisor
                             Log($"Buying {numPurchases} {t} purchases");
                             for (var i = 0; i < numPurchases; i++)
                             {
-                                if (buyEnergy)
-                                    ePurchase.CallMethod("buyCustomAll");
-
-                                if (buyMagic)
-                                    mPurchase.CallMethod("buyCustomAll");
-
-                                if (buyR3)
-                                    r3Purchase.CallMethod("buyCustomAll");
-
                                 if (buyPower)
                                     aPurchase.CallMethod("buyCustomPower");
 

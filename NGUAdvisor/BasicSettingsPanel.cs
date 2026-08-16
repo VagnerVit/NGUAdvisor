@@ -170,7 +170,12 @@ namespace NGUAdvisor
                 Mk("AutoConvertBoosts", "Convert Boosts", () => Settings.AutoConvertBoosts, v => Settings.AutoConvertBoosts = v),
                 Mk("AutoTitanGold", "Titan Gold", () => Settings.AutoTitanGold, v => Settings.AutoTitanGold = v),
                 Mk("UpgradeDiggers", "Digger Upgrades", () => Settings.UpgradeDiggers, v => Settings.UpgradeDiggers = v),
-                Mk("AutoBuyEM", "Buy E/M (EXP)", () => Settings.AutoBuyEM, v => Settings.AutoBuyEM = v),
+                // "Buy E/M (EXP)" is GONE (2026-08-14). It bought custom energy/magic/R3 with EXP using
+                // the amounts set in the game's own UI — amounts that ExpBalancer.WriteCustomPlan
+                // overwrites, so the two EXP spenders were one deciding for the other. Worse, turning
+                // this off did NOT stop the advisor's own EXP buys, so a user saving for a digger
+                // watched EXP drain anyway. ONE control now: the ADVISOR toggle on the EXP row
+                // (Actions panel / AdvisorExpBuys).
                 Mk("AutoBuyAdventure", "Buy Adventure (EXP)", () => Settings.AutoBuyAdventure, v => Settings.AutoBuyAdventure = v),
                 Mk("Autosave", "Daily Save", () => Settings.Autosave, v => Settings.Autosave = v),
                 Mk("AutoBuyConsumables", "Buy Consumables", () => Settings.AutoBuyConsumables, v => Settings.AutoBuyConsumables = v),

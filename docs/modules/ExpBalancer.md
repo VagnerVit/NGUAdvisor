@@ -31,7 +31,12 @@ EXP purchase planner: walks purchased E/M power/cap/bars toward the guide's rati
 - Not auto-detected: the pre-T7 "energy only once you can BB Normal NGU Ygg/EXP" window, the
   ch.6+ R3 phases, and the T9 absolute targets (3M/1M power etc. — a different model entirely).
 - A phase change makes `WriteCustomPlan` zero the boxes a phase doesn't want (e.g. the magic
-  custom-purchase boxes in ch.1-2), which also switches `Main`'s `AutoBuyEM` path off for them.
+  custom-purchase boxes in ch.1-2). It used to switch `Main`'s `AutoBuyEM` path off for them too —
+  that path is **gone** (2026-08-14): it spent EXP with the amounts this class writes, so the two
+  were one deciding for the other, and its "Buy E/M (EXP)" checkbox did not gate this class at all
+  (user-reported: EXP kept draining while they banked for a digger). `Settings.AdvisorExpBuys` — the
+  ADVISOR toggle on the EXP row — is the only control over EXP spent on energy/magic/R3 now. Off
+  means EXP banks.
 
 ## Walk-toward-ratio model (replaces "catch the runaway leader")
 

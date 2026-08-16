@@ -100,5 +100,99 @@ namespace NGUAdvisor.Managers
 
             return (power + toughness + special) / 3.0;
         }
+
+        // Game's autoTransform values: 0 none, 1 power, 2 toughness, 3 special.
+        public const int TypeNone = 0;
+        public const int TypePower = 1;
+        public const int TypeToughness = 2;
+        public const int TypeSpecial = 3;
+
+        // Which boost type is worth the most right now, for the game's auto-transform setting.
+        //
+        // Priced at the TOP tier on purpose: a boost small enough to fit inside every channel's
+        // headroom delivers its full value whatever its type, so lower tiers answer "they are all
+        // equal" and the choice would be arbitrary. Only the tiers that overflow expose which sink
+        // still has room -- and overflow is destroyed, so that is exactly the loss the transform
+        // exists to avoid.
+        //
+        // TypeNone comes back only when nothing can absorb a boost at all: the cube is a soft sink
+        // that never fully saturates, so as long as it is usable, Power or Toughness beats None.
+        // Delivered value of one TOP-tier boost per type: [power, toughness, special].
+        public static double[] TypeScores(Sinks s)
+        {
+            if (s == null) return new double[3];
+            int tier = BoostValueMath.Ladder.Length;
+
+            return new[]
+            {
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.PowerGearHeadroom,
+                        s.CubePowerRaw, s.CubePowerSoftcap, s.CubeUsable)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.ToughnessGearHeadroom,
+                        s.CubeToughnessRaw, s.CubeToughnessSoftcap, s.CubeUsable)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.SpecialGearHeadroom, 0.0, 0.0, false)),
+            };
+        }
+
+        // Same three numbers with the cube EXCLUDED — what the gear alone can absorb.
+        public static double[] GearScores(Sinks s)
+        {
+            if (s == null) return new double[3];
+            int tier = BoostValueMath.Ladder.Length;
+            return new[]
+            {
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.PowerGearHeadroom, 0.0, 0.0, false)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.ToughnessGearHeadroom, 0.0, 0.0, false)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.SpecialGearHeadroom, 0.0, 0.0, false)),
+            };
+        }
+
+        // GEAR DECIDES THE TYPE; the cube only breaks a tie.
+        //
+        // Not TypeScores' argmax, and the reason is the whole point of this method: the cube is a soft
+        // sink that accepts Power and Toughness EQUALLY, so below its softcap every boost "delivers"
+        // its full value whatever it is — which flattens the three types into a tie and hands the
+        // decision to whichever branch happens to be tested first. Live case (2026-08-14): gear
+        // headroom P=18700, T=0, S=564, cube far under cap → scores P=T=18888, and the advisor sat on
+        // Toughness, the one type the gear could not use at all.
+        //
+        // The cube cannot tell P from T, so it must not be what picks between them. Gear can — and
+        // Special exists ONLY in gear (the cube has no special channel), so pricing it against a cube
+        // that eats everything guarantees it never wins.
+        public static int BestType(Sinks s)
+        {
+            double[] gear = GearScores(s);
+            double best = Math.Max(gear[0], Math.Max(gear[1], gear[2]));
+            if (best > 0.0)
+            {
+                if (best == gear[2]) return TypeSpecial;
+                if (best == gear[0]) return TypePower;
+                return TypeToughness;
+            }
+
+            // Gear is saturated: the cube is the only sink left, and it takes just P and T.
+            if (s == null || !s.CubeUsable) return TypeNone;
+            double top = BoostValueMath.ValueOfTier(BoostValueMath.Ladder.Length);
+            double cubePower = BoostValueMath.CubeGain(s.CubePowerRaw, s.CubePowerSoftcap, top);
+            double cubeToughness = BoostValueMath.CubeGain(s.CubeToughnessRaw, s.CubeToughnessSoftcap, top);
+            if (cubePower <= 0.0 && cubeToughness <= 0.0) return TypeNone;
+            return cubeToughness > cubePower ? TypeToughness : TypePower;
+        }
+
+        public static string TypeName(int type)
+        {
+            switch (type)
+            {
+                case TypePower: return "Power";
+                case TypeToughness: return "Toughness";
+                case TypeSpecial: return "Special";
+                default: return "None";
+            }
+        }
     }
 }

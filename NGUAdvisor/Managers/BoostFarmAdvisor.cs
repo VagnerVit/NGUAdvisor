@@ -270,6 +270,98 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor: {e.Message}"); return v; }
         }
 
+        // What is dropping HERE, and how far the level-100 copy of it is.
+        //
+        // Game truth for the "how far" half (decomp):
+        //   - a dropped boost arrives at level 0 (Equipment ctor; ItemNameDesc only adds
+        //     bonusLootLevels() to items whose level is already > 0, so boosts never get it)
+        //   - merging is `level = level + other.level + 1`, capped at 100 (Equipment.mergeItem)
+        //   => one copy is worth `level + 1` drops, and level 100 costs 101 DROPS of that exact id.
+        //   - reaching 100 calls markItemAsMaxxed (InventoryController.checkItemTransform), and
+        //     mergeable() then refuses that id forever: each id can be maxed exactly once.
+        //
+        // The id is decided by the auto-transform type, because every boost drop is rerolled into it
+        // (ItemNameDesc, all four loot paths) — ids 1-13 Power, 14-26 Toughness, 27-39 Special.
+        public class DropInfo
+        {
+            public bool Known;
+            public int Zone;
+            public int Id;
+            public int Tier;
+            public int Type;              // BoostSinks.TypePower/Toughness/Special
+            public double DropsPerSecond;
+            public int HaveDrops;         // sum of (level + 1) over owned copies
+            public const int NeedDrops = 101;
+            public bool Maxxed;
+        }
+
+        // `zone` = -1 for wherever the character currently is; pass 1000 to ask about ITOPOD explicitly.
+        public static DropInfo DropHere(int zone = -1)
+        {
+            DropInfo d = new DropInfo();
+            try
+            {
+                Character c = Main.Character;
+                if (c == null) return d;
+
+                int type = TransformManager.EffectiveBoostType(c);
+                if (type == BoostSinks.TypeNone) return d;   // nothing is being rerolled into a type
+
+                int mode = Main.Settings?.CombatMode ?? 0;
+                d.Zone = zone < 0 ? c.adventure.zone : zone;
+
+                // The highest tier the zone rolls: that is the copy worth counting toward a max, and
+                // the lower roll of a two-roll zone is a different id entirely.
+                double dropsPerSecond = 0.0;
+                int tier = 0;
+                if (d.Zone == 1000)
+                {
+                    ItopodFarmAdvisor.Rates r = ItopodFarmAdvisor.ForMode(Main.Settings?.ITOPODCombatMode == 0 ? 0 : 3);
+                    if (!r.Known) return d;
+                    tier = ItopodRewards.BoostLadderIndex(ItopodRewards.Tier(r.DefaultFloor));
+                    dropsPerSecond = ItopodRewards.BoostDropChance * r.KillsPerSecond;
+                }
+                else
+                {
+                    ZoneBoost z = null;
+                    foreach (ZoneBoost row in Table)
+                        if (row.Zone == d.Zone) { z = row; break; }
+                    if (z == null) return d;
+
+                    double dc = c.lootFactor();
+                    double factor = z.Rooted ? Math.Pow(dc, 1.0 / 3.0) : dc;
+                    ZoneCadence.Estimate est = ZoneCadence.For(d.Zone, mode);
+                    if (!est.Known) return d;
+
+                    foreach (double[] roll in z.Rolls)
+                    {
+                        int t = BoostValueMath.TierOfValue(roll[0]);
+                        if (t < tier) continue;
+                        double cap = roll.Length > 2 ? roll[2] : 1.0;
+                        tier = t;
+                        dropsPerSecond = BoostValueMath.RollProbability(roll[1], factor, cap) * est.NormalKillsPerSecond;
+                    }
+                }
+
+                if (tier < 1) return d;
+                d.Tier = tier;
+                d.Type = type;
+                d.Id = tier + (type - 1) * 13;
+                d.DropsPerSecond = dropsPerSecond;
+
+                var maxxed = c.inventory.itemList.itemMaxxed;
+                d.Maxxed = d.Id < maxxed.Count && maxxed[d.Id];
+
+                foreach (Equipment e in c.inventory.inventory)
+                    if (e != null && e.id == d.Id)
+                        d.HaveDrops += e.level + 1;
+
+                d.Known = true;
+            }
+            catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor.DropHere: {e.Message}"); }
+            return d;
+        }
+
         public static string ModeName(int mode)
         {
             switch (mode)

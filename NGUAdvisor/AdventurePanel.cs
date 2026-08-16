@@ -42,11 +42,14 @@ namespace NGUAdvisor
 
         // ITOPOD view
         private Button _targetItopod;
-        private Button _autoPush;
+        private ComboBox _itopodFloor;
+        private NumericUpDown _itopodTargetFloor;
         private Button _itopodBeast;
         private ComboBox _itopodOptimize;
         private ComboBox _itopodCombat;
         private Label _floorInfo;
+        private Label _zoneDropLine;
+        private Label _itopodDropLine;
 
         // BLACKLIST view
         private ListBox _blackList;
@@ -296,6 +299,16 @@ namespace NGUAdvisor
             _gearLine.Location = new Point(UiTheme.S(10), y);
             y += UiTheme.LinePitch * 2 + UiTheme.S(4);
 
+            // Which boost id this spot actually drops, and how far its level-100 copy is. It belongs
+            // beside the farm decision, not beside the transform toggles: the answer changes with the
+            // ZONE, and the transform type is only what the drop is rerolled into.
+            _zoneDropLine = MkLbl("");
+            _zoneDropLine.AutoSize = false;
+            _zoneDropLine.Size = new Size(page.Width - UiTheme.S(20), UiTheme.TextH);
+            page.Controls.Add(_zoneDropLine);
+            _zoneDropLine.Location = new Point(UiTheme.S(10), y);
+            y += UiTheme.LinePitch * 2 + UiTheme.S(4);
+
             var chead = MkHead("COMBAT STYLE");
             page.Controls.Add(chead);
             chead.Location = new Point(UiTheme.S(10), y);
@@ -347,11 +360,37 @@ namespace NGUAdvisor
             y += UiTheme.HeadPitch;
 
             _targetItopod = MkToggle("Target ITOPOD", () => Settings.AdventureTargetITOPOD = !Settings.AdventureTargetITOPOD);
-            _autoPush = MkToggle("Auto-Push", () => Settings.ITOPODAutoPush = !Settings.ITOPODAutoPush);
             _itopodBeast = MkToggle("Beast Mode", () => Settings.ITOPODBeastMode = !Settings.ITOPODBeastMode);
-            foreach (Control c in new Control[] { _targetItopod, _autoPush, _itopodBeast })
+            foreach (Control c in new Control[] { _targetItopod, _itopodBeast })
                 page.Controls.Add(c);
-            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _targetItopod, _autoPush, _itopodBeast) + UiTheme.S(14);
+            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _targetItopod, _itopodBeast) + UiTheme.S(14);
+
+            // Floor mode replaces the old Auto-Push checkbox: pushing is what "Max" means, and a fixed
+            // target pushes too — up to the target, not past it. ITOPODAutoPush stays the underlying
+            // permission flag so a death during a push can revoke it without losing the chosen mode.
+            var floorLbl = MkLbl("Floor");
+            _itopodFloor = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            UiTheme.StyleCombo(_itopodFloor);
+            _itopodFloor.Items.AddRange(new object[] { "Optimal", "Fixed", "Max" });
+            _itopodFloor.SelectedIndexChanged += (s, e) =>
+            {
+                if (_syncing || Settings == null) return;
+                Settings.ITOPODFloorMode = _itopodFloor.SelectedIndex;
+                Settings.ITOPODAutoPush = _itopodFloor.SelectedIndex != 0;
+                _itopodTargetFloor.Enabled = _itopodFloor.SelectedIndex == 1;
+            };
+            _itopodTargetFloor = new NumericUpDown
+            {
+                Width = UiTheme.S(82),
+                Minimum = 1,
+                Maximum = ItopodConstants.MaxFloor,
+                Font = UiTheme.Ui,
+            };
+            UiTheme.StyleNum(_itopodTargetFloor);
+            _itopodTargetFloor.ValueChanged += (s, e) => { if (!_syncing && Settings != null) Settings.ITOPODTargetFloor = (int)_itopodTargetFloor.Value; };
+            foreach (Control c in new Control[] { floorLbl, _itopodFloor, _itopodTargetFloor })
+                page.Controls.Add(c);
+            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), floorLbl, _itopodFloor, _itopodTargetFloor) + UiTheme.S(14);
 
             var optLbl = MkLbl("Optimize");
             _itopodOptimize = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
@@ -378,6 +417,14 @@ namespace NGUAdvisor
             _floorInfo = MkLbl("");
             page.Controls.Add(_floorInfo);
             _floorInfo.Location = new Point(UiTheme.S(10), y);
+            y += UiTheme.LinePitch * 2;
+
+            _itopodDropLine = MkLbl("");
+            _itopodDropLine.AutoSize = false;
+            _itopodDropLine.Size = new Size(page.Width - UiTheme.S(20), UiTheme.TextH);
+            page.Controls.Add(_itopodDropLine);
+            _itopodDropLine.Location = new Point(UiTheme.S(10), y);
+            page.Height = Math.Max(page.Height, _itopodDropLine.Bottom + UiTheme.S(8));
             return page;
         }
 
@@ -517,7 +564,10 @@ namespace NGUAdvisor
                 if (cm >= 0 && cm < _combatMode.Items.Count) _combatMode.SelectedIndex = cm;
 
                 StyleOnOff(_targetItopod, Settings.AdventureTargetITOPOD);
-                StyleOnOff(_autoPush, Settings.ITOPODAutoPush);
+                int fm = Settings.ITOPODFloorMode;
+                if (fm >= 0 && fm < _itopodFloor.Items.Count) _itopodFloor.SelectedIndex = fm;
+                _itopodTargetFloor.Value = Math.Min(Math.Max(1, Settings.ITOPODTargetFloor), ItopodConstants.MaxFloor);
+                _itopodTargetFloor.Enabled = fm == 1;
                 StyleOnOff(_itopodBeast, Settings.ITOPODBeastMode);
                 int om = Settings.ITOPODOptimizeMode;
                 if (om >= 0 && om < _itopodOptimize.Items.Count) _itopodOptimize.SelectedIndex = om;
@@ -553,8 +603,31 @@ namespace NGUAdvisor
 
                 var g = GearFarmAdvisor.Analyze();
                 UiLayout.FitOrGrow(_gearLine, g.Known ? g.Text : "", 2);
+
+                UiLayout.FitOrGrow(_zoneDropLine, DropLine(BoostFarmAdvisor.DropHere()), 2);
             }
             catch (Exception ex) { LogDebug($"Boost advice: {ex.Message}"); }
+        }
+
+        // "What drops here, and how far the level-100 copy is." 101 drops: a boost lands at level 0 and
+        // a merge is level+level+1 capped at 100, so each copy holds `level + 1` drops
+        // (BoostFarmAdvisor.DropHere carries the decomp provenance).
+        private static string DropLine(BoostFarmAdvisor.DropInfo d)
+        {
+            if (!d.Known)
+                return "Boost drop: none here, or auto transform is set to None.";
+            string name = Main.ItemNameNice(d.Id);
+            if (d.Maxxed)
+                return $"Boost drop: {name} — already maxed; the game blocks further merges of it.";
+
+            int left = Math.Max(0, BoostFarmAdvisor.DropInfo.NeedDrops - d.HaveDrops);
+            if (left == 0)
+                return $"Boost drop: {name} — you hold enough drops for level 100; merge them.";
+            // Duration() takes HOURS.
+            string eta = d.DropsPerSecond > 0
+                ? $"~{NumberFormatter.Duration(left / d.DropsPerSecond / 3600.0)} left"
+                : "not dropping at this rate";
+            return $"Boost drop: {name} · {d.HaveDrops}/{BoostFarmAdvisor.DropInfo.NeedDrops} drops toward level 100 · {eta} (padlock a copy to keep it)";
         }
 
         private void RefreshFloorInfo()
@@ -584,6 +657,11 @@ namespace NGUAdvisor
                 // with and wrapped every line into "Optimal / idle f...". FitOrGrow is for labels that
                 // own a fixed width; an AutoSize label grows on its own, including across the \n.
                 _floorInfo.Text = text;
+
+                // Always ITOPOD, never "wherever you stand": this page answers for the pod, and its
+                // boost tier comes from the floor rather than a zone drop table.
+                UiLayout.FitOrGrow(_itopodDropLine, DropLine(BoostFarmAdvisor.DropHere(1000)), 2);
+                _itopodDropLine.Top = _floorInfo.Bottom + UiTheme.S(6);
             }
             catch (Exception ex) { LogDebug($"Floor info: {ex.Message}"); }
         }

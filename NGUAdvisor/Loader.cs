@@ -42,6 +42,38 @@ namespace NGUAdvisor
             WriteMarker();
         }
 
+        // EXTERNAL UNLOAD IS A FILE, NOT A METHOD CALL. Both ways of asking SharpMonoInjector to do it
+        // killed the running game on 2026-08-13:
+        //
+        //   eject -m Unload         runs Unity + WinForms teardown (CancelInvoke, Form.Close,
+        //                           Object.Destroy) on the INJECTOR's thread — the main-thread rule in
+        //                           CLAUDE.md is not advisory. The game died minutes later, silently.
+        //   eject -m RequestUnload  returns immediately, and `eject` then UNLOADS THE ASSEMBLY out from
+        //                           under a MonoBehaviour that is still executing it. Instant crash.
+        //
+        // `eject` fundamentally requires a synchronous teardown, and a safe teardown fundamentally
+        // cannot be synchronous from outside. So nothing external calls into the assembly at all: the
+        // operator drops a file, Main.Update() notices it on the Unity thread, and the advisor unloads
+        // itself. The file is deleted as the acknowledgement, so a waiting script can watch it vanish.
+        public static string UnloadRequestPath() => Path.Combine(
+            Path.Combine(Environment.ExpandEnvironmentVariables("%userprofile%/AppData/LocalLow"), "NGUAdvisor"),
+            "unload.request");
+
+        public static bool UnloadRequested()
+        {
+            try
+            {
+                if (!File.Exists(UnloadRequestPath())) return false;
+                File.Delete(UnloadRequestPath());
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("NGUAdvisor: could not read the unload request: " + e.Message);
+                return false;
+            }
+        }
+
         public static void Unload()
         {
             DeleteMarker();

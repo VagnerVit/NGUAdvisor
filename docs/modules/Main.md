@@ -4,6 +4,21 @@
 creates a `GameObject`, adds the `Main` MonoBehaviour, and marks it `DontDestroyOnLoad`.
 `Loader.Unload()` calls `Main.Unload()` then destroys it.
 
+## Unloading from outside: a FILE, never a method call
+
+`Update()` polls `%LocalLow\NGUAdvisor\unload.request` once a second, deletes it as the
+acknowledgement, and runs `Loader.Unload()`. That indirection is not fussiness — both direct routes
+killed a live game on 2026-08-13:
+
+| Attempt | Failure |
+|---|---|
+| `smi.exe eject … -m Unload` | Teardown (`CancelInvoke`, `settingsForm.Close()`, `Object.Destroy`) executes on the INJECTOR's thread. Delayed hard crash, nothing in any log. |
+| `smi.exe eject … -m RequestUnload` (flag + drain) | The method returns instantly and `eject` then unloads the assembly out from under the still-running MonoBehaviour. Immediate crash. |
+
+`eject` requires a synchronous teardown; a safe teardown cannot be synchronous from off-thread. There
+is no variant of it that works — see the `deploying-advisor` skill. The same reasoning applies to any
+future external entry point: an outside caller may leave a request, never touch Unity state.
+
 ## Cached statics — the documented invariant
 
 `Main.Character` and `Main.InventoryController` are `static readonly`, resolved once. NGU keeps ONE

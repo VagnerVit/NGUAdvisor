@@ -1462,7 +1462,6 @@ namespace NGUAdvisor
                 AutoFightBosses.Enabled = !newSettings.MoneyPitRunMode;
                 AutoFightBosses.Checked = newSettings.AutoFight;
                 AutoBuyAdv.Checked = newSettings.AutoBuyAdventure;
-                AutoBuyEM.Checked = newSettings.AutoBuyEM;
                 AutoBuyConsumables.Checked = newSettings.AutoBuyConsumables;
                 ConsumeIfRunning.Checked = newSettings.ConsumeIfAlreadyRunning;
                 Autosave.Checked = newSettings.Autosave;
@@ -2217,12 +2216,6 @@ namespace NGUAdvisor
                 Settings.BloodMacGuffinBThreshold = val;
         }
 
-        private void AutoBuyEM_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_initializing) return;
-            Settings.AutoBuyEM = AutoBuyEM.Checked;
-        }
-
         private void IdleMinor_CheckedChanged(object sender, EventArgs e)
         {
             if (_initializing) return;
@@ -2465,6 +2458,10 @@ namespace NGUAdvisor
         {
             if (_initializing) return;
             Settings.ITOPODAutoPush = ITOPODAutoPush.Checked;
+            // The Adventure panel expresses the same decision as a floor mode. Keep them one truth:
+            // a fixed target already pushes on its own, so only Optimal <-> Max flip here.
+            if (Settings.ITOPODFloorMode != 1)
+                Settings.ITOPODFloorMode = ITOPODAutoPush.Checked ? 2 : 0;
         }
 
         private void DisableOverlay_CheckedChanged(object sender, EventArgs e)

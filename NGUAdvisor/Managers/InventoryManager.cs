@@ -445,6 +445,16 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // WHAT THIS NO LONGER DOES: pick the boost auto-transform type.
+        //
+        // It used to own that setting outright — locked boost wins, else BoostPriority against the gear's
+        // actual need, else CubePriority — through the game's own `_ic.selectAuto*Transform()` setters.
+        // Nothing named it, which is how a second owner went unnoticed until TransformManager started
+        // writing `settings.autoTransform` too and the two fought every ~30 s (user-reported: "T jumps for
+        // a moment, then P overrides it"). ONE owner now: TransformManager.ApplyBoostTransform, which
+        // carries the locked-boost rule over and answers to the user's explicit P/T/S/X choice.
+        //
+        // What remains here is the part that is genuinely about conversion, not about the type.
         public static void ManageBoostConversion(ih[] boostSlots)
         {
             if (_character.challenges.levelChallenge10k.curCompletions < _character.allChallenges.level100Challenge.maxCompletions)
@@ -453,92 +463,14 @@ namespace NGUAdvisor.Managers
             if (!Settings.AutoConvertBoosts)
                 return;
 
-            // MATERIALIZED, not a lazy Where: the three reads below (Any, the level-100 unlock, the min-id
-            // scan) each re-ran GetConvertedInventory over the whole inventory, allocating an ih plus an
-            // item-name lookup per occupied slot every time — three full passes for one decision.
+            // MATERIALIZED, not a lazy Where: re-running GetConvertedInventory allocated an ih plus an
+            // item-name lookup per occupied slot every time.
             List<ih> lockedBoosts = Inventory.GetConvertedInventory().Where(x => x.id < 40 && x.locked).ToList();
-            // If we have a boost locked, we want to stay on that until its maxxed
-            if (lockedBoosts.Count > 0)
-            {
-                // Unlock level 100 boosts
-                foreach (var maxLockedBoost in lockedBoosts)
-                    if (maxLockedBoost.level == 100)
-                        Inventory.inventory[maxLockedBoost.slot].removable = true;
 
-                int? minId = null;
-                foreach (var b in lockedBoosts)
-                    if (b.level != 100 && (minId == null || b.id < minId.Value))
-                        minId = b.id;
-
-                if (minId <= 13)
-                    _ic.selectAutoPowerTransform();
-                else if (minId <= 26)
-                    _ic.selectAutoToughTransform();
-                else if (minId <= 39)
-                    _ic.selectAutoSpecialTransform();
-                else
-                    return;
-            }
-
-            var needed = new BoostsNeeded();
-
-            foreach (var item in boostSlots)
-                needed += item.equipment.GetNeededBoosts();
-
-            string[] boostPriorities = Settings.BoostPriority.Length > 0 ? Settings.BoostPriority : new string[] { "Power", "Toughness", "Special" };
-
-            foreach (var boostPriority in boostPriorities)
-            {
-                switch (boostPriority)
-                {
-                    case "Power":
-                        if (needed.power > 0)
-                        {
-                            _ic.selectAutoPowerTransform();
-                            return;
-                        }
-                        break;
-                    case "Toughness":
-                        if (needed.toughness > 0)
-                        {
-                            _ic.selectAutoToughTransform();
-                            return;
-                        }
-                        break;
-                    case "Special":
-                        if (needed.special > 0)
-                        {
-                            _ic.selectAutoSpecialTransform();
-                            return;
-                        }
-                        break;
-                }
-            }
-
-            switch (Settings.CubePriority)
-            {
-                case 0:
-                    _ic.selectAutoNoneTransform();
-                    return;
-                case 1:
-                    if (Inventory.cubePower > Inventory.cubeToughness)
-                        _ic.selectAutoToughTransform();
-                    else
-                        _ic.selectAutoPowerTransform();
-                    return;
-                case 2:
-                    if (Inventory.cubePower / _ic.cubePowerSoftcap() > Inventory.cubeToughness / _ic.cubeToughnessSoftcap())
-                        _ic.selectAutoToughTransform();
-                    else
-                        _ic.selectAutoPowerTransform();
-                    return;
-                case 3:
-                    _ic.selectAutoPowerTransform();
-                    return;
-                case 4:
-                    _ic.selectAutoToughTransform();
-                    return;
-            }
+            // Unlock level 100 boosts — a maxed padlocked boost has nothing left to gain from being held.
+            foreach (var maxLockedBoost in lockedBoosts)
+                if (maxLockedBoost.level == 100)
+                    Inventory.inventory[maxLockedBoost.slot].removable = true;
         }
 
         public static int MoveFromDaycareToInventory(Inventory inv, int slot)

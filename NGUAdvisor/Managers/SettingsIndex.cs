@@ -228,8 +228,8 @@ namespace NGUAdvisor.Managers
             // what each layer does.
             e.Add(Sys(SystemIds.Boosts, "Boosts", Destinations.Boosts,
                 "Boost priority — and the inventory automation that carries it: merges, filters, convertibles.",
-                "ManageInventory AutoBoostPriority PriorityBoosts BoostBlacklist CubePriority FavoredMacguffin",
-                layers + " advisor active manual mode inventory automation boost priority merge filter convertibles cube macguffin transforms climb keep max"));
+                "ManageInventory AutoBoostPriority PriorityBoosts BoostBlacklist CubePriority FavoredMacguffin BoostTransformMode",
+                layers + " advisor active manual mode inventory automation boost priority merge filter convertibles cube macguffin transforms climb keep max auto transform power toughness special boost type"));
 
             // Indexed for what CombatEnabled actually does (adventure routing), never as though it
             // disabled all combat — titan and quest zones run regardless.
@@ -245,8 +245,8 @@ namespace NGUAdvisor.Managers
             // "routing" would be answering a different question than the one asked.
             e.Add(Sys(SystemIds.Adventure, "Adventure", Destinations.Adventure,
                 "Adventure routing and combat style: the farm zone, ITOPOD, gear hunt, and how it fights. Titan and quest zones run regardless.",
-                "CombatEnabled AdvisorZones SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush AllowZoneFallback SnipeBossOnly BeastMode",
-                layers + " adventure combat combat enabled advisor routes zones manual zone farm zone target itopod gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
+                "CombatEnabled AdvisorZones SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush ITOPODFloorMode ITOPODTargetFloor AllowZoneFallback SnipeBossOnly BeastMode",
+                layers + " adventure combat combat enabled advisor routes zones manual zone farm zone target itopod itopod floor fixed floor target floor push max floor gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
 
             // No synthetic panel-wide decisions boolean, and — corrected in slice 7.5C — not seven
             // decision sources either. A mode's source is `!IsNullOrEmpty(GetObj())`, and LOOT HUNTER and
@@ -335,8 +335,12 @@ namespace NGUAdvisor.Managers
             e.Add(Set("AutoConvertBoosts", "Convert boosts", gAuto, "Convert boosts automatically.", "AutoConvertBoosts", ""));
             e.Add(Set("AutoTitanGold", "Titan gold", gAuto, "Bank titan gold drops.", "AutoTitanGold", ""));
             e.Add(Set("UpgradeDiggers", "Digger upgrades", gAuto, "The tool may buy digger upgrades.", "UpgradeDiggers", "upgrade diggers"));
-            e.Add(Set("AutoBuyEM", "Buy E/M with EXP", gAuto, "Spend EXP on energy and magic.", "AutoBuyEM", "exp energy magic"));
-            e.Add(Set("AutoBuyAdventure", "Buy adventure with EXP", gAuto, "Spend EXP on adventure stats.", "AutoBuyAdventure", "exp power toughness"));
+            // "Buy E/M with EXP" is RETIRED (2026-08-14) — energy/magic/R3 spending is the EXP row's
+            // ADVISOR toggle now. Its search words live on here, on the one EXP control still in this
+            // panel, so a search for "buy e/m" lands on something true instead of nothing.
+            e.Add(Set("AutoBuyAdventure", "Buy adventure with EXP", gAuto,
+                "Spend EXP on adventure stats. Energy, magic and R3 are the advisor's EXP row (Actions panel).",
+                "AutoBuyAdventure", "exp power toughness buy e/m energy magic r3"));
             e.Add(Set("Autosave", "Daily save", gAuto, "Save the game daily for the AP reward.", "Autosave", ""));
             // The third one's BLURB is doing real work: "Consume mid-run" is the only one of the three whose
             // TITLE does not contain the word "consumable", so without it in the text a search for

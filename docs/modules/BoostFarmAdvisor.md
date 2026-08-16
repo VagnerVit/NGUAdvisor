@@ -78,7 +78,31 @@ deliberately stricter than the value model's — `cubePower()` does not hard-cla
 returns `softcap + sqrt(raw − softcap)`, so the value model still credits an over-cap cube with the
 diminishing remainder while the gate calls it done.
 
+## `DropHere(zone)` — which boost id this spot drops, and how far level 100 is
+
+Separate from the rate model: `Analyze()` answers "where should I farm", `DropHere` answers "what is
+landing in my inventory, and how long until it maxes". Game truth, all from the decomp:
+
+| Rule | Source |
+|---|---|
+| a dropped boost arrives at **level 0** | `Equipment` ctor; `ItemNameDesc` adds `bonusLootLevels()` only to items already above level 0, so boosts never get it |
+| merging is `level = level + other.level + 1`, capped at 100 | `Equipment.mergeItem` |
+| ⇒ one copy holds `level + 1` drops, and **level 100 costs 101 drops** of that exact id | the two rules above |
+| reaching 100 marks the id maxed and **merges of it are refused forever** | `checkItemTransform` → `markItemAsMaxxed`; `mergeable()` tests `itemMaxxed[id]` |
+| the id is `tier + (type − 1) × 13` | ids 1-13 Power, 14-26 Toughness, 27-39 Special |
+
+The type comes from `TransformManager.EffectiveBoostType` (the user's forced P/T/S/X or the advisor's
+pick), because every boost drop is rerolled into it before it lands. `zone < 0` means "wherever the
+character is"; pass `1000` for ITOPOD, whose tier comes from the FLOOR (`ItopodRewards`) rather than a
+zone drop table. Drops/second reuses this advisor's own inputs — roll chance × `lootFactor` under the
+per-roll cap × `ZoneCadence` kills/s — so it introduces no second rate model.
+
+Only the HIGHEST tier a zone rolls is reported: a two-roll zone's lower roll is a different id, and it
+is the high one worth counting toward a max.
+
 ## Consumers
 
 `AdvisorApply.ApplyZones` (idle-farm routing between gear farm / boost farm / ITOPOD) and the
-Advisor priorities list (`Verdict.Text`). `BestZone == -1000` means ITOPOD.
+Advisor priorities list (`Verdict.Text`). `BestZone == -1000` means ITOPOD. `DropHere` feeds the
+AdventurePanel ZONES and ITOPOD pages — deliberately NOT the Boosts panel's transform strip: the
+answer changes with the zone, and the transform type is only what the drop is rerolled into.

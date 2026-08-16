@@ -468,9 +468,14 @@ namespace NGUAdvisor.Managers
                     if (optimal < 0) optimal = 0;
                     int reachable = Math.Min(optimal, highest - 1);
                     bool canPushHigher = optimal > highest - 1;
-                    bool managed = Main.Settings != null && Main.Settings.ITOPODOptimizeMode > 0;
+                    // A fixed floor is managed too, but by the USER's number — reporting the solved
+                    // idle-best there would describe a floor the advisor is deliberately not using.
+                    bool fixedFloor = Main.Settings != null && Main.Settings.ITOPODFloorMode == 1;
+                    bool managed = Main.Settings != null && (Main.Settings.ITOPODOptimizeMode > 0 || fixedFloor);
                     int start = c.adventure.itopodStart;
-                    if (managed)
+                    if (fixedFloor)
+                        list.Add(new Rec { System = "ITOPOD", Text = $"Floor fixed at {Main.Settings.ITOPODTargetFloor} (idle-best would be ~{reachable})", Optimal = true });
+                    else if (managed)
                         list.Add(new Rec { System = "ITOPOD", Text = $"Floor auto-optimized (idle-best ~{reachable}{(canPushHigher ? ", can push higher" : "")})", Optimal = true });
                     else if (Math.Abs(start - reachable) >= 10)
                         list.Add(new Rec { System = "ITOPOD", Text = $"Set beacon to ~{reachable} (now {start}){(canPushHigher ? " and push floors" : "")}, or enable ITOPOD optimization", Severity = 1 });

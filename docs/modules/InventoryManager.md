@@ -44,7 +44,13 @@ data.
 - `ManageQuestItems` — quest item handling (they keep dropping past target and flood slots — see
   QuestManager's capstone-hold inventory guard).
 - `ManageConvertibles`, `ManageBoostConversion`, `ShowBoostProgress` — boost conversion + the
-  progress readout (F-key / panel).
+  progress readout (F-key / panel). **`ManageBoostConversion` no longer picks the auto-transform
+  type.** It used to — locked boost, then `BoostPriority` against the gear's need, then `CubePriority`,
+  all through the game's `selectAuto*Transform()` setters — and that made it a second, unnamed owner
+  of `settings.autoTransform`. When `TransformManager` gained the user-facing P/T/S/X control the two
+  fought every ~30 s. The decision moved to `TransformManager.AdvisedType` (TransformManager.md); all
+  that remains here is unlocking maxed padlocked boosts. `BoostPriority` and `CubePriority` no longer
+  influence the transform type — `BoostSinks` prices gear headroom and cube softcap directly.
 - `ManageFavoredMacguffin` / `RestoreMacguffins` — the favored-MacGuffin swap used by
   YggdrasilManager's harvest and blood spells. **`RestoreMacguffins` is self-guarding on
   `_savedMacguffins`** — it no-ops unless a swap is outstanding, which is what makes the harvest
