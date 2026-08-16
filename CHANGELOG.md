@@ -4,6 +4,58 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.30] - 2026-08-16
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+The theme is **one owner per setting**. Two of the fixes below are the same bug wearing different
+clothes: a setting written by two modules that did not know about each other, and a spend allowed by
+two checkboxes neither of which could stop it. Both were only visible live — one as a toggle that
+flickered between types every half minute, the other as EXP draining while the user was banking it.
+
+### Added
+
+- **Auto Transform is now the advisor's (Boosts > Transforms).** The game rerolls every dropped boost
+  into one chosen type; the right type is the one whose sinks still have room, and that moves as gear
+  fills up. Five choices — `Advisor | P | T | S | X` — with the note under the strip always naming
+  the type actually being written into the game, so Advisor mode is never a black box. Hidden behind
+  the same 100-level challenge completion the game hides its own toggles behind.
+- **ITOPOD floor mode (Adventure > ITOPOD): Optimal / Fixed / Max.** "Fixed" holds the floor you type
+  and stops the game's Lazy ITOPOD drifting off it; "Max" is the old Auto-Push. Pushing survives as
+  the underlying permission flag, so a death during a push revokes the climb without discarding the
+  mode you chose — and a fixed target keeps farming the highest floor it reached.
+- **"What drops here, and how far level 100 is"** on the ZONES and ITOPOD pages: the boost id this
+  spot actually drops, drops held against the 101 a level-100 copy costs, and the ETA at the current
+  kill rate. All from the decomp — a boost lands at level 0, a merge is `level + level + 1` capped at
+  100, and the game refuses every merge of an id once it maxes.
+- **Unload without touching the game: drop `unload.request` in the NGUAdvisor data folder.** The
+  advisor notices it on the Unity thread and tears itself down. This exists because both `smi.exe
+  eject` modes killed a live game — teardown on the injector's thread, or the assembly unloaded out
+  from under a still-running MonoBehaviour. An outside caller may leave a request; it may never touch
+  Unity state.
+- **UI crashes now leave a stack trace.** WinForms answers an unhandled exception in a handler by
+  tearing the window down, and Mono's driver logs nothing at all — the advisor kept running with its
+  window simply gone and a clean log (user-reported). Two handlers now catch that.
+
+### Fixed
+
+- **The advisor transformed boosts into the one type the gear could not use.** It priced types against
+  the cube, which accepts Power and Toughness equally, so below the softcap all three tied and the
+  first branch tested won: with gear headroom `P=18700 T=0 S=564` it sat on Toughness. Gear decides
+  the type now; the cube only breaks a tie, since it cannot tell P from T and has no Special channel
+  at all.
+- **Two modules were writing the auto-transform setting.** `InventoryManager.ManageBoostConversion`
+  had owned it silently through the game's own setters, so once the user-facing control landed the
+  two overwrote each other every ~30 s ("T jumps for a moment, then P overrides it"). There is one
+  writer now, and the module doc says so.
+
+### Changed
+
+- **"Buy E/M (EXP)" is gone.** It spent EXP on custom energy/magic/R3 using amounts that
+  `ExpBalancer` itself writes — one spender deciding for the other — and switching it off did not
+  stop the advisor's own EXP buys, so EXP kept draining while the user banked for a digger. The
+  ADVISOR toggle on the EXP row is the single control now; off means EXP banks.
+
 ## [1.2.29] - 2026-08-12
 
 Existing settings and profile files remain compatible with version 1.1.0.
