@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 {
@@ -100,27 +101,29 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         // Deduped per resource AND per verdict — each is a STATE that would otherwise print every pass for
         // the rest of the run; keying on the verdict too means the transition into BB-capped prints at once
         // instead of waiting out the running line's throttle.
-        private static readonly System.Collections.Generic.Dictionary<string, DateTime> _lastDbgLog =
-            new System.Collections.Generic.Dictionary<string, DateTime>();
+        private static readonly Dictionary<string, DateTime> _lastDbgLog = new Dictionary<string, DateTime>();
 
         private void LogWandoosDbg(string what, string verdict, long bb, long added)
         {
             try
             {
                 string key = what + "|" + verdict;
-                if (_lastDbgLog.TryGetValue(key, out var at) && (DateTime.UtcNow - at).TotalSeconds < 300)
+                if (_lastDbgLog.TryGetValue(key, out DateTime at) && (DateTime.UtcNow - at).TotalSeconds < 300)
                     return;
                 _lastDbgLog[key] = DateTime.UtcNow;
-                bool e = Type == ResourceType.Energy;
-                long held = e ? _character.wandoos98.wandoosEnergy : _character.wandoos98.wandoosMagic;
-                long idle = e ? _character.idleEnergy : _character.magic.idleMagic;
+                bool isEnergy = Type == ResourceType.Energy;
+                long held = isEnergy ? _character.wandoos98.wandoosEnergy : _character.wandoos98.wandoosMagic;
+                long idle = isEnergy ? _character.idleEnergy : _character.magic.idleMagic;
                 string tail = verdict == "STOOD DOWN"
                     ? $"released={idle} to the tokens after it"
                     : $"added={added} idleLeft={idle} (bb out of reach — this lane is not capped)";
                 Main.LogDebug($"[WandoosDbg] {what} {verdict} os={_character.wandoos98.os} bb={bb}"
                             + $" held={held} ceiling={MaxAllocation} {tail}");
             }
-            catch { }
+            catch (Exception e)
+            {
+                Main.LogDebug($"[WandoosDbg] failed: {e.Message}");
+            }
         }
     }
 }

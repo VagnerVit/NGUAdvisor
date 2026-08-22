@@ -4,6 +4,44 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.31] - 2026-08-22
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+The theme is **the profile file wins**. Everything below was one report — "equipment and energy
+distribution is not really guided by the profile file, I'm in a challenge and it puts weird equip
+that is not required and energy into NGU" — and it turned out to be three separate layers all
+deciding they knew better than the file they had been handed.
+
+### Fixed
+
+- **A profile's gear is followed inside challenges.** The challenge overlay rotated the loadout
+  between Adventure and NGUs on its own whenever a challenge was active, and outranked the profile
+  while doing it. It now stands down as soon as the active gear breakpoint names anything — an `ID`
+  list, a `Priorities` chain, or an `Objective`. The rotation exists to un-freeze gear a profile says
+  nothing about, not to overrule a profile that does.
+- **A gear `ID` list is no longer discarded for the whole challenge.** The built-in per-challenge
+  default (NORB→Adventure, NOTM→Gold Drops, …) resolves to a NAME, and names are resolved before the
+  manual ID list, so an untagged `ID` breakpoint never reached the character once a challenge
+  started. The default now speaks only for a breakpoint that names no gear at all.
+- **A hand-written priority list is no longer replaced by a built-in template.** In NOAUG/NOTM/NONGU,
+  once a challenge left half the list inactive, the whole list was swapped for a template whose
+  `ALLNGU` lane dumped the cap into NGUs — a system the profile never mentioned. That reshaping is
+  now `AutoProfile`-only: reshaping a generated list is the overlay's job, reshaping yours is not. A
+  list with nothing left alive still falls back, where the alternative is an idle cap.
+- **Wandoos stops taking energy and magic past the bar breakpoint**, where it buys nothing. The
+  game's `addEnergy` only adds and never clamps, so a profile with two Wandoos lanes (`CAPWAN:50`
+  plus a trailing `WAN`) stacked a second bar breakpoint onto an already-satisfied bar and every unit
+  of it was dead. The lane now allocates only the headroom it is missing and releases the rest to the
+  priorities after it. The breakpoint is read from the game, so it is right for Wandoos MEH and XL
+  and for Evil/Sadistic, not just Wandoos 98 on Normal.
+
+### Added
+
+- **`[WandoosDbg]` in `debug.log`** — whether the Wandoos lane ran or stood down, with the bar
+  breakpoint next to what it currently holds, so "how far am I from the cap" has an answer. A
+  BB-capped bar looks identical to a funded one in the game UI.
+
 ## [1.2.30] - 2026-08-16
 
 Existing settings and profile files remain compatible with version 1.1.0.
