@@ -88,6 +88,28 @@ and every Normal character whose cap is below `baseTime / speed`. An uncapped `C
 payoff is the narrowest in the game — Wandoos multiplies **Fight Boss** A/D only (never adventure
 stats, so it cannot help a titan kill) and its dump levels are **wiped at rebirth**.
 
+**Past BB the lane stands down** (user rule 2026-08-22: "když Wandoos bude capped, přesměrovat
+energii jinam"). BB — the bar breakpoint, the allocation at which the bar levels once per tick — is
+read from the GAME (`wandoos98Controller.capAmountEnergy/capAmountMagic()` = `baseTime/speed + 1`),
+never re-derived: `baseEnergyTime()` switches on `difficulty × wandoos98.os`, so a hand-written
+`1e9 / speed` would be right only for Wandoos 98 on Normal and silently wrong for MEH/XL and every
+Evil+ run. `AllocateEnergy/Magic` allocate the HEADROOM to BB (`bb - wandoos98.wandoosEnergy`), not
+BB, because `addEnergy()` only ADDS — the decomp does `wandoosEnergy += min(input, idleEnergy)` with
+no clamp, so a profile carrying TWO Wandoos lanes (`CAPWAN:50` plus a trailing `WAN`, as CBlock1
+does) stacked a second BB onto an already-satisfied bar and every unit of it was dead. Returning
+early IS the redirect: `UpdateMaxAllocation` re-reads the live idle pool per token, so what the lane
+leaves behind is what the tokens after it pick up. `Allocate()` still reports **true** — a BB-capped
+lane has succeeded, and a `false` re-runs the whole pass hunting a fix that does not exist.
+
+`[WandoosDbg]` logs both outcomes (`STOOD DOWN` / `RUNNING`, deduped per resource AND verdict, 5 min)
+— without the RUNNING line an empty log cannot be told apart from a lane that never ran, and
+`bb` vs `held` answers "how far from the cap am I". Measured on the ch.3 Normal NOAUG save this was
+built against: `bb=102 533 204` for BOTH resources (`baseEnergyTime` = `baseMagicTime` = 1e9),
+energy `ceiling=32 535 649` → `held=25 633 353` (= BB/4, i.e. one level per 4 ticks), magic
+`ceiling=3 477 563` → `held=3 417 781` (one level per 30 ticks). So on that save BB is 4x/30x out of
+reach and the stand-down never triggers — the guard is for a cap that has grown into BB, and is one
+more reason the token belongs in a LATE breakpoint rather than a long-run one.
+
 Measured on a ch.3 Normal save (cap 5 571 250, `totalWandoosEnergySpeed` ~3.0, so BB would need
 3.3e8 = 59x cap): `Normal-LRB`'s trailing `WAN` held **62.5 % of the cap for the whole 3 h 55 m run**
 and returned 6 449 levels = 28.4x A/D. Boss requirements in that range grow ~10x per boss
@@ -117,7 +139,14 @@ purpose — those are exactly the Wandoos-is-the-power-source cases.
   `Priorities` chain. `PerformSwap` resolves in this order: explicit `Priorities` → a named
   `GearChain` preset matching `Objective` → a single objective → the `ChallengeDetector.DefaultGear`
   smart default (which yields a NAME, so it flows through the preset lookup too) → the manual ID
-  list. Exposes `ActiveObjective` (priority-0's name — so a chain PRESET's own name is not preserved
+  list. **The smart default is skipped when the breakpoint carries an `ID` list or a `Priorities`
+  chain** — because it resolves to a name, and names outrank the ID list, an untagged `ID`-list
+  breakpoint used to be silently discarded for the whole challenge (user-reported 2026-08-22 on
+  CBlock1: "it puts weird equip that is not required"). Only a breakpoint naming NO gear at all is
+  silent enough for a default to speak for it. Exposes `ProfileOwnsGear` (an `ID` list, a
+  `Priorities` chain, or an `Objective` came from the profile — `ChallengeOverlay` reads it to keep
+  its rotation off a loadout the profile owns; it is deliberately not derived from `ActiveChain`,
+  which after the smart default may be the ADVISOR's chain), `ActiveObjective` (priority-0's name — so a chain PRESET's own name is not preserved
   in it; `GearChain.Describe` names the whole chain) / `ActiveChainSource` / `ActiveForceRespawn` /
   `ActiveChain`, which `AdvisorApply.ApplyGearRefresh` reads. `ActiveChain` is a **copy**
   (`chain.ToList()`) — a static must never alias the live profile structure.
@@ -127,7 +156,7 @@ purpose — those are exactly the Wandoos-is-the-power-source cases.
     the plain objective of that name — a `ChallengeOverlay.GearObjectiveOverride` of "Adventure" was
     silently handed the profile's whole three-step chain. `AdvisorApply` now keys off "is there an
     override at all", never off a name comparison.
-  - **`Reset()` clears every `Active*`** (profile reload / rebirth). The mirror describes a
+  - **`Reset()` clears every `Active*` and `ProfileOwnsGear`** (profile reload / rebirth). The mirror describes a
     breakpoint that is no longer applied, and a stale `ActiveChain` outranks the name the refresh
     resolves for itself.
 

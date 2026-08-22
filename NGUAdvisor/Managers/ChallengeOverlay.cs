@@ -182,6 +182,20 @@ namespace NGUAdvisor.Managers
                 return;
             }
 
+            // The rotation exists to un-freeze gear the profile says NOTHING about. A profile that names
+            // gear for this challenge -- an ID list, a Priorities chain, or an Objective -- outranks it
+            // (user rule: inside challenges, follow the profile file). Gated on !auto because AutoProfile
+            // runs no gear breakpoints at all, so ProfileOwnsGear there can only be a stale leftover.
+            if (!auto && AllocationProfiles.Breakpoints.GearBreakpoints.ProfileOwnsGear)
+            {
+                if (GearObjectiveOverride != null)
+                {
+                    GearObjectiveOverride = null;
+                    Record("GEAR", "gear rotation off", $"{cur}: the profile's own gear breakpoint owns the loadout");
+                }
+                return;
+            }
+
             bool pushing = Phase == "push";
             string want = pushing ? "Adventure" : "NGUs";
             if (want != GearObjectiveOverride)
@@ -292,7 +306,14 @@ namespace NGUAdvisor.Managers
                 // Template takeover when a strip challenge gutted the list (>= half inactive — the
                 // count includes finished-target entries, an acceptable over-trigger since the
                 // template only exists for challenges whose strips are the dominant cause).
-                bool gutted = origCount > 0 && valid.Count * 2 <= origCount;
+                //
+                // AutoProfile ONLY: reshaping a GENERATED list is the overlay's job, reshaping the user's is
+                // not (user-reported: CBlock1 in a strip challenge lost its whole energy list to the
+                // template, whose ALLNGU lane then dumped the cap into NGUs — a system the profile never
+                // named). A hand-written profile keeps its surviving priorities; a list with NOTHING left
+                // alive still falls through to the template/Fallback below, where the alternative is an
+                // idle cap rather than a profile being overruled.
+                bool gutted = Main.Settings.AutoProfile && origCount > 0 && valid.Count * 2 <= origCount;
                 if ((gutted || valid.Count == 0) && Templates.TryGetValue(cur, out var perType)
                     && perType.TryGetValue(type, out var tokens))
                 {

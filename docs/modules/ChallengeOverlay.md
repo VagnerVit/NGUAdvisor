@@ -62,12 +62,29 @@ untouched (allocation walks tokens in order, recomputing idle/prioCount per non-
 
 ## Challenge adaptation
 
+**THE PROFILE FILE WINS INSIDE CHALLENGES** (user rule 2026-08-22, reported as "equipment and energy
+are not guided by the profile file"). The overlay adapts what a profile leaves UNSAID; it does not
+overrule what a profile says. Two gates enforce it, and both are the fix for one report:
+
+- **Gear rotation stands down on `GearBreakpoints.ProfileOwnsGear`** — an `ID` list, a `Priorities`
+  chain, or an `Objective` in the active gear breakpoint. `Tick` clears `GearObjectiveOverride`
+  (narrating it once) instead of rotating Adventure/NGUs, so `ApplyGearRefresh` falls through to the
+  profile. The flag is NOT derivable from `ActiveChain`: after `GearBreakpoints`' smart default folds
+  a challenge objective in, that chain is the ADVISOR's — see AllocationProfiles.md §GearBreakpoints,
+  where the same report also stopped the smart default from outranking an explicit `ID` list.
+- **Template takeover is `AutoProfile`-only** (below).
+
 - **Stripping**: tokens for systems a challenge kills are dropped (BestAug refuses NOAUG,
   TimeMachineBP refuses NOTM, NGUBP dies with the disabled NGU button).
 - **Re-weighting templates** (`Templates`): stripping alone leaves SURVIVORS holding the dead
   systems' shares (a 70 %-NGU profile in NONGU floods basic training), so per-challenge templates
   re-weight the remaining priorities. `_fallbackOn`/`_templateOn` narrate each injection ONCE per
-  state change, not per tick.
+  state change, not per tick. **The `gutted` (≥ half inactive) trigger requires `AutoProfile`** —
+  reshaping a GENERATED list is the overlay's job, reshaping a hand-written one is not: CBlock1's
+  6-token energy list was replaced wholesale by the strip template, whose `ALLNGU` lane then dumped
+  the cap into NGUs, a system that profile never named. A manual profile keeps its surviving
+  priorities; only `valid.Count == 0` still falls through to the template/`Fallback`, where the
+  alternative is an idle cap rather than a profile being overruled.
 - **LSC**: `SetLscAugTargets`/`RestoreLscAugTargets` inject sword-first aug targets; the target
   comes from the CONTROLLER's `laserSwordTarget()`, never
   `challenges.laserSwordChallenge.curCompletions + 2` (that field is the normal-difficulty

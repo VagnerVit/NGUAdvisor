@@ -43,7 +43,10 @@ not a framework:
   explicitly so the greedy budget levels high-priority diggers first.
 - **Gear refresh** (`ApplyGearRefresh`, throttle 120 s): objective resolution order is
   challenge rotation > GEAR HUNT ("LOOT HUNTER") > `ChallengeOverlay.GearObjectiveOverride` >
-  profile's `GearBreakpoints.ActiveChainSource ?? ActiveObjective`. The hunt must be checked FIRST
+  profile's `GearBreakpoints.ActiveChainSource ?? ActiveObjective`. **The challenge rotation only
+  ever reaches this list when the profile named no gear for the challenge** — `ChallengeOverlay.Tick`
+  suppresses its own override on `GearBreakpoints.ProfileOwnsGear` (see ChallengeOverlay.md), so the
+  precedence here never has to arbitrate profile-vs-rotation. The hunt must be checked FIRST
   outside challenges — the override is set whenever AutoProfile runs, so `override ?? hunt` never
   fell through (user-reported). The profile's `ActiveChain` is used **iff no override is in play**,
   which is a flag and deliberately NOT a name comparison: `ActiveObjective` is a chain's lead

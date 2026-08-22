@@ -91,6 +91,13 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
         // profile's whole three-step chain. AdvisorApply matches on this instead.
         public static string ActiveChainSource { get; private set; }
 
+        // True when the last-applied breakpoint carried gear the USER wrote down (an ID list or a Priorities
+        // chain), as opposed to a name a smart default resolved for it. ChallengeOverlay reads it to stay off
+        // the loadout: its rotation exists to un-freeze gear a profile says nothing about, not to overrule a
+        // profile that does. NOT derivable from ActiveChain -- after the smart default folds a challenge
+        // objective in, that chain is the ADVISOR's, and ActiveChainSource is null for an explicit chain too.
+        public static bool ProfileOwnsGear { get; private set; }
+
         // Profile reload / rebirth: the Active* mirror describes a breakpoint that is no longer applied, and
         // a stale ActiveChain outranks the name AdvisorApply resolves for itself.
         public override void Reset()
@@ -100,6 +107,7 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
             ActiveChainSource = null;
             ActiveObjective = null;
             ActiveForceRespawn = false;
+            ProfileOwnsGear = false;
         }
 
         protected override bool PerformSwap(Breakpoint bp)
@@ -110,9 +118,19 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
             string objectiveName = bp.priorities.Objective;
             bool forceRespawn = bp.priorities.ForceRespawn;
 
+            // An ID list or a Priorities chain in the profile IS challenge-specific gear the user wrote
+            // down; only a breakpoint that carries NEITHER is silent enough for a default to speak for it
+            // (user-reported: CBlock1's ID list never reached the character inside a challenge, because the
+            // smart default resolved to a NAME and names outrank the ID list below).
+            bool explicitProfileGear = (bp.priorities.Priorities != null && bp.priorities.Priorities.Count > 0)
+                                    || (bp.priorities.Ids != null && bp.priorities.Ids.Length > 0);
+            // An Objective the profile named counts as the user's gear too, but it does NOT gate the smart
+            // default below (that gate already tests objectiveName, which still holds the profile's name here).
+            bool profileOwnsGear = explicitProfileGear || !string.IsNullOrEmpty(objectiveName);
+
             // Smart default: if this breakpoint has no explicit objective and isn't itself challenge-tagged,
             // but a challenge is active, optimize for the built-in objective for that challenge (if any).
-            if (string.IsNullOrEmpty(objectiveName) && string.IsNullOrEmpty(bp.challenge))
+            if (string.IsNullOrEmpty(objectiveName) && string.IsNullOrEmpty(bp.challenge) && !explicitProfileGear)
             {
                 var ch = Managers.ChallengeDetector.Current();
                 if (ch != null)
@@ -151,6 +169,7 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 ActiveChainSource = chainSource;
                 ActiveObjective = chain[0].Objective.Name;
                 ActiveForceRespawn = forceRespawn;
+                ProfileOwnsGear = profileOwnsGear;
             }
             else
             {
@@ -159,6 +178,7 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 ActiveChainSource = null;
                 ActiveObjective = null;
                 ActiveForceRespawn = false;
+                ProfileOwnsGear = profileOwnsGear;
             }
 
             current = bp;
