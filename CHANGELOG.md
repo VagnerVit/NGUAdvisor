@@ -4,22 +4,13 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
-## [1.2.33] - 2026-08-26
+## [1.3.0] - 2026-08-26
 
 Existing settings and profile files remain compatible with version 1.1.0.
 
-### Fixed
-
-- **The never-boost list now also stops the advisor farming and transforming for those items.** User-
-  caught the moment 1.2.32 shipped: blacklisting an item kept it out of the boost pass, but the value
-  model behind the auto-transform pick counted equipped gear independently of the priority list. So a
-  blacklisted item wanting Special kept the advisor making Special boosts with nowhere to put them, kept
-  boost drops priced as if they had a home, and kept the boost-farming demand gate reporting
-  "equipped <item> needs boosts". All three now skip blacklisted items.
-
-## [1.2.32] - 2026-08-26
-
-Existing settings and profile files remain compatible with version 1.1.0.
+Supersedes 1.2.32 and 1.2.33, which shipped this feature and its fix separately the same day. Nothing
+is added or removed here — the two entries are merged, because half a "never boost" list is not a
+feature. Install this instead of either.
 
 ### Added
 
@@ -30,6 +21,11 @@ Existing settings and profile files remain compatible with version 1.1.0.
   back. Pick items with the same inventory picker the priority list uses; the two lists are mutually
   exclusive, so blacklisting an item removes it from the priority list and vice versa. It gates
   boosting only — merges still answer to the transform-chain toggles.
+- **Blacklisted items also stop steering the advisor's boost decisions.** Not boosting an item was only
+  half the answer: the value model behind the auto-transform pick counted equipped gear independently
+  of the priority list, so a blacklisted item wanting Special kept the advisor making Special boosts
+  with nowhere to put them, kept boost drops priced as if they had a home, and kept the boost-farming
+  demand gate reporting "equipped <item> needs boosts". All three now skip blacklisted items.
 
 ## [1.2.31] - 2026-08-22
 
