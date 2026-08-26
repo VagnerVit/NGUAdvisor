@@ -104,6 +104,12 @@ namespace NGUAdvisor.Managers
         // Main.Start seeds the two implicit groups into the list ONCE (BoostSeed) so this is not a silent
         // behavior change; from then on the list is exactly what gets boosted, in its own order.
         //
+        // THE BLACKLIST IS BACK (user request, 2026-08-26) and this is its hard gate. Removing an item
+        // from the list is NOT enough in ADVISOR ACTIVE mode: AdvisorApply.ApplyBoostPriority rewrites
+        // PriorityBoosts from InventoryAdvisor.AutoBoostPriority every 10 minutes, so a manual removal
+        // comes back on its own. The advisor filters the blacklist out of what it writes; this gate is
+        // what makes the answer "never" regardless of how an id reached the list.
+        //
         // `ci` is unused now and kept only because callers pass their existing snapshot.
         public static ih[] GetBoostSlots(ih[] ci)
         {
@@ -115,6 +121,7 @@ namespace NGUAdvisor.Managers
             {
                 ih f = LoadoutManager.FindItemSlot(id);
                 if (f?.equipment.isEquipment() != true) continue;
+                if (BoostBlacklisted(id)) continue;
                 // Transform protection is NOT part of the retired blacklist: a maxed chain copy the user
                 // holds back must never be boosted, because applying a boost runs the game's
                 // checkItemTransform and would trigger the transformation.
@@ -696,21 +703,25 @@ namespace NGUAdvisor.Managers
         #endregion
 
         #region Lambda
-        // Quest-item and MacGuffin-merge exclusion only (ManageQuestItems, MergeGuffs) — the boost path
-        // calls TransformManager.Frozen directly now. Settings.BoostBlacklist survives as a persisted
-        // field so settings.json round-trips and an older-DLL rollback still finds the data.
+        // Quest-item and MacGuffin-merge exclusion (ManageQuestItems, MergeGuffs) plus the boost gate in
+        // GetBoostSlots — the boost path also calls TransformManager.Frozen directly for chain protection.
         private static bool IsBlacklisted(ih x) => Settings.BoostBlacklist.Contains(x.id) || TransformManager.Frozen(x);
 
         private static bool IsBlacklisted(int id) => Settings.BoostBlacklist.Contains(id);
+
+        // The blacklist's one public reader: InventoryAdvisor.AutoBoostPriority filters it out of the
+        // order it writes, so the panel never shows a row that GetBoostSlots is going to skip.
+        public static bool BoostBlacklisted(int id) => Settings?.BoostBlacklist != null && IsBlacklisted(id);
 
         // Frozen = transform-chain protection (TransformManager): a maxed chain item whose transform the
         // user is holding back (Keep max lvl, or Auto-climb off) must not be boosted or merged — both
         // paths run the game's checkItemTransform and would trigger the transformation.
         //
-        // The boost blacklist that used to live here is RETIRED (spec 2026-07-28): boosting is driven by
-        // the priority list alone, and merging is governed by the chain toggles that actually govern it.
-        // Its second job — blocking merges — had already needed an exception carved out of it (blacklisted
-        // Sir Lootys at lv 0/5/77 never merged), which is what a rule serving two purposes looks like.
+        // Frozen and the blacklist are DIFFERENT LEVERS and both survive: Frozen is the advisor protecting
+        // a transform chain, the blacklist is the user saying "never this item". Merging stays governed by
+        // the chain toggles that actually govern it, NOT by the blacklist — that second job is what had
+        // needed an exception carved out of it (blacklisted Sir Lootys at lv 0/5/77 never merged), which is
+        // what a rule serving two purposes looks like. Do not wire the blacklist back into merging.
         private static bool MergeBlocked(ih x)
         {
             var chain = TransformManager.MergeAllowed(x.id);

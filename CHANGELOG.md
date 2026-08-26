@@ -4,6 +4,20 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.32] - 2026-08-26
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Added
+
+- **A "never boost" list is back on the Boosts page.** Removing an item from the priority list only
+  keeps it out while boosting is in MANUAL MODE — with ADVISOR ACTIVE the advisor recomputes the list
+  every 10 minutes and the item comes straight back. The NEVER BOOST list under both views is the
+  answer: an item on it is skipped whatever the priority list says, and the advisor stops putting it
+  back. Pick items with the same inventory picker the priority list uses; the two lists are mutually
+  exclusive, so blacklisting an item removes it from the priority list and vice versa. It gates
+  boosting only — merges still answer to the transform-chain toggles.
+
 ## [1.2.31] - 2026-08-22
 
 Existing settings and profile files remain compatible with version 1.1.0.

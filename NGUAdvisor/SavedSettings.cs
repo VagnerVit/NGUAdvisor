@@ -992,10 +992,12 @@ namespace NGUAdvisor
             }
         }
 
-        // RETIRED as of the 2026-07-28 boosts change: nothing reads this any more (the priority list is the
-        // only boost source, and merges answer to the transform-chain toggles). The field is KEPT so
-        // settings.json round-trips unchanged and a rollback to an older DLL still finds the user's data.
-        // See docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md §3.
+        // "Never boost these ids". Retired by the 2026-07-28 boosts change, RESTORED 2026-08-26 on user
+        // request — and now a boost-only lever: read by InventoryManager.GetBoostSlots (the hard gate) and
+        // InventoryAdvisor.AutoBoostPriority (so the advisor stops writing blacklisted ids back into
+        // PriorityBoosts every 10 minutes). It no longer blocks merges; the transform-chain toggles own
+        // that. Mutually exclusive with PriorityBoosts — BoostsPanel keeps an id out of both lists.
+        // See docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md §3 and its 2026-08-26 addendum.
         public int[] BoostBlacklist
         {
             get => _boostBlacklist;

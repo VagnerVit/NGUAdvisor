@@ -14,25 +14,41 @@ filtering. Operates on `ih[]` inventory-helper snapshots (`GetConvertedInventory
 | `IsMaxxed` | `itemList.itemMaxxed[id]` |
 | `IsLocked` | `!inventory[slot].removable` |
 
-## Boost targets: the priority list, and nothing else
+## Boost targets: the priority list, minus the blacklist
 
 `GetBoostSlots` returns exactly `Settings.PriorityBoosts`, in list order, filtered to equipment that
-still needs boosts and is not `TransformManager.Frozen`. It used to also include every equipped item
-and every locked inventory item implicitly — see
+still needs boosts, is not `TransformManager.Frozen`, and is not on `Settings.BoostBlacklist`. It used
+to also include every equipped item and every locked inventory item implicitly — see
 `docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md` for why that went away and how existing
 lists were seeded.
 
-**Merge exclusions are chain rules only.** `MergeBlocked`/`MergeBlockedId` consult
-`TransformManager.MergeAllowed` + `Frozen`; non-chain items always merge. The retired boost blacklist
-used to serve here too, which is why it once needed an exception carved out of it (blacklisted Sir
-Lootys at lv 0/5/77 never merged).
+### The blacklist (retired 2026-07-28, restored 2026-08-26 on user request)
 
-`IsBlacklisted` itself is not dead: quest-item merging (`ManageQuestItems`) and MacGuffin merging
-(`MergeGuffs`, two call sites) still consult `Settings.BoostBlacklist` — those were deliberately left
-alone. `Main.SeedBoostPriorityOnce()` empties the blacklist during its one-time migration (and logs
-what it contained) so nobody is left with an invisible active blacklist; `SavedSettings.BoostBlacklist`
-stays a persisted field so `settings.json` round-trips and a rollback to an older DLL still finds the
-data.
+**Two readers, and both are needed.** `GetBoostSlots` is the hard gate — an id on the blacklist is
+never boosted, whatever put it in the priority list. `InventoryAdvisor.AutoBoostPriority` filters the
+same list out of the order it returns, because in ADVISOR ACTIVE mode
+`AdvisorApply.ApplyBoostPriority` rewrites `PriorityBoosts` from it every 10 minutes: without that
+filter, removing an item by hand comes back on its own — the user-reported reason the blacklist was
+brought back at all. `InventoryManager.BoostBlacklisted(int)` is the public reader for both.
+
+**It is boost-only. Do not wire it back into merging.** `MergeBlocked`/`MergeBlockedId` consult
+`TransformManager.MergeAllowed` + `Frozen`; non-chain items always merge. Serving merges too is what
+once forced an exception out of it (blacklisted Sir Lootys at lv 0/5/77 never merged). `IsBlacklisted`
+is also still read by quest-item merging (`ManageQuestItems`) and MacGuffin merging (`MergeGuffs`, two
+call sites) — deliberately left alone through both the retirement and the restore.
+
+**`Frozen` is a different lever.** Frozen is the advisor protecting a transform chain (applying a boost
+runs the game's `checkItemTransform`); the blacklist is the user saying "never this item". Both gate
+`GetBoostSlots`, neither replaces the other.
+
+**Mutually exclusive with the priority list.** `BoostsPanel` keeps an id out of both: blacklisting it
+drops it from `PriorityBoosts`, re-adding it to `PriorityBoosts` drops it from the blacklist. Not
+cosmetic — `BoostSinks`/`BoostFarmAdvisor` price the priority list without consulting the gate, so an
+id on both lists would make their boost-value estimate wrong.
+
+**`Main.SeedBoostPriorityOnce()` must not clear it.** It did during the retirement migration; that
+code is gone. The seed is deferred until the inventory is populated, so it can still run for the first
+time long after the restore, and clearing would delete a live setting.
 
 ## Main passes
 

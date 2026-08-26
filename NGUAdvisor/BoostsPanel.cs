@@ -18,11 +18,15 @@ namespace NGUAdvisor
     // TRANSFORMS: one row per chain — live tier/level state + Auto-climb / Keep max lvl / Filter lower.
     //
     // Layout pre-flight: everything below the top row is derived from measured rows, not tuned pixels —
-    // priority list ListH(14), two button rows at SCtl(24), a hint line, the live readout ListH(4), then
-    // the Apply-order row. The page grows to its content inside the scrolling host (one scroll owner per
-    // screen), so no fixed height may be reintroduced here.
-    // BLACKLIST REMOVED 2026-07-28: the priority list is the only boost source; merges answer to the
-    // transform-chain toggles. Spec: docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md
+    // priority list ListH(14), two button rows at SCtl(24), a hint line, the live readout ListH(4), the
+    // Apply-order row, then the blacklist panel (ListH(4) + one button row) placed under whichever view
+    // is showing. The page grows to its content inside the scrolling host (one scroll owner per screen),
+    // so no fixed height may be reintroduced here.
+    // BLACKLIST: removed 2026-07-28 (spec docs/superpowers/specs/2026-07-28-boosts-panel-ux-design.md
+    // §3), RESTORED 2026-08-26 on user request. It is a "never boost this" list, no longer a merge lever
+    // (merges answer to the transform-chain toggles). It sits in its OWN section below the two exclusive
+    // views, visible in both, because in ADVISOR ACTIVE the advisor rewrites the priority list every 10
+    // minutes and the blacklist is then the only way to keep an item out of it.
     public class BoostsPanel : Panel
     {
         private Button _segBoost;
@@ -43,6 +47,9 @@ namespace NGUAdvisor
         private Panel _manualView;
         private ListBox _readout;
         private ListBox _prio;
+        private Panel _blackView;
+        private ListBox _black;
+        private readonly List<int> _blackIds = new List<int>();
         private ListBox _manualReadout;
         private ComboBox _order;
         // The ids currently rendered in _prio, parallel to its Items, so a selection can be restored by
@@ -277,7 +284,7 @@ namespace NGUAdvisor
             _boostPage.Controls.Add(_advisorView);
             _advisorView.Controls.Add(new Label
             {
-                Text = "BOOST ORDER (advisor-written; blacklist advisor-managed)",
+                Text = "BOOST ORDER (advisor-written; the blacklist below still wins)",
                 Location = new Point(UiTheme.S(10), 0),
                 AutoSize = true,
                 Font = UiTheme.ColHeader,
@@ -297,8 +304,8 @@ namespace NGUAdvisor
                 BackColor = UiTheme.Ground
             });
 
-            // MANUAL view: the editable priority list IS the boost list (spec 2026-07-28 — the blacklist is
-            // retired and equipped/locked are no longer boosted implicitly), plus a live readout of what
+            // MANUAL view: the editable priority list IS the boost list (spec 2026-07-28 — equipped/locked
+            // are no longer boosted implicitly), minus the blacklist below it, plus a live readout of what
             // will actually be boosted, filled by the same GetBoostSlots the automation uses so the panel
             // cannot disagree with behavior.
             _manualView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
@@ -306,7 +313,9 @@ namespace NGUAdvisor
 
             // ROWS, NOT OFFSETS (see the note this replaced): the lists are asked for a row count so the
             // usable space is what is specified, and a running cursor keeps everything below them honest.
-            // The blacklist's rows went to the priority list, which is why it is 14 now.
+            // The priority list keeps the 14 rows it took over in 2026-07-28. The restored blacklist did
+            // NOT take them back: it is its own panel below both views, and the page grows to its
+            // content inside the scrolling host, so nothing here has to shrink to make room.
             const int PrioRows = 14, ReadoutRows = 4;
             int listW = _pw - UiTheme.S(30);
             int y = 0;
@@ -383,9 +392,42 @@ namespace NGUAdvisor
             advisorBottom += UiTheme.S(8);
             if (_advisorView.Height < advisorBottom) _advisorView.Height = advisorBottom;
 
-            // The page hosts whichever of the two views is showing, so it must fit the TALLER one.
-            int pageBottom = Math.Max(_manualView.Bottom, _advisorView.Bottom);
-            if (_boostPage.Height < pageBottom) _boostPage.Height = pageBottom;
+            // BLACKLIST: its own section, OUTSIDE the two exclusive views because it applies to both. Its
+            // Top is not placed here — the view above it is either the tall manual card or the short
+            // advisor one, so PositionBlacklist() moves it whenever the mode flips (SyncFromSettings).
+            _blackView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(10)), BackColor = UiTheme.Ground };
+            _boostPage.Controls.Add(_blackView);
+
+            int by = 0;
+            _blackView.Controls.Add(new Label { Text = "NEVER BOOST (skipped in both modes, whatever the list says)", Location = new Point(UiTheme.S(10), by), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            by += UiTheme.HeadPitch;
+            _black = new ListBox { Location = new Point(UiTheme.S(10), by), Size = new Size(listW, UiTheme.ListH(4)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
+            UiTheme.StyleList(_black);
+            _blackView.Controls.Add(_black);
+            by = _black.Bottom + UiTheme.S(8);
+
+            int wBlackAdd = MeasureBtn("Add from inventory"), wBlackRem = MeasureBtn("Remove");
+            bx = UiTheme.S(10);
+            _blackView.Controls.Add(MkBtn("Add from inventory", bx, by, wBlackAdd, AddToBlacklist)); bx += wBlackAdd + UiTheme.S(6);
+            _blackView.Controls.Add(MkBtn("Remove", bx, by, wBlackRem, RemoveFromBlacklist));
+
+            int blackBottom = 0;
+            foreach (Control c in _blackView.Controls) blackBottom = Math.Max(blackBottom, c.Bottom);
+            _blackView.Height = blackBottom + UiTheme.S(8);
+
+            PositionBlacklist();
+        }
+
+        // The blacklist rides under whichever view is showing, and the page has to fit that sum — the two
+        // views differ in height by more than the blacklist is tall, so a single tuned Top would either
+        // overlap the manual card or leave a hole under the advisor one.
+        private void PositionBlacklist()
+        {
+            if (_blackView == null) return;
+            int above = (Settings != null && Settings.AutoBoostPriority ? _advisorView : _manualView).Bottom;
+            _blackView.Top = above + UiTheme.S(6);
+            int pageBottom = _blackView.Bottom + UiTheme.S(4);
+            if (_boostPage.Height != pageBottom) _boostPage.Height = pageBottom;
         }
 
         private static readonly string[][] OrderPerms =
@@ -617,9 +659,49 @@ namespace NGUAdvisor
             List<int> cur = (Settings.PriorityBoosts ?? new int[0]).ToList();
             foreach (int id in picked)
                 if (id > 0 && !cur.Contains(id)) cur.Add(id);
+            // THE TWO LISTS ARE MUTUALLY EXCLUSIVE. Putting an item back on the priority list is the
+            // user un-saying "never boost this", and leaving it on both would show a row that
+            // GetBoostSlots then skips — plus BoostSinks/BoostFarmAdvisor price the priority list
+            // without consulting the gate, so an id on both lists makes their value estimate a lie.
+            Settings.BoostBlacklist = (Settings.BoostBlacklist ?? new int[0]).Where(id => !picked.Contains(id)).ToArray();
             Settings.PriorityBoosts = cur.ToArray();
             SyncFromSettings();
             Activity.Completed($"Added {picked.Length} item(s) to priority boosts");
+        }
+
+        private void AddToBlacklist()
+        {
+            if (Settings == null) return;
+            int[] picked = BoostPickerForm.Pick(FindForm(), Settings.BoostBlacklist ?? new int[0],
+                "Never boost these items", needsOnly: false);
+            if (picked == null || picked.Length == 0) return;
+
+            List<int> cur = (Settings.BoostBlacklist ?? new int[0]).ToList();
+            foreach (int id in picked)
+                if (id > 0 && !cur.Contains(id)) cur.Add(id);
+            // Mutually exclusive, the other way round — see AddFromInventory. In ADVISOR ACTIVE the
+            // advisor would put it back on its next pass anyway; the blacklist filter in
+            // AutoBoostPriority is what makes that stick.
+            Settings.PriorityBoosts = (Settings.PriorityBoosts ?? new int[0]).Where(id => !picked.Contains(id)).ToArray();
+            Settings.BoostBlacklist = cur.ToArray();
+            SyncFromSettings();
+            Activity.Completed($"{picked.Length} item(s) will never be boosted");
+        }
+
+        private void RemoveFromBlacklist()
+        {
+            if (Settings == null) return;
+            int[] indices = _black.SelectedIndices.Cast<int>().ToArray();
+            if (indices.Length == 0) return;
+            List<int> drop = new List<int>();
+            foreach (int idx in indices)
+                if (idx >= 0 && idx < _blackIds.Count) drop.Add(_blackIds[idx]);
+            if (drop.Count == 0) return;
+            // Removed from the blacklist only — NOT added back to the priority list. Boostable again is
+            // not the same as "boost this next", and re-adding would silently reorder the user's list.
+            Settings.BoostBlacklist = (Settings.BoostBlacklist ?? new int[0]).Where(id => !drop.Contains(id)).ToArray();
+            SyncFromSettings();
+            Activity.Completed($"Removed {drop.Count} item(s) from the never-boost list");
         }
 
         private void RemoveSelectedPrio()
@@ -724,6 +806,7 @@ namespace NGUAdvisor
                 // only when this flag is on. Opening or syncing the panel never overwrites a manual list.
                 _advisorView.Visible = auto;
                 _manualView.Visible = !auto;
+                PositionBlacklist();
 
                 int cube = Settings.CubePriority;
                 if (cube >= 0 && cube < _cube.Items.Count) _cube.SelectedIndex = cube;
@@ -773,6 +856,24 @@ namespace NGUAdvisor
 
                 RefreshManualReadout();
 
+                // Same "rebuild only on a real change" rule as the priority list above: this method runs
+                // on every settings write in the app.
+                int[] black = Settings.BoostBlacklist ?? new int[0];
+                if (!SameIds(black, _blackIds))
+                {
+                    _black.BeginUpdate();
+                    try
+                    {
+                        _black.Items.Clear();
+                        _blackIds.Clear();
+                        foreach (int id in black)
+                        {
+                            _black.Items.Add($"{ItemNameNice(id)}  (#{id})");
+                            _blackIds.Add(id);
+                        }
+                    }
+                    finally { _black.EndUpdate(); }
+                }
             }
             finally { _syncing = false; }
             RefreshChains();

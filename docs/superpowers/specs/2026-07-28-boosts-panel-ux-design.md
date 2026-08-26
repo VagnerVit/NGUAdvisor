@@ -1,7 +1,8 @@
 # Boosts panel UX — design
 
 **Date:** 2026-07-28
-**Status:** approved (user, this session)
+**Status:** approved (user, this session) — **§2/§3/§5 blacklist decision REVERSED 2026-08-26, see the
+addendum at the end of this file.**
 **Scope:** `BoostsPanel`, `InventoryManager` boost/merge target selection, `InventoryAdvisor.AutoBoostPriority`,
 `SavedSettings` (two new fields), one new form (`BoostPickerForm`).
 
@@ -218,3 +219,34 @@ Game-coupled paths cannot be unit-tested; verification is explicit and manual:
 Extracting a `BoostPlan` manager (considered as approach B and rejected: it rewrites parts of a
 29 KB file full of invariants to solve a problem that was not reported). The live-preview benefit of B
 is obtained here by having the panel call `GetBoostSlots` directly.
+
+## Addendum 2026-08-26 — the blacklist is back (boost-only)
+
+The premise quoted in Problem — "if an item is removed from priority boosts it won't be boosted" — is
+true in MANUAL MODE and **false in ADVISOR ACTIVE**: §7's `AdvisorApply.ApplyBoostPriority` rewrites
+`Settings.PriorityBoosts` from `InventoryAdvisor.AutoBoostPriority` every 10 minutes, so an item
+removed by hand reappears on its own within 10 minutes. The user hit exactly that and asked for the
+blacklist back.
+
+What changed against this spec:
+
+- **§2/§3:** `GetBoostSlots` gates on `Settings.BoostBlacklist` again (hard gate, both modes), and
+  `AutoBoostPriority` filters it out of the order it returns so the advisor stops writing blacklisted
+  ids back into the list the panel shows.
+- **§5:** the blacklist section returns to `BoostsPanel`, in its own panel below the two exclusive
+  views so it is visible in **both** modes — ADVISOR ACTIVE is where it is the only lever. The picker
+  is `BoostPickerForm` (§5's own contribution), not the old type-an-ID textbox; it takes a title and a
+  "Needs boosts only" default so the blacklist can pick items that need nothing right now.
+- **§6 (merging) stands unchanged.** The blacklist is boost-only now; merging answers to the
+  transform-chain toggles. The Sir Lootys exception argument was against the *dual* purpose, and that
+  is the part that stays retired.
+- **§8 migration:** the "also clears `BoostBlacklist`" step is **removed** from
+  `Main.SeedBoostPriorityOnce()`. The seed defers until the inventory is populated, so it can still run
+  for the first time after this change, and clearing would now delete a live user setting.
+- **§9 layout:** the priority list KEEPS its 14 rows. The design considered 14 → 10 to make room, but
+  the blacklist is its own panel below the views rather than a section inside the manual card, and the
+  page grows to its content inside the scrolling host — so nothing has to shrink. The blacklist panel's
+  `Top` is recomputed on every mode flip (`PositionBlacklist`), because the two views differ in height
+  by more than the blacklist is tall.
+- The two lists are kept mutually exclusive by the panel, because `BoostSinks`/`BoostFarmAdvisor` price
+  `PriorityBoosts` without consulting the gate.

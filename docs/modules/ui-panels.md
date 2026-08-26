@@ -66,7 +66,7 @@ non-scrolling panel has no scrollbar to reach the overflow with.
 | `SpendPanel` | `SpendOverview` — one row per currency, each naming the module that owns the ordering (it owns none itself) |
 | `GoldPanel`, `PitPanel` | gold snipe state, `MoneyPitManager.AdvisorPlan`/`PredictNext` |
 | `YggPanel`, `QuestsPanel`, `BloodPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |
-| `BoostsPanel` + `BoostPickerForm` | `InventoryManager.GetBoostSlots` (live readout), `InventoryAdvisor`, `TransformManager` |
+| `BoostsPanel` + `BoostPickerForm` | `InventoryManager.GetBoostSlots` (live readout), `InventoryAdvisor`, `TransformManager`; the NEVER BOOST panel writes `Settings.BoostBlacklist` and sits outside the two exclusive views (visible in both — see `PositionBlacklist`) |
 | `SystemIndexPanel`, `BasicSettingsPanel` | `SettingsIndex` (+ the search box), `SystemCatalog` |
 | `LogsPanel`, `LogSliver` | `LogTail` / in-memory feeds; the EXPORT STATE chip **requests** a dump (`Main.RequestStateExport`) — see StateExport.md, it must never call the exporter directly |
 | `ProfileEditorForm` + `*EditorPanel` (Resource/Gear/List/Misc/WanDiff) | `ProfileModel` + `ProfileValidator` + `PriorityCatalog` |

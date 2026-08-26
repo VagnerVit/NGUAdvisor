@@ -145,7 +145,11 @@ namespace NGUAdvisor.Managers
                 }
                 catch { }
             }
-            return list.ToArray();
+            // The user's blacklist wins over everything above. Filtered HERE and not in the three passes
+            // because this is the value AdvisorApply writes into Settings.PriorityBoosts every 10 minutes:
+            // an item that GetBoostSlots is going to skip must not be put back into the list the panel
+            // shows, or the panel disagrees with the behavior once every advisor pass.
+            return list.Where(id => !InventoryManager.BoostBlacklisted(id)).ToArray();
         }
     }
 }

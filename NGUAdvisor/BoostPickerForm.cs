@@ -32,11 +32,15 @@ namespace NGUAdvisor
         private List<Row> _shown = new List<Row>();
         private int[] _result = new int[0];
 
-        public static int[] Pick(IWin32Window owner, int[] alreadyInList)
+        // `title` and `needsOnly` exist for the blacklist section, which picks from the same inventory but
+        // for the opposite reason: an item you never want boosted usually still needs boosts, and one that
+        // needs none right now is exactly the kind you want to keep off the list for good.
+        public static int[] Pick(IWin32Window owner, int[] alreadyInList,
+            string title = "Add items to priority boosts", bool needsOnly = true)
         {
             try
             {
-                using (BoostPickerForm f = new BoostPickerForm(alreadyInList))
+                using (BoostPickerForm f = new BoostPickerForm(alreadyInList, title, needsOnly))
                     return f.ShowDialog(owner) == DialogResult.OK ? f._result : new int[0];
             }
             catch (Exception e)
@@ -47,9 +51,9 @@ namespace NGUAdvisor
             }
         }
 
-        private BoostPickerForm(int[] alreadyInList)
+        private BoostPickerForm(int[] alreadyInList, string title, bool needsOnly)
         {
-            Text = "Add items to priority boosts";
+            Text = title;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
@@ -74,7 +78,7 @@ namespace NGUAdvisor
             _needsOnly = new ScaledCheckBox
             {
                 Text = "Needs boosts only",
-                Checked = true,
+                Checked = needsOnly,
                 Location = new Point(_search.Right + UiTheme.S(12), UiTheme.S(10)),
                 AutoSize = true,
                 Font = UiTheme.Ui,

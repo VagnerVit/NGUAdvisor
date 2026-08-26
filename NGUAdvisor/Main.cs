@@ -40,7 +40,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.2.31";
+        public const string Version = "1.2.32";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -750,15 +750,10 @@ namespace NGUAdvisor
                 Settings.PriorityBoosts = Managers.BoostSeed.SeedPriorityBoosts(
                     Settings.PriorityBoosts, equipped.ToArray(), locked.ToArray());
 
-                int[] retiredBlacklist = Settings.BoostBlacklist;
-                if (retiredBlacklist != null && retiredBlacklist.Length > 0)
-                {
-                    string names = string.Join(", ", retiredBlacklist.Select(id => $"{ItemNameNice(id)}  (#{id})"));
-                    Log($"Boost blacklist retired: clearing {retiredBlacklist.Length} entries ({names}) " +
-                        "so quest/MacGuffin merges are no longer blocked by them.");
-                    Settings.BoostBlacklist = new int[0];
-                }
-
+                // THE BLACKLIST IS NOT CLEARED HERE ANY MORE. This used to empty it as part of retiring it
+                // (2026-07-28); it was restored as a boost-only lever on 2026-08-26, so wiping it would
+                // now delete a live user setting on the first launch that gets this far — the seed is
+                // deferred until the inventory is populated, so "already seeded" is not a safe assumption.
                 Settings.BoostSeeded = true;
 
                 Log($"Boost priority seeded once: {before} existing + {equipped.Count} equipped + {locked.Count} locked " +
