@@ -4,6 +4,19 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.33] - 2026-08-26
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **The never-boost list now also stops the advisor farming and transforming for those items.** User-
+  caught the moment 1.2.32 shipped: blacklisting an item kept it out of the boost pass, but the value
+  model behind the auto-transform pick counted equipped gear independently of the priority list. So a
+  blacklisted item wanting Special kept the advisor making Special boosts with nowhere to put them, kept
+  boost drops priced as if they had a home, and kept the boost-farming demand gate reporting
+  "equipped <item> needs boosts". All three now skip blacklisted items.
+
 ## [1.2.32] - 2026-08-26
 
 Existing settings and profile files remain compatible with version 1.1.0.

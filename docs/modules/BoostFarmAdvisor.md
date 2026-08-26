@@ -68,7 +68,9 @@ moves) and assumed one swing per kill at it.
 
 A coarse on/off switch behind the `AdvisorFarmBoost` setting: boosts only pay while something consumes
 them — an Infinity Cube under its softcap, or equipped/priority-listed gear with
-`GetNeededBoosts().Total() > 0`. Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand
+`GetNeededBoosts().Total() > 0` that is **not on `Settings.BoostBlacklist`** (checked inside the local
+`NeedsBoosts`, not in the two loops, because equipped gear is walked independently of the priority
+list — 2026-08-26). Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand
 unknown → keep farming) — the classic always-boost behavior on any read error.
 
 Note this gate is now mostly belt-and-braces: `BoostSinks` prices drops against the same headroom

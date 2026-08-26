@@ -120,8 +120,12 @@ namespace NGUAdvisor.Managers
                 if (c.inventory.cubePower < ic.cubePowerSoftcap()) { why = "cube power under softcap"; return true; }
                 if (c.inventory.cubeToughness < ic.cubeToughnessSoftcap()) { why = "cube toughness under softcap"; return true; }
 
+                // Blacklisted ids are not demand: they never receive a boost, so "it needs boosts" is
+                // not a reason to keep farming them. Checked here rather than in the two loops below
+                // because equipped gear is walked independently of the priority list.
                 bool NeedsBoosts(int id)
                 {
+                    if (InventoryManager.BoostBlacklisted(id)) return false;
                     var slot = LoadoutManager.FindItemSlot(id);
                     return slot != null && slot.equipment.GetNeededBoosts().Total() > 0;
                 }

@@ -32,6 +32,12 @@ namespace NGUAdvisor.Managers
             public double RecycleChance;
         }
 
+        // A SINK IS SOMEWHERE A BOOST CAN ACTUALLY GO. Equipped gear is taken independently of the
+        // priority list on purpose — it is what the character is wearing — but a blacklisted item takes
+        // no boost at all, so counting its headroom is counting a channel that does not exist. That is
+        // not cosmetic: this one set feeds BestType (the auto-transform pick, which would keep making
+        // Special for a blacklisted item that wants Special and has nowhere to put it) AND ValueOfDrop
+        // (the farm-rate price of a boost drop). Both were wrong until 2026-08-26.
         private static IEnumerable<int> TargetIds()
         {
             HashSet<int> ids = new HashSet<int>();
@@ -43,6 +49,7 @@ namespace NGUAdvisor.Managers
             int[] prio = Main.Settings?.PriorityBoosts;
             if (prio != null)
                 foreach (int id in prio) ids.Add(id);
+            ids.RemoveWhere(id => InventoryManager.BoostBlacklisted(id));
             return ids;
         }
 

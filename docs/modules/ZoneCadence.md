@@ -159,6 +159,14 @@ leaning on it to justify a relaxed entry-HP threshold would be backwards).
 
 ## What a boost drop is worth (`BoostSinks`)
 
+**Which items count as sinks (`TargetIds`).** Equipped gear (`LoadoutManager.CurrentGearIds`) plus
+`Settings.PriorityBoosts`, **minus `Settings.BoostBlacklist`**. Equipped gear is taken independently of
+the priority list on purpose, which is why the blacklist has to be subtracted explicitly: a blacklisted
+item receives no boost, so its headroom is a channel that does not exist. Added 2026-08-26 with the
+blacklist restore, and it fixes two things at once — this set feeds both `ValueOfDrop` (the farm-rate
+price of a drop) and `BestType` (TransformManager's auto-transform pick, which otherwise keeps making
+Special for a blacklisted item that wants Special and has nowhere to put it).
+
 A flat "tier value" over-priced high tiers badly. `Equipment.boostEquip` decides the real value:
 
 - **Power / Toughness** land on one gear channel and are then CLAMPED at

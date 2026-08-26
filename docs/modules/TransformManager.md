@@ -97,7 +97,9 @@ unlock, which is about conversion rather than type. Do not reintroduce a second 
 
 Advisor mode is `AdvisedType(c)`: a padlocked UNFINISHED boost wins (ids 1-13 Power, 14-26 Toughness,
 27-39 Special — carried over from `ManageBoostConversion`, on the reasoning that a padlock is the user
-saying "finish this one"), otherwise `BoostSinks.BestType(BoostSinks.Current())`, which prices one
+saying "finish this one"), otherwise `BoostSinks.BestType(BoostSinks.Current())` — whose sink set
+excludes blacklisted items, without which this pick keeps choosing the type a never-boosted item wants
+(see ZoneCadence.md, `TargetIds`) — which prices one
 boost of the TOP tier into each type's sinks and takes the argmax. The top tier is deliberate: a boost that fits inside
 every channel's headroom delivers its full value whatever its type, so lower tiers answer "all equal"
 and the pick would be arbitrary. Only overflow — which the game DESTROYS — reveals which sink still
