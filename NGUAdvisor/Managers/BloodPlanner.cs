@@ -343,15 +343,18 @@ namespace NGUAdvisor.Managers
                 // stays credited until those are funded too.
                 bool goldDemand = OptimizationAdvisor.GoldStarvedForAugs(c, 2.0)
                     || OptimizationAdvisor.GoldStarvedForDiggers(c);
-                if (windowOpen && c.machine.realBaseGold > 0 && goldDemand && GoldBelowKnee(c, bps, out var goldReason))
+                if (windowOpen && SinkWanted(true) && TargetOpen(GoldTarget(), CounterfeitPercentNow(c))
+                    && c.machine.realBaseGold > 0 && goldDemand && GoldBelowKnee(c, bps, out var goldReason))
                 {
                     p.WantGold = true;
-                    p.RouteReason = goldReason + (OptimizationAdvisor.GoldStarvedForAugs(c, 2.0) ? " · augs unfunded" : " · digger upgrades unfunded");
+                    p.RouteReason = goldReason + (OptimizationAdvisor.GoldStarvedForAugs(c, 2.0) ? " · augs unfunded" : " · digger upgrades unfunded")
+                        + TargetSuffix(GoldTarget());
                 }
-                else if (windowOpen && DcBelowZoneRec(c, out var dcReason))
+                else if (windowOpen && SinkWanted(false) && TargetOpen(LootTarget(), SpaghettiPercentNow(c))
+                    && DcBelowZoneRec(c, out var dcReason))
                 {
                     p.WantLoot = true;
-                    p.RouteReason = dcReason;
+                    p.RouteReason = dcReason + TargetSuffix(LootTarget());
                 }
                 else if (numberEligible)
                 {
@@ -456,6 +459,38 @@ namespace NGUAdvisor.Managers
             catch { _bloodMattersCache = true; }   // fail-safe: keep rituals if the state read throws
             return _bloodMattersCache;
         }
+
+        // USER TARGETS (Systems > BLOOD inputs). Neither log sink is capped by the game, so without a
+        // ceiling Counterfeit/Spaghetti would hold the pool for the rest of the run once they win the
+        // routing. The checkbox is a permission and the number is a ceiling; inside what they allow the
+        // advisor's own gates (investment window, gold demand, the knee, zone DC) still decide. These
+        // read the same bonuses as the MANUAL AutoSpellSwap path (Main.cs), so a target means the same
+        // thing in both modes. 0 = no ceiling, matching BloodNumberThreshold's "0 = no floor".
+        public static int CounterfeitPercentNow(Character c)
+        {
+            try { return (int)Math.Round((c.bloodMagicController.goldBonus() - 1) * 100); }
+            catch { return 0; }
+        }
+
+        public static int SpaghettiPercentNow(Character c)
+        {
+            try { return (int)Math.Round((c.bloodMagicController.lootBonus() - 1) * 100); }
+            catch { return 0; }
+        }
+
+        public static bool TargetOpen(int target, int now) => target <= 0 || now < target;
+
+        private static bool SinkWanted(bool gold)
+        {
+            var s = Main.Settings;
+            if (s == null) return true;
+            return gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti;
+        }
+
+        private static int GoldTarget() => Main.Settings != null ? Main.Settings.CounterfeitThreshold : 0;
+        private static int LootTarget() => Main.Settings != null ? Main.Settings.SpaghettiThreshold : 0;
+
+        private static string TargetSuffix(int target) => target > 0 ? $" · to {target}%" : "";
 
         // Counterfeit gold cost-curve knee. Game: +N% GPS needs goldSpellBlood = minGold x 2^(sqrt(N)-1).
         // There is NO game cap (goldBonus = 1 + floor((log2(blood/min)+1)^2)/100 — user-corrected; the

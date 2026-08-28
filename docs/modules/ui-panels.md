@@ -181,3 +181,21 @@ So the standing rules for this window: every container that holds a numeric deri
 was audited the reported issue count was a floor — the ✕/↑/↓ row buttons and the numeric rows exist on
 every tab, so a clipped caption on Energy or Misc had nothing reporting it. The 137 issues that showed
 up in `debug.log` were one tab's worth.
+
+## BloodPanel — the SINKS rows (2026-08-28)
+
+The INPUTS block is split in two. The top half is unchanged (Auto Spell Swap + the three
+on-rebirth toggles + `Guff A/B >=`). Below it, **SINKS** is one row per blood sink:
+
+| column | Spaghetti / Counterfeit | NUMBER |
+|---|---|---|
+| caption | `ScaledCheckBox` = permission (`BloodWantSpaghetti` / `BloodWantCounterfeit`) | plain label — it is the fallback sink, so "off" is not a state |
+| `up to` / `floor` | ceiling in %, 0 = none | floor, 0 = none |
+| status | `now 19% -> 40%` / `target reached` / `no ceiling` / `off` | `now x500M -> floor 100M` / `floor met` |
+
+Geometry is three scaled column constants (`SinkCapX`/`SinkNumX`/`SinkStatX`); the status labels are
+the only per-tick writes and go through `UiLayout.FitInto`.
+
+**Auto Spell Swap is disabled and greyed while `CastBloodSpells` is on**, with `_swapNote` spelling
+out why: Main only runs that path when automation is OFF. It used to sit there lit green, doing
+nothing — the same class of bug as the two dead % fields (see BloodPlanner.md).

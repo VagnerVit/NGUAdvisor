@@ -31,6 +31,8 @@ namespace NGUAdvisor
         private Label _cNum, _cLoot, _cGold;     // route chips: created ONCE, recolored in place (never per-tick churn)
         private NumericUpDown _guffAThr, _guffBThr, _spag, _counter;
         private TextBox _numberThr;
+        private ScaledCheckBox _wantSpag, _wantGold;   // sink PERMISSION; the numeric beside it is the CEILING
+        private Label _spagStat, _goldStat, _numStat, _swapNote;
         private bool _syncing;
 
         public BloodPanel(int canvasW = 0)
@@ -76,6 +78,47 @@ namespace NGUAdvisor
             Controls.Add(n);
             cx += w + UiTheme.S(18);
             return n;
+        }
+
+        // Sink-row geometry: caption | "up to"/"floor" | value | live status.
+        private const int SinkCapX = 226, SinkNumX = 276, SinkStatX = 372;
+
+        private ScaledCheckBox MkWant(string caption, int y, Func<bool> get, Action<bool> set)
+        {
+            var cb = new ScaledCheckBox { Text = caption, AutoSize = true, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y) };
+            cb.CheckedChanged += (s, e) => { if (_syncing || Settings == null) return; set(cb.Checked); RefreshStatus(); };
+            Controls.Add(cb);
+            return cb;
+        }
+
+        private void MkColLabel(string text, int y)
+        {
+            Controls.Add(new Label { Text = text, AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(SinkCapX), y + UiTheme.S(4)) });
+        }
+
+        private NumericUpDown MkSinkNum(int y, int min, int max, Action<decimal> set)
+        {
+            var n = new NumericUpDown { Location = new Point(UiTheme.S(SinkNumX), y), Width = UiTheme.S(80), Minimum = min, Maximum = max, Font = UiTheme.Ui };
+            UiTheme.StyleNum(n);
+            n.ValueChanged += (s, e) => { if (_syncing || Settings == null) return; try { set(n.Value); RefreshStatus(); } catch (Exception ex) { LogDebug($"Blood sink num: {ex.Message}"); } };
+            Controls.Add(n);
+            return n;
+        }
+
+        private Label MkSinkStatus(int y)
+        {
+            var l = new Label
+            {
+                Text = "",
+                AutoSize = false,
+                Size = new Size(Math.Max(UiTheme.S(140), _w - UiTheme.S(SinkStatX) - UiTheme.S(30)), UiTheme.TextH),
+                Font = UiTheme.Ui,
+                ForeColor = UiTheme.Muted,
+                BackColor = UiTheme.Ground,
+                Location = new Point(UiTheme.S(SinkStatX), y + UiTheme.S(4))
+            };
+            Controls.Add(l);
+            return l;
         }
 
         private void Build()
@@ -138,32 +181,64 @@ namespace NGUAdvisor
             _guffBRb = MkToggle("Guff B on Rebirth", () => Settings.BloodMacGuffinBOnRebirth = !Settings.BloodMacGuffinBOnRebirth);
             UiLayout.Row(UiTheme.S(10), top + UiTheme.S(130), UiTheme.S(8), _swap, _pillRb, _guffARb, _guffBRb);
 
+            // Auto Spell Swap runs ONLY in Main's manual path (`AutoSpellSwap && !CastBloodSpells`), so with
+            // automation on it is a dead switch. It used to sit here lit green and doing nothing.
+            _swapNote = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), top + UiTheme.S(164)) };
+            Controls.Add(_swapNote);
+
             // No "Pill ≥" input: IronPillThreshold is dead — the advisor casts the pill on
             // BloodPlanner timing (CastIronNow), nothing reads a manual blood threshold anymore.
             int cx = UiTheme.S(10);
-            _guffAThr = MkNum("Guff A ≥", ref cx, top + UiTheme.S(166), 0, 100000, v => Settings.BloodMacGuffinAThreshold = (int)v);
-            _guffBThr = MkNum("Guff B ≥", ref cx, top + UiTheme.S(166), 0, 100000, v => Settings.BloodMacGuffinBThreshold = (int)v);
+            _guffAThr = MkNum("Guff A ≥", ref cx, top + UiTheme.S(192), 0, 100000, v => Settings.BloodMacGuffinAThreshold = (int)v);
+            _guffBThr = MkNum("Guff B ≥", ref cx, top + UiTheme.S(192), 0, 100000, v => Settings.BloodMacGuffinBThreshold = (int)v);
 
-            cx = UiTheme.S(10);
-            _spag = MkNum("Spaghetti %", ref cx, top + UiTheme.S(200), 0, 100, v => Settings.SpaghettiThreshold = (int)v, 60);
+            // SINKS. The game caps neither log sink, so the ceiling has to come from the user: without one
+            // Counterfeit/Spaghetti holds the pool for the rest of the run once it wins the routing.
+            // Checkbox = permission, number = ceiling (0 = none, as BloodNumberThreshold's 0 = no floor);
+            // inside what they allow BloodPlanner's own gates still choose. Before this the two % fields
+            // were read ONLY by Main's manual AutoSpellSwap path, so in ADVISOR mode they were dead.
+            MkHead("SINKS — WHAT THE ADVISOR MAY ROUTE BLOOD INTO", UiTheme.S(10), top + UiTheme.S(230));
+
+            int y = top + UiTheme.S(256);
+            _wantSpag = MkWant("Spaghetti — drop chance", y, () => Settings.BloodWantSpaghetti, v => Settings.BloodWantSpaghetti = v);
+            MkColLabel("up to", y);
+            _spag = MkSinkNum(y, 0, 100000, v => Settings.SpaghettiThreshold = (int)v);
+            _spagStat = MkSinkStatus(y);
+
+            y = top + UiTheme.S(290);
+            _wantGold = MkWant("Counterfeit Gold — GPS", y, () => Settings.BloodWantCounterfeit, v => Settings.BloodWantCounterfeit = v);
+            MkColLabel("up to", y);
             // Counterfeit has NO game-side cap (goldBonus = 1 + floor((log2(blood/min)+1)^2)/100,
             // decomp AllBloodMagicController:105) — the old max of 100 falsely capped the target.
-            _counter = MkNum("Counterfeit %", ref cx, top + UiTheme.S(200), 0, 100000, v => Settings.CounterfeitThreshold = (int)v, 60);
-            Controls.Add(new Label { Text = "Number ≥", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(cx, top + UiTheme.S(204)) });
-            cx += UiLayout.MeasureText("Number ≥", UiTheme.Ui) + UiTheme.S(6);
-            _numberThr = new TextBox { Location = new Point(cx, top + UiTheme.S(200)), Width = UiTheme.S(110), Font = UiTheme.Ui };
-            _numberThr.TextChanged += (s, e) =>
+            _counter = MkSinkNum(y, 0, 100000, v => Settings.CounterfeitThreshold = (int)v);
+            _goldStat = MkSinkStatus(y);
+
+            // NUMBER carries no checkbox: it is the FALLBACK sink (FillRouting's default branch), so
+            // "off" is not a state it can be in — and its number is a FLOOR, not a ceiling.
+            y = top + UiTheme.S(324);
+            Controls.Add(new Label { Text = "NUMBER — rebirth multi", AutoSize = false, Size = new Size(UiTheme.S(210), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y + UiTheme.S(4)) });
+            MkColLabel("floor", y);
+            _numberThr = new TextBox { Location = new Point(UiTheme.S(SinkNumX), y), Width = UiTheme.S(96), Font = UiTheme.Ui, Height = UiTheme.LineH };
+            _numberThr.TextChanged += (s2, e2) =>
             {
                 if (_syncing || Settings == null) return;
                 if (double.TryParse(_numberThr.Text, out var d)) { try { Settings.BloodNumberThreshold = d; } catch { } }
             };
             Controls.Add(_numberThr);
+            _numStat = MkSinkStatus(y);
 
-            _advice = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), top + UiTheme.S(242)) };
+            _advice = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), top + UiTheme.S(366)) };
             Controls.Add(_advice);
         }
 
-        private static string Fmt(double v) => NumberFormatter.Abbrev(v);   // consolidated (finding #31); handles negative deltas
+        private static string Fmt(double v) => NumberFormatter.Abbrev(v);
+
+        private static string SinkStatus(int now, int target, bool want)
+        {
+            if (!want) return $"now {now}% — off";
+            if (target <= 0) return $"now {now}% — no ceiling";
+            return now < target ? $"now {now}% → {target}%" : $"now {now}% — target reached";
+        }   // consolidated (finding #31); handles negative deltas
 
         private static Label MakeChip(string text) => new Label
         {
@@ -195,7 +270,12 @@ namespace NGUAdvisor
                 // RefreshStatus: the bar stays out of the per-tick path entirely.
                 _controlBar?.Sync();
 
-                UiTheme.ApplyState(_swap, Settings.AutoSpellSwap ? UiTheme.Cap : UiTheme.Danger, Color.White);
+                // Dead switch while automation owns the spells — Main only runs it when CastBloodSpells
+                // is OFF, so lighting it green there advertised a control that does nothing.
+                bool swapLive = !Settings.CastBloodSpells;
+                _swap.Enabled = swapLive;
+                UiTheme.ApplyState(_swap, !swapLive ? UiTheme.Faint : (Settings.AutoSpellSwap ? UiTheme.Cap : UiTheme.Danger), Color.White);
+                _swapNote.Text = swapLive ? "" : "Auto Spell Swap applies only while AUTOMATION is off — the advisor owns the spell toggles.";
                 UiTheme.ApplyState(_pillRb, Settings.IronPillOnRebirth ? UiTheme.Cap : UiTheme.Danger, Color.White);
                 UiTheme.ApplyState(_guffARb, Settings.BloodMacGuffinAOnRebirth ? UiTheme.Cap : UiTheme.Danger, Color.White);
                 UiTheme.ApplyState(_guffBRb, Settings.BloodMacGuffinBOnRebirth ? UiTheme.Cap : UiTheme.Danger, Color.White);
@@ -203,6 +283,8 @@ namespace NGUAdvisor
                 _guffBThr.Value = Clamp(_guffBThr, Settings.BloodMacGuffinBThreshold);
                 _spag.Value = Clamp(_spag, Settings.SpaghettiThreshold);
                 _counter.Value = Clamp(_counter, Settings.CounterfeitThreshold);
+                _wantSpag.Checked = Settings.BloodWantSpaghetti;
+                _wantGold.Checked = Settings.BloodWantCounterfeit;
                 _numberThr.Text = Settings.BloodNumberThreshold.ToString("0");
             }
             catch (Exception e) { LogDebug($"Blood sync: {e.Message}"); }
@@ -256,6 +338,19 @@ namespace NGUAdvisor
                     SetChip(_cLoot, plan.WantLoot);
                     SetChip(_cGold, plan.WantGold);
                 }
+
+                // Sink rows: current bonus against the user's ceiling, read through BloodPlanner so the
+                // panel and the routing can never disagree about what "reached" means.
+                int spagNow = BloodPlanner.SpaghettiPercentNow(c);
+                int goldNow = BloodPlanner.CounterfeitPercentNow(c);
+                UiLayout.FitInto(_spagStat, SinkStatus(spagNow, Settings.SpaghettiThreshold, Settings.BloodWantSpaghetti));
+                UiLayout.FitInto(_goldStat, SinkStatus(goldNow, Settings.CounterfeitThreshold, Settings.BloodWantCounterfeit));
+                double rp = 1;
+                try { rp = c.bloodMagic.rebirthPower; } catch { }
+                double floor = Settings.BloodNumberThreshold;
+                UiLayout.FitInto(_numStat, floor <= 0
+                    ? $"now x{Fmt(rp)} — no floor"
+                    : (rp < floor ? $"now x{Fmt(rp)} → floor {Fmt(floor)}" : $"now x{Fmt(rp)} — floor met"));
 
                 string advice = !plan.Known ? "Blood advisor idle." : plan.Text;
                 if (plan.Known && !string.IsNullOrEmpty(plan.RouteReason)) advice += $" — {plan.RouteReason}";

@@ -47,10 +47,12 @@ live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` tog
 2. **NUMBER floor**: `BloodNumberThreshold` is a FLOOR, not a ceiling — below it NUMBER outranks
    the in-run sinks. (Old code stopped at the target, capping a linear uncapped multiplier AND
    cutting ritual funding for the rest of the run.)
-3. **Gold** — while the investment window is open (first 50 % of the run; log sinks must earn
-   back before the wipe), TM has base gold, gold demand exists (augs ×2 hysteresis OR digger
-   upgrades), and the next +1 % is within ~20 min of full income (`GoldBelowKnee`).
-4. **Spaghetti** — zone-farming below the zone's `RecommendedDcPercent` (GoldCBlockMode only).
+3. **Gold** — the user allows it (`BloodWantCounterfeit`) and its bonus is under the user's
+   ceiling (`CounterfeitThreshold`), the investment window is open (first 50 % of the run; log
+   sinks must earn back before the wipe), TM has base gold, gold demand exists (augs ×2 hysteresis
+   OR digger upgrades), and the next +1 % is within ~20 min of full income (`GoldBelowKnee`).
+4. **Spaghetti** — allowed + under `SpaghettiThreshold`, and zone-farming below the zone's
+   `RecommendedDcPercent` (GoldCBlockMode only).
 5. **NUMBER default sink** — rebirth scheduled and not NORB; the rebirth force-cast banks
    leftovers anyway, so routing early costs nothing.
 6. **All off** — NORB / no rebirth: nothing to bank; keep rituals from draining the marathon.
@@ -62,3 +64,34 @@ the routing INTENT, not the toggles ApplyBlood last wrote (throttled 60 s, lag u
 intent-reads broke a real deadlock — NUMBER gated behind a default-0 threshold → no live toggle
 → no rituals → no blood → NUMBER stuck at 1.0 forever. When the advisor does NOT own blood, the
 live toggles ARE the intent. Cached 10 s; fail-safe returns true (keep rituals).
+
+## User targets — permission and ceiling (2026-08-28)
+
+Neither log sink is capped by the game, so once one wins the routing it holds the pool for the rest
+of the run. The two Systems > BLOOD fields are now that ceiling:
+
+- **Checkbox** (`BloodWantSpaghetti` / `BloodWantCounterfeit`) = permission. Unchecked -> never routed.
+- **Number** (`SpaghettiThreshold` / `CounterfeitThreshold`) = ceiling in %, **0 = no ceiling**
+  (mirroring `BloodNumberThreshold`'s 0 = no floor). Reached -> the sink drops out of the routing.
+- Inside what they allow, every existing gate still decides — the targets FILTER the candidates,
+  they do not override the math.
+- Both defaults are **true**: a settings file written before these existed routed gold/loot freely,
+  and a false default would silently switch a sink off on upgrade.
+- NUMBER carries no checkbox: it is the FALLBACK branch, so "off" is not a state it can be in, and
+  its number stays a FLOOR.
+
+`CounterfeitPercentNow()` / `SpaghettiPercentNow()` read `bloodMagicController.goldBonus()` and
+`lootBonus()` — the same values Main's manual `AutoSpellSwap` path uses, so a target means the same
+thing in both modes, and BloodPanel renders its rows through them rather than recomputing.
+
+**Why this existed as a bug (user-reported):** in ADVISOR mode the two % fields were read by nothing
+at all. Their only reader is `Main.cs`'s `if (Settings.AutoSpellSwap && !Settings.CastBloodSpells)`
+branch, which is dead whenever automation is on — so the panel offered two knobs, plus a lit-green
+Auto Spell Swap button, that could not affect anything.
+
+**Rejected, with evidence (2026-08-28):** feeding BR rituals from BB-capped magic. The idea was that
+when the magic lanes hit their blitz-boost ceiling the surplus idles, making rituals free, so
+`ChallengeOverlay`'s `bloodMatters` gate should not drop BR-30 there. Every `[WandoosDbg] magic`
+sample in the 2026-08-24 session reports `bb out of reach` with `held` 4x-136x below `bb`, and the
+two `STOOD DOWN` lines are both `energy` — which rituals do not consume. There is no such surplus at
+this scale; revisit only if the magic cap grows an order of magnitude.

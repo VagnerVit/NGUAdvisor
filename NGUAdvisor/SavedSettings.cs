@@ -58,6 +58,8 @@ namespace NGUAdvisor
         [SerializeField] private bool _autoSpellSwap;
         [SerializeField] private int _spaghettiThreshold;
         [SerializeField] private int _counterfeitThreshold;
+        [SerializeField] private bool _bloodWantSpaghetti = true;
+        [SerializeField] private bool _bloodWantCounterfeit = true;
         [SerializeField] private bool _castBloodSpells;
         [SerializeField] private double _ironPillThreshold;
         [SerializeField] private int _bloodMacGuffinAThreshold;
@@ -406,6 +408,10 @@ namespace NGUAdvisor
             AssignValue(ref _atHourDecidedRunSec, other?.AtHourDecidedRunSec, (value) => value >= 0.0, 0.0);
             AssignValue(ref _counterfeitThreshold, other?.CounterfeitThreshold, (value) => value >= 0);
             AssignValue(ref _spaghettiThreshold, other?.SpaghettiThreshold, (value) => value >= 0);
+            // Default TRUE: a saved file from before these existed routed gold/loot freely, and a
+            // false default would silently switch that sink off on upgrade.
+            _bloodWantSpaghetti = other?.BloodWantSpaghetti ?? true;
+            _bloodWantCounterfeit = other?.BloodWantCounterfeit ?? true;
             _castBloodSpells = other?.CastBloodSpells ?? false;
             AssignValue(ref _ironPillThreshold, other?.IronPillThreshold, (value) => value >= 0.0);
             AssignValue(ref _bloodMacGuffinAThreshold, other?.BloodMacGuffinAThreshold, (value) => value >= 0);
@@ -1181,6 +1187,28 @@ namespace NGUAdvisor
             {
                 if (value == _counterfeitThreshold) return;
                 _counterfeitThreshold = value;
+                SaveSettings();
+            }
+        }
+
+        public bool BloodWantSpaghetti
+        {
+            get => _bloodWantSpaghetti;
+            set
+            {
+                if (value == _bloodWantSpaghetti) return;
+                _bloodWantSpaghetti = value;
+                SaveSettings();
+            }
+        }
+
+        public bool BloodWantCounterfeit
+        {
+            get => _bloodWantCounterfeit;
+            set
+            {
+                if (value == _bloodWantCounterfeit) return;
+                _bloodWantCounterfeit = value;
                 SaveSettings();
             }
         }
