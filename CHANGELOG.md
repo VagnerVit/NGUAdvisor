@@ -4,6 +4,31 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-28
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Fixed
+
+- **The Spaghetti and Counterfeit targets on the Blood page now do something.** They had a single
+  reader, the manual auto-swap path, which only runs while AUTOMATION is off — so with the advisor
+  driving, both fields, and the Auto Spell Swap button beside them, were controls that could not
+  affect anything. The percentages are now the ceiling the advisor routes toward in either mode, and
+  Auto Spell Swap is greyed out with a note while automation owns the spell toggles.
+- **Blood routing has a ceiling at all.** The game caps neither Counterfeit Gold nor Blood Spaghetti,
+  so whichever of them won the routing kept the whole blood pool for the rest of the run, however
+  small the next step had become. A sink now drops out once it reaches your target.
+
+### Added
+
+- **A checkbox per blood sink.** Unchecking Spaghetti or Counterfeit Gold keeps the advisor out of it
+  entirely. Inside what the checkboxes and targets allow, the advisor's own reasoning — the
+  investment window, gold demand, the cost-curve knee, the zone's recommended drop chance — still
+  decides which sink gets the pool. NUMBER has no checkbox: it is where blood goes when nothing else
+  qualifies, and its number stays a floor rather than a ceiling.
+- **Each sink row shows where it stands.** `now 344% → 350%`, `target reached`, `no ceiling` or
+  `off`, so the routing decision on the same page can be read against the numbers that drive it.
+
 ## [1.3.0] - 2026-08-26
 
 Existing settings and profile files remain compatible with version 1.1.0.
