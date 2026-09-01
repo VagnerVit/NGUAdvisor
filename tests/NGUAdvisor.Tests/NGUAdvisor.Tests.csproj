@@ -40,6 +40,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\ApTierTable.cs" Link="Linked\ApTierTable.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\PpEta.cs" Link="Linked\PpEta.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\AtMath.cs" Link="Linked\AtMath.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
   </ItemGroup>
 
 </Project>
