@@ -4,6 +4,46 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-01
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
+### Added
+
+- **The advisor stops automating when the game updates.** It reads hundreds of live NGU values by
+  name and index and acts on them, and nothing checked the game build — so the first patch that
+  renamed or renumbered one would have had it automating on wrong data, silently. The build is now
+  recorded on first run, and if it later changes the advisor holds every state-changing action and
+  says so in the overlay. Reads, advice and the HUD keep working. Delete `compat.dat` from the
+  advisor folder and reload once you are satisfied the new build behaves.
+- **The whole challenge-block campaign installs with the advisor.** Only one block shipped before;
+  the rest sat in `SampleProfiles\`, which nothing copied — you had to know the folder was there.
+  All 22 campaign profiles now install like the goal presets. Nothing you already have is
+  overwritten.
+- **Gear the guide keeps for a later chapter is no longer trashed.** The KEEP/TRASH verdict asked
+  the optimizer, your loadouts and what you are wearing, all of which judge an item by what it wins
+  today — which is exactly wrong for a unique-special item whose point is two chapters away. The
+  guide's "Items to Keep" lists now hold those, each with the reason, until the chapter its horizon
+  ends. Past that it goes back to being trash, and says why the protection lapsed.
+
+### Fixed
+
+- **Hacks no longer swallow R3 that buys nothing.** A hack banks at most one level per game tick,
+  and the progress bar RESETS on overflow rather than carrying it — so allocation past that point is
+  discarded, and just below the threshold is the worst place to sit: nine tenths of the rate runs at
+  a little over half efficiency. R3 is now funded to the cheapest amount that reaches the same
+  levels per tick, and the remainder goes to the next priority. Every other resource lane already
+  worked this way; hacks were the one that did not.
+- **A mistyped hack priority no longer parks your whole R3 pool.** A token the parser could not read
+  an index out of — `HACK-` with nothing after it — reported itself as a valid breakpoint and then
+  allocated nothing, every pass, with nothing in the log. A hack already at its hard cap did the
+  same: the game keeps burning its progress bar but stops granting levels.
+- **The log names the zone you are actually in.** Zone routing is a priority cascade, and eight of
+  its branches — money pit, gold snipe, titan, quest, CBlock, the Evil climb — take over without the
+  reporting knowing. `[ZoneDbg]` could name your sniped zone while you were somewhere else
+  entirely. The branch that wins now records itself, so the line says where you went and what
+  displaced the plan.
+
 ## [1.3.1] - 2026-08-28
 
 Existing settings and profile files remain compatible with version 1.1.0.
