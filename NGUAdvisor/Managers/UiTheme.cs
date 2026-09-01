@@ -40,6 +40,9 @@ namespace NGUAdvisor.Managers
         public static readonly Font Bold = new Font("Segoe UI", 9f, FontStyle.Bold);
         public static readonly Font ColHeader = new Font("Segoe UI", 7.5f, FontStyle.Bold);
         public static readonly Font Chip = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+        // 9pt everywhere EXCEPT a NumericUpDown, whose height Mono derives from the font and will not let
+        // us set — so the font IS the height. Measured in the static ctor; see the probe there.
+        public static readonly Font Num;
 
         // DPI-TRUE line metrics (root cause of every stacked-text overlap): the game's Mono renders
         // text at the REAL screen DPI while every hand-placed pixel stays fixed. The values below were
@@ -127,26 +130,57 @@ namespace NGUAdvisor.Managers
                 {
                     probe.Height = LineH;
                     NumChrome = Math.Max(0, probe.Height - probe.ClientSize.Height);
+
                     // Prove the stretch on a control we own, and record the result. Two rounds of this bug
                     // were diagnosed by guessing at the mechanism from the audit alone; NumInner says
                     // whether the inner box can be made to keep a height at all, in isolation.
                     probe.Height = LineH + NumChrome;
                     StretchNumEdit(probe);
                     foreach (Control c in probe.Controls)
-                        if (c is TextBoxBase) NumInner = c.Height;
+                        if (c is TextBoxBase) { NumInner = c.Height; NumSideChrome = Math.Max(0, probe.Width - c.Width); }
                 }
             }
             catch (Exception e) { info += $"; num chrome probe failed ({e.Message})"; }
 
+            // THE FONT IS THE ONLY LEVER ON A NumericUpDown'S HEIGHT. Mono clamps every height write in
+            // UpDownBase.SetBoundsCoreInternal — an `internal override`, so not even a subclass can reach
+            // it — and the value it clamps to is derived from Font.Height (LineHeightControls.cs has the
+            // decompiled line). At 9pt that is 23px against a 25px line, which is the standing audit
+            // finding no assignment could ever clear.
+            //
+            // Step the size up until a PROBE REPORTS a height that covers the line. Deliberately not
+            // computed from PreferredHeight's `Font.Height + 7`: that formula varies with BorderStyle, and
+            // asking the control what it became is the same game-truth move as the chrome probe above.
+            // Half-point steps so the text grows as little as the rule allows — this font sits next to 9pt
+            // labels, so every extra point is visible.
+            Num = Ui;
+            try
+            {
+                for (float size = Ui.Size; size <= Ui.Size + 6f; size += 0.5f)
+                {
+                    Font candidate = size == Ui.Size ? Ui : new Font(Ui.FontFamily, size, Ui.Style);
+                    int h;
+                    using (var probe = new NumericUpDown { Font = candidate }) h = probe.Height;
+                    if (h >= LineH) { Num = candidate; break; }
+                    if (candidate != Ui) candidate.Dispose();
+                }
+                info += $", num font {Num.Size:0.#}pt";
+            }
+            catch (Exception e) { info += $"; num font probe failed ({e.Message})"; }
+
             // InvariantCulture: this line is read back from debug.log when diagnosing layout, and a
             // comma-decimal locale wrote "scale 1,52" (project rule — pin culture on number paths).
             CalibrationInfo = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}, num chrome {7}, num inner {8}",
-                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale, NumChrome, NumInner);
+                "UI metrics: {0} => pitch {1}/{2}/{3}, line {4}, head {5}, scale {6:F2}, num chrome {7}, num inner {8}, num side {9}, num w(9999) {10}",
+                info, LinePitch, HeadPitch, TextH, LineH, HeadH, Scale, NumChrome, NumInner, NumSideChrome, NumWidthFor("9999"));
         }
 
         // Measured chrome of a NumericUpDown (border + internal padding): outer height minus client height.
         public static readonly int NumChrome;
+        // Everything a NumericUpDown spends horizontally before the digits get any room: the docked spin
+        // button plus both borders. Measured off the inner edit box rather than assumed, because the
+        // button is a raw 16px constant in Mono while the borders come from the theme.
+        public static readonly int NumSideChrome;
 
         // Height the probe's INNER edit box kept after being stretched. Diagnostic only: if this reads the
         // line height but the audit still reports 32 on real controls, the stretch works and something is
@@ -182,10 +216,13 @@ namespace NGUAdvisor.Managers
                 c.DrawItem += ComboDraw;
                 // Mono computes the CLOSED height from Font.Height too, and unlike ItemHeight it will not
                 // recompute it for us — state it, with room for the border the box draws itself.
-                c.Height = LineH + S(6);
+                c.Height = ComboH;
             }
             catch { }
         }
+
+        // Closed height of a styled dropdown: the line plus the border the box paints itself.
+        public static int ComboH => LineH + S(6);
 
         private static void ComboDraw(object sender, DrawItemEventArgs e)
         {
@@ -250,6 +287,23 @@ namespace NGUAdvisor.Managers
         // the click target, and every row helper derives from it, so rows follow.
         public static int NumH => LineH + NumChrome + S(8);
 
+        // Width a spinner needs to actually SHOW a given value — pass the WIDEST string it can hold.
+        // Derived, not tuned: the digits are sized by Num now, so a hardcoded width would go stale the
+        // moment that font lands differently on another display, and nothing would catch it. UiLayout's
+        // audit cannot: it measures the value CURRENTLY DISPLAYED, never the widest the control accepts,
+        // which is how these fields stayed too narrow without a single finding.
+        //
+        // Check the room before calling this. A wider spinner pushes into whatever sits beside it, and two
+        // of the three fields that prompted it turned out to be boxed in by their neighbours — see the
+        // ui-infra.md note. Widening one without moving them trades a truncated value for an overlap.
+        public static int NumWidthFor(string widest)
+        {
+            // S(2): the caret column. A right-aligned box still reserves it, so digits sized to the exact
+            // text width lose their last pixel column to it.
+            try { return TextRenderer.MeasureText(widest ?? "", Num).Width + NumSideChrome + S(2); }
+            catch { return S(60); }
+        }
+
         public static void StyleNum(NumericUpDown n)
         {
             if (n == null) return;
@@ -259,6 +313,11 @@ namespace NGUAdvisor.Managers
                 // hygiene, NOT the fix for the short inner box — the log showed the outer height was being
                 // accepted all along (see the NumChrome note in the static constructor).
                 n.AutoSize = false;
+                // The font, not the height, is what actually moves this control's box — Mono clamps the
+                // height and derives it from Font.Height instead (see UiTheme.Num and
+                // LineHeightControls.cs). Set it before the height so the reset the font change triggers
+                // lands on the value we want.
+                if (Num != null && n.Font != Num) n.Font = Num;
                 n.Height = NumH;
                 // Now that the height sticks, the chrome of THIS instance is measurable — a panel may hand
                 // us a different font than the probe used. Grow until the CLIENT area fits the line;

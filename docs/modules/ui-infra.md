@@ -115,11 +115,95 @@ accent-weak selection, Ink text) because the ask was size, not restyling.
 
 | Helper | Applies to | What it does |
 |---|---|---|
-| `StyleCombo(c)` | `ComboBox` | `OwnerDrawFixed` + `ItemHeight = LineH`, and states the closed `Height` (Mono will not recompute that one) |
+| `StyleCombo(c)` | `ComboBox` | `OwnerDrawFixed` + `ItemHeight = LineH`; the closed `Height` it states is held by `LineComboBox`, not by this call — see below |
 | `StyleList(l)` | `ListBox` | `OwnerDrawFixed` + `ItemHeight = LinePitch`; honours `SelectionMode.None` |
-| `StyleNum(n)` | `NumericUpDown` | no `DrawMode` exists, but it *does* honour an explicit `Height` — so state it |
+| `StyleNum(n)` | `NumericUpDown` | no `DrawMode` exists, and it does NOT honour an explicit `Height` either — see the section below |
 | `ListH(rows)` | list heights | **specify lists in ROWS.** A pixel height silently means a different row count at every scale |
 | `OwnerDrawTabs(tc)` | `TabControl` | owner-draws the strip AND states `SizeMode.Fixed` + `ItemSize`: height from `SCtl`, width from the widest caption measured in **`Bold`** (the selected tab draws bold, so `Ui` would ellipsize whichever tab is active). **Call it after the pages exist** — the width is derived from them. A TabControl sizes its own strip from `Font.Height` like the controls above, so the captions paint at the real DPI into a band built for a third of it and the strip shows a horizontal slice of its own labels |
+
+### The height these two controls report is NOT settable — measured, then read off the decompile
+
+`StyleCombo`/`StyleNum` set a height and Mono throws it away. This is not a race that can be won from
+outside the control, and it is not a matter of hooking the right event. An instrumented pass over the
+live form assigned the wanted height **three times** to every dropdown and spinner on it and logged the
+result: **70 controls, not one moved** (2026-09-01). Both land on a font-derived value and stay:
+
+| Control | Mono forces | at 9pt / scale 1.0 | restated by |
+|---|---|---|---|
+| `ComboBox` | `SnapHeight` replaces it with `PreferredHeight => Font.Height + 8` | 24 vs a 25px line | every `SetBoundsCore` write that specifies Height |
+| `NumericUpDown` | `UpDownBase` clamps to `PreferredHeight => Font.Height + 7` | 23 vs a 25px line — fixed via `UiTheme.Num` | every write, no exceptions |
+
+`Font.Height` is the 96-DPI value — the same trap `UiLayout` documents for measurement — so the shortfall
+is ~2px at the tuning baseline and roughly **two thirds of the line** on a 200% display, which is where
+this was first reported as dropdowns being small and hard to hit.
+
+**ComboBox is fixable.** `LineComboBox` (`Managers/LineHeightControls.cs`) is the type to construct —
+`new ComboBox` in a panel is now a bug. Mono throws the height away in `SnapHeight`:
+
+```csharp
+private int SnapHeight(int height) {
+    if (DropDownStyle == ComboBoxStyle.Simple && height > PreferredHeight) { /* integral */ }
+    else { height = PreferredHeight; }        // i.e. ALWAYS, for DropDown and DropDownList
+    return height;
+}
+```
+
+…but `ComboBox.SetBoundsCore` only **calls** `SnapHeight` when the write specifies `Height` (or the box
+is anchored top+bottom, or docked). **A Location-only write passes the height straight through**, and
+that gap is the fix. It also explains a split that looked random before it was measured: dropdowns that
+`UiLayout.Row` repositions AFTER styling came out at the right height for free, on Row's Location write,
+while dropdowns carrying their `Location` in their own object initializer never got a second write — so
+`StyleCombo`'s Height write had the last word and was snapped back. Two dropdowns in `BoostsPanel` ended
+at 31 and the third at 24 for no other reason. `LineComboBox` re-issues the floor as a Location write
+deliberately, so it no longer depends on the order a panel lays its controls out. It must call
+`SetBoundsCore` directly — routed through `SetBounds` it is dropped by `SetBoundsInternal`, which returns
+early when the position is unchanged and the write does not specify Height.
+
+**NumericUpDown cannot be fixed by its height — only by its FONT.** The subclass trick does not hold,
+because `UpDownBase` overrides the **internal** entry point one level below the protected one:
+
+```csharp
+internal override void SetBoundsCoreInternal(int x, int y, int width, int height, BoundsSpecified specified)
+{
+    base.SetBoundsCoreInternal(x, y, width, Math.Min(width, PreferredHeight), specified);
+}
+```
+
+The height is discarded unconditionally — no `specified` gate to slip through, unlike ComboBox — and
+`internal override` cannot be reached from outside `System.Windows.Forms`. Note this contradicts the
+older claim that the outer control "does honour an explicit Height": that came from a probe on an
+unparented control UiTheme owns, which never runs the reset. It is why four releases (1.2.7, 1.2.12,
+1.2.13, 1.2.15) were spent on this box.
+
+What Mono clamps TO is `Font.Height + 7`, so **`UiTheme.Num` is the fix**: the static ctor steps the UI
+font up in half points until a probe REPORTS a height that covers `LineH`, and `StyleNum` applies that
+font to every spinner. It came out at **10pt against 9pt everywhere else** (23px → 26px), and it cleared
+all 22 standing NumericUpDown findings at once. Deliberately probed rather than computed from
+`PreferredHeight`: that formula varies with `BorderStyle`, and asking the control what it became is the
+same game-truth move as the chrome probe beside it. **`Num` is measured, so it follows the display** — do
+not replace it with a hardcoded point size.
+
+Known consequence of the font route: **bigger digits are WIDER** (`"9999"` 31px → 41px). Use
+`UiTheme.NumWidthFor(widest)` to size a spinner — it measures the string in `Num` and adds the exact
+`NumSideChrome` (the docked 16px spin button plus both borders, probed off the inner edit box, 20px
+here) plus the caret column. Never hardcode a spinner width again: the digits are font-derived now, so
+a tuned number goes stale the moment `Num` lands differently, and **the audit will not catch it** — it
+measures the value currently displayed, never the widest the control accepts.
+
+**Check the room before widening.** Of the three `Maximum = 9999` fields this was introduced for, only
+one had space; widening the other two blind would have traded a truncated value for an overlap:
+
+| Field | Slot | Needs | Outcome |
+|---|---|---|---|
+| `GearEditorPanel.Row._id` | 68px (`_name` at S(74)) | 58 | widened, 10px clear |
+| `MiscEditorPanel` amount | was 60px | 58 | field moved S(150) → S(120) first; the label ends at ~112, so the column had 38px of unused slack |
+| `ResourceEditorPanel.Nud` (h/m/s) | 48px, fixed by the `h`/`m`/`s` separators | 58 | NOT widened — sized `NumWidthFor("99")` = 47 instead |
+
+The h/m/s case is the one worth remembering: `Maximum` is a lazy shared 9999 there, but the field holds
+the hours, minutes and seconds of a rebirth time in a 48px slot pinned by the separator labels at
+S(90)/S(154)/S(218). Sizing it for its Maximum would print over them; sizing it for its real content is
+correct AND fixes a 1px shortfall the 10pt font had just introduced into the old hardcoded S(46).
+Three-digit hours do not fit at either font and never did — that needs the TIME chip re-laid out.
 
 `ScaledCheckBox` (`Managers/ScaledCheckBox.cs`) exists for the same reason and is the one case that
 needs a subclass: `CheckBox` exposes no `DrawMode`, and its glyph is a fixed ~13px system metric that

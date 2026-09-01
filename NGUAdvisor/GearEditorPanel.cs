@@ -326,7 +326,7 @@ namespace NGUAdvisor
                 var sourcePanel = new Panel { Dock = DockStyle.Top, Height = SourceH, BackColor = UiTheme.AccentWeak };
                 sourcePanel.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = UiTheme.Border });
                 sourcePanel.Controls.Add(new Label { Text = "GEAR SOURCE", Location = new Point(UiTheme.S(2), UiTheme.S(13)), AutoSize = true, ForeColor = UiTheme.Accent, Font = UiTheme.Bold });
-                _source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(260), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
+                _source = new LineComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(260), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
                 UiTheme.StyleCombo(_source);   // states the height, so centre AFTER it
                 _source.Location = new Point(UiTheme.S(104), (SourceH - _source.Height) / 2);
                 _source.Items.Add("Manual (item IDs)");
@@ -899,7 +899,7 @@ namespace NGUAdvisor
 
         private class Row : Panel
         {
-            private readonly NumericUpDown _id = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.S(60), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+            private readonly NumericUpDown _id = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.NumWidthFor("9999"), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
             private readonly Label _name = new Label { AutoSize = true, ForeColor = UiTheme.Ink, Font = UiTheme.Ui };
             private readonly Button _up, _down, _rem;
 
@@ -976,7 +976,7 @@ namespace NGUAdvisor
                 _entry = entry;
                 Height = ChainRowH;
 
-                _obj = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(180), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
+                _obj = new LineComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(180), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface, ForeColor = UiTheme.Ink };
                 UiTheme.StyleCombo(_obj);   // states the height, so centre AFTER it
                 foreach (var o in GearObjectives.Objectives) _obj.Items.Add(o.Name);
 

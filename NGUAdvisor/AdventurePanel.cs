@@ -210,7 +210,7 @@ namespace NGUAdvisor
             // The old "ADVISOR ROUTES ZONES / MANUAL ZONE" toggle wrote AdvisorZones and lived here; it is
             // the DECISIONS layer and now sits in the bar. The zone picker stays — it IS the manual choice.
             _zoneLbl = MkLbl("Zone");
-            _zoneCombo = new ComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _zoneCombo = new LineComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_zoneCombo);
             foreach (var kv in ZoneHelpers.ZoneList)
             {
@@ -250,7 +250,7 @@ namespace NGUAdvisor
                 AdvisorApply.GearRestored();   // re-arm the gear pass: swap on the next tick, not after the 120s throttle
             });
             _huntLbl = MkLbl("Stage");
-            _huntZone = new ComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _huntZone = new LineComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_huntZone);
             foreach (var kv in ZoneHelpers.ZoneList)
             {
@@ -321,7 +321,7 @@ namespace NGUAdvisor
             _bossesOnly = MkToggle("Bosses Only", () => Settings.SnipeBossOnly = !Settings.SnipeBossOnly);
             _fallthrough = MkToggle("Fallthrough", () => Settings.AllowZoneFallback = !Settings.AllowZoneFallback);
             var modeLbl = MkLbl("Mode");
-            _combatMode = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _combatMode = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_combatMode);
             _combatMode.Items.AddRange(new object[] { "Idle", "Snipe", "Defensive", "Offensive" });
             _combatMode.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.CombatMode = _combatMode.SelectedIndex; };
@@ -369,7 +369,7 @@ namespace NGUAdvisor
             // target pushes too — up to the target, not past it. ITOPODAutoPush stays the underlying
             // permission flag so a death during a push can revoke it without losing the chosen mode.
             var floorLbl = MkLbl("Floor");
-            _itopodFloor = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _itopodFloor = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodFloor);
             _itopodFloor.Items.AddRange(new object[] { "Optimal", "Fixed", "Max" });
             _itopodFloor.SelectedIndexChanged += (s, e) =>
@@ -393,12 +393,12 @@ namespace NGUAdvisor
             y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), floorLbl, _itopodFloor, _itopodTargetFloor) + UiTheme.S(14);
 
             var optLbl = MkLbl("Optimize");
-            _itopodOptimize = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _itopodOptimize = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodOptimize);
             _itopodOptimize.Items.AddRange(new object[] { "Disabled", "Default", "PP", "EXP/AP" });
             _itopodOptimize.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.ITOPODOptimizeMode = _itopodOptimize.SelectedIndex; };
             var cmbLbl = MkLbl("Combat");
-            _itopodCombat = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _itopodCombat = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodCombat);
             // ITOPOD combat is BINARY, not four-valued: ITOPODManager reads this setting only as
             // Convert.ToBoolean(...) (:119) and `== 0` (:95, :125, :526, :706, :727). Snipe, Defensive
@@ -444,9 +444,9 @@ namespace NGUAdvisor
             y = _blackList.Bottom + UiTheme.S(8);
 
             _spriteNames = new Dictionary<int, string>();
-            _blZone = new ComboBox { Width = UiTheme.S(185), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _blZone = new LineComboBox { Width = UiTheme.S(185), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_blZone);
-            _blEnemy = new ComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _blEnemy = new LineComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_blEnemy);
             try
             {

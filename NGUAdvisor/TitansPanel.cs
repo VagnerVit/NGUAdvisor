@@ -175,7 +175,7 @@ namespace NGUAdvisor
             }
 
             _modeLbl = new Label { Text = "Mode", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
-            _combatMode = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _combatMode = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_combatMode);
             _combatMode.Items.AddRange(new object[] { "Idle", "Snipe", "Defensive", "Offensive" });
             _combatMode.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.TitanCombatMode = _combatMode.SelectedIndex; };

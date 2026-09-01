@@ -186,7 +186,7 @@ namespace NGUAdvisor
                 {
                     int x = UiTheme.S(6) + col * colW;
                     var chk = new ScaledCheckBox { Text = $"{kv.Value}", AutoSize = true, Location = new Point(x, rowY + UiTheme.S(4)), BackColor = UiTheme.Surface };
-                    var amt = new NumericUpDown { Minimum = 1, Maximum = 9999, Width = UiTheme.S(50), Location = new Point(x + UiTheme.S(150), rowY + UiTheme.S(2)), Font = UiTheme.Ui, Enabled = false, TextAlign = HorizontalAlignment.Right };
+                    var amt = new NumericUpDown { Minimum = 1, Maximum = 9999, Width = UiTheme.NumWidthFor("9999"), Location = new Point(x + UiTheme.S(120), rowY + UiTheme.S(2)), Font = UiTheme.Ui, Enabled = false, TextAlign = HorizontalAlignment.Right };
                     UiTheme.StyleNum(amt);
                     if (have.TryGetValue(kv.Key, out var a2)) { chk.Checked = true; amt.Value = Math.Min(9999, Math.Max(1, a2)); amt.Enabled = true; }
                     int idx = _codes.Count;

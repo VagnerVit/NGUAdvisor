@@ -121,7 +121,7 @@ namespace NGUAdvisor
             _manualStrip = new Panel { Location = new Point(0, UiTheme.S(148)), Size = new Size(W - UiTheme.S(4), UiTheme.S(34)), BackColor = UiTheme.Ground, Tag = "exclusive" };
             Controls.Add(_manualStrip);
             var tierLbl = new Label { Text = "min tier", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
-            _minTier = new ComboBox { Width = UiTheme.S(80), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _minTier = new LineComboBox { Width = UiTheme.S(80), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_minTier);
             foreach (var t in MoneyPitManager.moneyPitThresholds)
                 _minTier.Items.Add(MoneyPitManager.TierName(t));
