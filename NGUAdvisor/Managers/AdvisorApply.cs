@@ -157,6 +157,7 @@ namespace NGUAdvisor.Managers
             try
             {
                 if (Main.Settings == null || !Main.Settings.GlobalEnabled) return;
+                if (!CompatibilityGate.ActionsAllowed) return;   // observe-only on a changed game build
                 var c = Main.Character;
                 if (c == null) return;
                 if ((DateTime.UtcNow - _lastTick).TotalSeconds < 30) return;

@@ -374,6 +374,13 @@ namespace NGUAdvisor
                 Settings.FlushSettings();
                 Settings.LoadSettings();
 
+                // Before anything automates: confirm the game build has not moved since it was last
+                // confirmed. Reads and advice stay live either way; only state-changing paths are held.
+                // Placed HERE and not beside the directory creation: the gate logs, and up there the log
+                // writer does not exist yet — doing it early aborted Main.Start() before "writer alive",
+                // which reads as "the inject did nothing" and is very hard to tell apart from one.
+                Managers.CompatibilityGate.Initialize(_dir);
+
                 SeedBoostPriorityOnce();
 
                 ZoneStatHelper.CreateOverrides(_dir);
@@ -867,7 +874,7 @@ namespace NGUAdvisor
         {
             try
             {
-                if (!Settings.GlobalEnabled)
+                if (!Settings.GlobalEnabled || !Managers.CompatibilityGate.ActionsAllowed)
                     return;
 
                 var needsAllocation = false;
@@ -1006,7 +1013,7 @@ namespace NGUAdvisor
         {
             try
             {
-                if (!Settings.GlobalEnabled)
+                if (!Settings.GlobalEnabled || !Managers.CompatibilityGate.ActionsAllowed)
                 {
                     _timeLeft = 10f;
                     return;
@@ -1262,7 +1269,7 @@ namespace NGUAdvisor
                 CombatHelpers.IsCurrentlyFightingTitan = false;
                 CombatHelpers.ClearRoute();   // the winning branch below records itself
 
-                if (!Settings.GlobalEnabled)
+                if (!Settings.GlobalEnabled || !Managers.CompatibilityGate.ActionsAllowed)
                     return;
 
                 if (!Character.buttons.adventure.interactable)
@@ -1520,7 +1527,10 @@ namespace NGUAdvisor
 
         private void RefreshOverlayText()
         {
-            _overlayText[0] = $"Automation - {(Settings.GlobalEnabled ? "Active" : "Inactive")}";
+            string compatHold = Managers.CompatibilityGate.StatusLine();
+            _overlayText[0] = compatHold != null
+                ? $"Automation - {compatHold}"
+                : $"Automation - {(Settings.GlobalEnabled ? "Active" : "Inactive")}";
             _overlayText[1] = $"Next Loop - {_timeLeft:00.0}s";
             _overlayText[2] = $"Profile - {Settings.AllocationFile}";
             _overlayText[3] = $"Action - {LockManager.GetLockTypeName()}";

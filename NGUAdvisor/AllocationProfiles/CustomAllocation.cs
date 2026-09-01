@@ -143,6 +143,8 @@ namespace NGUAdvisor.AllocationProfiles
         {
             if (!Settings.GlobalEnabled)
                 return;
+            if (!Managers.CompatibilityGate.ActionsAllowed)
+                return;   // observe-only on a changed game build
 
             if (IsAllocationRunning)
                 return;
