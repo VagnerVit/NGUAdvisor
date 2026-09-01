@@ -15,7 +15,7 @@ namespace NGUAdvisor
             // DEFAULT ComboBox style only (the gear-source picker proved it; FlatStyle.Flat is an
             // unproven Mono paint path). The CARD's SetWidth anchors this LEFT of the Delete button
             // (Left = _del.Left - Width - 10) so it can never overlap at any card width.
-            var combo = new ComboBox
+            var combo = new LineComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(UiTheme.S(332), UiTheme.S(5)),

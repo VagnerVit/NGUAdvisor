@@ -222,9 +222,15 @@ namespace NGUAdvisor
 
             private static Label Sep(string t, int x, int y) => new Label { Text = t, Location = new Point(x, y), AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
             private static Label ColLabel(string t, int x) => new Label { Text = t, Location = new Point(x, UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.ColHeader };
+            // Sized for TWO digits, not for Maximum. These are the h/m/s of a rebirth time and they sit in
+            // 48px slots fixed by the "h"/"m"/"s" separators at S(90)/S(154)/S(218) — a field wide enough
+            // for 9999 (58px) would print straight over them. Two digits is what the chip was built to
+            // hold, and NumWidthFor keeps that true as the font moves: at 10pt "99" needs 47 of the 48,
+            // where the old hardcoded S(46) had quietly gone 1px short. Three-digit hours do NOT fit at
+            // either font and never did; that needs the chip re-laid out, not the field widened.
             private NumericUpDown Nud(int x)
             {
-                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.S(46), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
+                NumericUpDown n = new NumericUpDown { Minimum = 0, Maximum = 9999, Width = UiTheme.NumWidthFor("99"), Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
                 UiTheme.StyleNum(n);   // states the height, so centre AFTER it
                 n.Location = new Point(x, (ChipH - n.Height) / 2);
                 return n;
@@ -363,7 +369,7 @@ namespace NGUAdvisor
             private readonly ResourceKind _kind;
 
             // structured controls
-            private readonly ComboBox _base = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = ColPrioW, Font = UiTheme.Ui };
+            private readonly ComboBox _base = new LineComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = ColPrioW, Font = UiTheme.Ui };
             private readonly NumericUpDown _index = new NumericUpDown { Minimum = 0, Maximum = 99, Width = ColIdxW, Font = UiTheme.Ui, TextAlign = HorizontalAlignment.Right };
             private readonly CapToggle _cap = new CapToggle();
             // ScaledCheckBox, not CheckBox: the native check glyph is a fixed ~13px system metric that

@@ -160,7 +160,7 @@ namespace NGUAdvisor
             // Re-homed from the retired Old Quests page (Phase B): quest-zone combat style. Sits
             // below whichever of plan/rules is taller (they're exclusive views sharing the slot).
             var cmLbl = new Label { Text = "Quest combat", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
-            _combatMode = new ComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _combatMode = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_combatMode);
             _combatMode.Items.AddRange(new object[] { "Idle", "Snipe", "Defensive", "Offensive" });
             _combatMode.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null && _combatMode.SelectedIndex >= 0) Settings.QuestCombatMode = _combatMode.SelectedIndex; };

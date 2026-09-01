@@ -215,7 +215,7 @@ namespace NGUAdvisor
             // DECISIONS layer under a name that reads like a permission. It is now in the bar.
             var cubeLbl = new Label { Text = "Cube", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
             _boostPage.Controls.Add(cubeLbl);
-            _cube = new ComboBox { Width = UiTheme.S(100), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _cube = new LineComboBox { Width = UiTheme.S(100), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_cube);
             _cube.Items.AddRange(new object[] { "None", "Balanced", "Softcap", "Power", "Toughness" });
             _cube.SelectedIndexChanged += (s, e) =>
@@ -227,7 +227,7 @@ namespace NGUAdvisor
 
             var gufLbl = new Label { Text = "Guffin", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
             _boostPage.Controls.Add(gufLbl);
-            _guffin = new ComboBox { Width = UiTheme.S(120), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            _guffin = new LineComboBox { Width = UiTheme.S(120), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_guffin);
             foreach (var kv in InventoryManager.macguffinList)
                 _guffin.Items.Add(new KeyValuePair<int, string>(kv.Key, kv.Value));
@@ -364,7 +364,7 @@ namespace NGUAdvisor
             // Boost APPLICATION order (Power/Toughness/Special) — six permutations in a combo, Mono-safe.
             var ordLbl = new Label { Text = "Apply order", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y + UiTheme.S(4)) };
             _manualView.Controls.Add(ordLbl);
-            _order = new ComboBox { Width = UiTheme.S(170), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(UiTheme.S(10) + UiLayout.MeasureText("Apply order", UiTheme.Ui) + UiTheme.S(8), y) };
+            _order = new LineComboBox { Width = UiTheme.S(170), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(UiTheme.S(10) + UiLayout.MeasureText("Apply order", UiTheme.Ui) + UiTheme.S(8), y) };
             UiTheme.StyleCombo(_order);
             foreach (var p in OrderPerms)
                 _order.Items.Add(string.Join(" → ", p));

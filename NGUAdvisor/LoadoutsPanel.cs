@@ -280,7 +280,7 @@ namespace NGUAdvisor
             };
             page.Controls.Add(m.Src);
 
-            m.Combo = new ComboBox
+            m.Combo = new LineComboBox
             {
                 Location = new Point(Math.Max(UiTheme.S(230), srcX + UiTheme.S(158)), UiTheme.S(11)),
                 Width = UiTheme.S(170),

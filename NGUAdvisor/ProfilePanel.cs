@@ -61,7 +61,7 @@ namespace NGUAdvisor
 
             // ---- SELECTED FILE ----
             MkHeader("SELECTED FILE", m, UiTheme.S(134));
-            _combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(260), Font = UiTheme.Ui };
+            _combo = new LineComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = UiTheme.S(260), Font = UiTheme.Ui };
             UiTheme.StyleCombo(_combo);
             Controls.Add(_combo);
             _switchBtn = MkBtn("SWITCH");

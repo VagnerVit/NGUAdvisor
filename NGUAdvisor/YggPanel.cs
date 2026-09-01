@@ -257,7 +257,7 @@ namespace NGUAdvisor
                 SyncFromSettings();
             };
             _tierLbl = new Label { Text = "at tier", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
-            _swapTier = new NumericUpDown { Width = UiTheme.S(48), Minimum = 1, Maximum = 20, Font = UiTheme.Ui };
+            _swapTier = new LineNumericUpDown { Width = UiTheme.S(48), Minimum = 1, Maximum = 20, Font = UiTheme.Ui };
             UiTheme.StyleNum(_swapTier);
             _swapTier.ValueChanged += (s, e) => { if (!_syncing && Settings != null) Settings.YggSwapThreshold = (int)_swapTier.Value; };
             Controls.Add(_activate);
