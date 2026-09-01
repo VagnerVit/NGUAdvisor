@@ -1,0 +1,215 @@
+{
+  "Breakpoints": {
+    "_Preset": "Challenge Block 3, Evil leg 2 of 2, guide chapter 5, EVIL (auto-installed). Everything in the Evil block after the 100 Level Challenges: all 5 No Augs and Basics, Troll 1-2 (1 is mandatory, 2 strongly recommended), No NGU 1, No Time Machine 1, No Rebirth 1-6, Blind 1 and a 24 Hour. Basic 1 is listed here as well as in EvilStart - harmless, it simply never matches once EvilStart has spent it. Number 1000 rebirth plan. Run CBlock3.0-N on Normal afterwards to finish the block, then hand back to 24h rebirths on Adventure stats and the Adventure Hack. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill to 0, Number to 1E+20. Put low targets on AT-0/1/2 and high or infinite on AT-3/4 - a run long enough to unlock AT is a run whose power has to come from Wandoos, which is what the NOTM and NORB gear/priority sets in this file are for.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLNGU",
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "CAPBESTAUG",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLNGU",
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "CAPBESTAUG",
+          "WAN"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesForNOTM": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "RIT-7",
+          "WAN"
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "HACK-0"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          190,
+          445,
+          242,
+          243,
+          195,
+          218,
+          446,
+          194,
+          189,
+          161,
+          138
+        ],
+        "Default-NGU2TM5Wan": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          190,
+          445,
+          242,
+          243,
+          195,
+          218,
+          446,
+          194,
+          189,
+          161,
+          138
+        ],
+        "NOTM-Gold3Wan4AT": [
+          241,
+          164,
+          238,
+          239,
+          240,
+          192,
+          142,
+          136,
+          189,
+          161,
+          218,
+          138,
+          101,
+          194,
+          446
+        ],
+        "NORB-NGU3TM3Aug2Wan": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          445,
+          243,
+          242,
+          195,
+          218,
+          446,
+          194,
+          226,
+          189,
+          161,
+          138
+        ],
+        "Comment": "Maximize TM & Wandoos, maximize gold drop accessories for NOTM"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          4,
+          5,
+          8,
+          10,
+          11
+        ],
+        "Comment": "Wandoos + Stats + E/MNGU + PP + Blood + Exp"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          4,
+          2,
+          6,
+          5
+        ],
+        "Comment": "Stats + Wandoos + Number + GPS + Adv"
+      }
+    ],
+    "NGUDiff": [
+      {
+        "Time": 0,
+        "Diff": 0
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "NOTM-1",
+      "NOAUG-1",
+      "NOAUG-2",
+      "NOAUG-3",
+      "NOAUG-4",
+      "NOAUG-5",
+      "TC-1",
+      "TC-2",
+      "NONGU-1",
+      "BASIC-1",
+      "BASIC-2",
+      "BASIC-3",
+      "BASIC-4",
+      "BASIC-5",
+      "BLIND-1",
+      "NORB-1",
+      "NORB-2",
+      "NORB-3",
+      "NORB-4",
+      "NORB-5",
+      "NORB-6",
+      "24HR-1"
+    ]
+  }
+}

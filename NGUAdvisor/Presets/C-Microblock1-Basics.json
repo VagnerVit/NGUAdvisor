@@ -1,0 +1,83 @@
+{
+  "Breakpoints": {
+    "_Preset": "Micro-CBlock, guide chapter 2, NORMAL (auto-installed). Runs the 5 Basic Challenges then the first 24 Hour Challenge - that order is forced, because 24H does not unlock until a Basic has been finished inside 24 hours. Rebirth is capped at 15 minutes, which is the cadence the guide states for this block; the Number 100 entry alongside it is the profile-set convention, not guide text. Energy and magic push only what moves bosses and Number here - Basic Training, Time Machine, Wandoos and the best affordable Augment. Enter after Boss 100 with some AVSP gear and T4 unlock puzzle started; hands back to a long rebirth for Mega/T4. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target High Security Base with Fallthrough (ITOPOD after boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0, and leave Number as the default blood sink with its threshold at 0. Skip this profile if all 5 Basics are already done - the guide skips Micro in that case. Progress the T4 unlock puzzle alongside the block.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "WAN",
+          "BESTAUG"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPTM",
+          "BR",
+          "WAN"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          122,
+          123,
+          124,
+          125,
+          126,
+          440,
+          117,
+          108
+        ]
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": []
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2
+        ]
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 15
+        }
+      }
+    ],
+    "Challenges": [
+      "BASIC-1",
+      "BASIC-2",
+      "BASIC-3",
+      "BASIC-4",
+      "BASIC-5",
+      "24HR-1"
+    ]
+  }
+}

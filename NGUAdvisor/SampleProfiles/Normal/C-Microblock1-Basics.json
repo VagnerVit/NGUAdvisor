@@ -1,0 +1,60 @@
+{
+  "Breakpoints": {
+    "Advisor": "Allocation Tab - Spaghetti/Counterfeit % to 0; Adventure Tab - Turn on Combat (Target: High Security Base, Idle Mode, Allow Fallthrough -> Select ITOPOD after unlocking boss 30); Gold Tab - Turn on CBlock Mode",
+    "Block": "Micro-CBlock (guide Chapter 2, T1-Mega). Contents: 5 Basic Challenges and 1 24H Challenge. Entry: after obtaining some AVSP gear, defeating Boss 100, and starting T4's unlock puzzle. Hands back to an LRB towards Mega/T4. Skip this profile if all 5 Basic Challenges are already done - the guide says to skip Micro in that case and the entries here would simply sit idle. Run the T4 unlock puzzle alongside the block: 'During your challenges, you can also be progressing the T4 unlock puzzle'.",
+    "Comment": "Guide focus for this block: 'features that push bosses and increase your Number, like Wandoos, Augmentations, Time Machine, and Blood Number'. Blood Number is not a profile field - it is the advisor's blood router, so leave Number as the default blood sink and keep the Blood Number threshold at 0. Beards are absent on purpose: the Beardverse comes after the Mini-CBlock, so there is nothing to allocate in Chapter 2. Advanced Training is absent because a 15 minute rebirth never runs long enough for AT to pay off. BESTAUG is used so no augment index has to be assumed this early; if idle energy gets reserved for an augment it cannot afford, swap BESTAUG for AUG-X and set a target level on the Augments tab (a capped target frees the energy again).",
+    "RebirthNotes": "Two entries, whichever fires first wins, and entering the next challenge pre-empts both. The 15 minute Time entry IS the guide's cadence, verbatim: 'It's suggested to do 15 minute rebirths to optimize number gain'. The Number 100 entry is NOT from the guide - it is the profile author's own convention, copied from the four C-Miniblock2.x profiles, and it only lets a rebirth fire EARLY once next-rebirth number gain is already past 100x. Raise it or delete it freely; the 15 minute ceiling is the part the guide actually asks for.",
+    "GearNotes": "Max P/T. Same shape as C-Miniblock2.1-100lc with the five body pieces moved back one zone: 122-126 is the A Very Strange Place set (the 'AVSP gear' named in the entry requirement) rather than the Mega set 130-134, which only drops in Mega Lands at the very end of the chapter. Accessories 440/117/108 are unchanged from 2.1 and all clear their boss requirement by Boss 100.",
+    "ChallengeNotes": "Basics first, then the 24H. The order is forced, not a preference: the 24 Hour Challenge does not unlock until a Basic Challenge has been completed within 24 hours. Finishing on a 24H to climb Number back up is also what the guide does at the end of the Mini-CBlock and CBlock1. This is the profile that seeds the Normal BASIC and 24HR lines - 24HR-1 here is what lets C-Miniblock2.4-Finish's 24HR-2 ever fire.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [ "CAPALLBT", "CAPTM", "WAN", "BESTAUG" ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [ "CAPTM", "BR", "WAN" ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [ 122, 123, 124, 125, 126, 440, 117, 108 ]
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": []
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [ 1, 2 ]
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100
+      },
+      {
+        "Type": "Time",
+        "Time": { "m": 15 }
+      }
+    ],
+    "Challenges": [
+      "BASIC-1", "BASIC-2", "BASIC-3", "BASIC-4", "BASIC-5",
+      "24HR-1"
+    ]
+  }
+}

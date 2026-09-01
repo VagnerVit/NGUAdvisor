@@ -1,0 +1,408 @@
+{
+  "Breakpoints": {
+    "_Preset": "Early Evil re-climb, guide chapter 5 sub-mode A (auto-installed). Entering Evil re-locks TM/AT/Wandoos, so this profile re-climbs them: short runs that push the boss wall while Basic Training and augments carry the energy, with a Blood Ritual on magic. Switches the NGU level track to Evil at hour 22. Use from Evil entry to roughly Boss 125, where T7 comes into reach. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "PriorityComment1": "CAP Allocations will use as much energy as it takes to cap, regular allocations evenly divide up the available idle energy. But allocations are individually applied left to right so there are some quirks",
+    "PriorityComment2": "In practice CAP allocations make dividers between groups of non-CAP allocations.",
+    "PriorityExample1": "For example, with priorities A, CAPB, C, D, E and total energy of 100",
+    "PriorityExample2": "A would get 25 energy (1/4 of 100 idle energy) as there are 4 non-cap priorities to allocate (A,C,D,E)",
+    "PriorityExample3": "CAPB would then take as much as it needs to cap (lets say it takes 60)",
+    "PriorityExample4": "C, D, E would then get each get 5 energy (1/3 each of 15 remaining idle energy) - technically C gets 1/3 of 15, D then gets 1/2 of 10 and then E gets all of 5, but has the same outcome",
+    "PriorityExample5": "If CAPB were first instead, A,C,D and E would each get 10 energy. If CAPB were last, A,C,D and E would each get 25 energy and CAPB would get nothing",
+    "PriorityExample6": "If C were instead CAPC, A would now get 33, CAPC would get the last 7 and D and E would get nothing. If D were instead CAPD, A would now get 33, C would get 3, CAPD would get 4 and E would get nothing",
+    "PriorityPercentComment1": "THE ADVISOR SIZES EVERY LANE ITSELF. It reads live capacities each tick and gives each system what it can actually use, so you do not need to write percentages at all - that is the default and the recommended setup.",
+    "PriorityPercentComment2": "A percentage (like ALLAT:25) is therefore read as MANUAL MODE: you are telling the advisor to stop optimising that system because you want to drive it. The lane claims its authored share off the top, before the advisor allocates anything, and is excluded from the optimiser.",
+    "PriorityPercentComment3": "Remove the ':percent' to hand that system back to the advisor. The load banner warns you for every percentage it finds, and the log tags those lanes [Manual].",
+    "PriorityPercentExample1": "The old share model these examples used to describe is gone - allocation is no longer 'A gets 25 of 100 idle, B gets 25 of the 75 remainder'. The advisor offers every seated lane min(what it can absorb, its share of what is left) and repeats until the pool is spent.",
+    "PriorityPercentExample2": "So 'A, B, C, D' with no percentages is not equivalent to any list with them. Writing A:25 does not reproduce the old first-in-line behaviour; it takes A out of the optimiser entirely and hands it a flat 25% of the resource.",
+    "PriorityPercentExample3": "R3 is the one place a percentage always meant what it says, and it still does - R3 is not routed through the constraint allocator. Note the R3 tail is otherwise priced by the advisor now (by marginal value density), and a percent opts that lane out of the pricing.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "TM"
+        ]
+      },
+      {
+        "Time": {
+          "m": 30
+        },
+        "Priorities": [
+          "AUG-6",
+          "AUG-7"
+        ],
+        "Note": "Reduce this time after unlocking boss 125 to match the time to reach 125"
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "Priorities": [
+          "CAPALLNGU",
+          "CAPALLAT",
+          "CAPWAN",
+          "AUG-6",
+          "AUG-7"
+        ],
+        "Note": "Set AT thresholds, expand time as needed to hit goals",
+        "AdvDC": [
+          "NGU-4",
+          "NGU-6"
+        ],
+        "PAWG (Challenge Prep)": [
+          "NGU-5",
+          "NGU-0",
+          "NGU-1",
+          "NGU-3"
+        ],
+        "Respawn": [
+          "NGU-2"
+        ],
+        "Magic-NGU": [
+          "NGU-7"
+        ],
+        "PP": [
+          "NGU-8"
+        ]
+      },
+      {
+        "Time": {
+          "h": 22
+        },
+        "Priorities": [
+          "ALLNGU"
+        ],
+        "Note": "Evil NGU time",
+        "Note2": "Add one hour per version of T7 defeated (ie: 22 at easy, 21 at normal, 20 at hard, 19 at brutal)",
+        "Note3": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
+        "Thresholds": "Magic-NGU or PP > x1.05, Respawn < x0.95, Gold > x1.2"
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "TM"
+        ]
+      },
+      {
+        "Time": {
+          "m": 30
+        },
+        "Priorities": [
+          "RIT-7"
+        ],
+        "Note": "RIT-7 is the EIGHTH ritual and it only exists once the NORMAL Troll challenge has 6+ completions (ritualsUnlocked() returns a count, 7 or 8). CBlock2-Normal runs TC-5/6/7, and that block is finished before Evil entry, so by the time this profile is used the ritual is there. If you skipped those Trolls the lane simply reports locked and is dropped before the share is divided - it costs nothing, it just does nothing. Ritual 7 also needs boss 105, which is inside this profile's own window (Evil entry to roughly boss 125)."
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "Priorities": [
+          "CAPALLNGU",
+          "WAN",
+          "BR"
+        ],
+        "YggExp": [
+          "NGU-0",
+          "NGU-1"
+        ],
+        "PowBTM (Challenge Prep)": [
+          "NGU-2",
+          "NGU-4"
+        ],
+        "Number": [
+          "NGU-3"
+        ],
+        "Energy-NGU": [
+          "NGU-5"
+        ],
+        "AdvB": [
+          "NGU-6"
+        ]
+      },
+      {
+        "Time": {
+          "h": 22
+        },
+        "Priorities": [
+          "ALLNGU"
+        ],
+        "Note": "Evil NGU time",
+        "Note2": "Add one hour per version of T7 defeated (ie: 22 at easy, 21 at normal, 20 at hard, 19 at brutal)",
+        "Note3": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
+        "Thresholds": "Energy-NGU or AdvB > x1.05, TM > x1.2"
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "HACK-0",
+          "HACK-1"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          190,
+          136,
+          118,
+          243,
+          218,
+          195,
+          446,
+          194,
+          445,
+          226,
+          227
+        ],
+        "Comment": "VoodooRespawn2TM"
+      },
+      {
+        "Time": {
+          "m": 30
+        },
+        "ID": [
+          168,
+          237,
+          238,
+          239,
+          240,
+          190,
+          136,
+          118,
+          243,
+          218,
+          195,
+          446,
+          194,
+          445,
+          226,
+          227
+        ],
+        "Comment": "VoodooRespawn2TM + BDW Weapon"
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          190,
+          136,
+          118,
+          445,
+          243,
+          242,
+          444,
+          195,
+          218,
+          446,
+          236
+        ],
+        "VoodooRespawn2NGU": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          190,
+          136,
+          118,
+          445,
+          243,
+          242,
+          444,
+          195,
+          218,
+          446,
+          236
+        ],
+        "VoodooRespawn2NGU + BDW Helm": [
+          241,
+          164,
+          238,
+          239,
+          240,
+          190,
+          136,
+          118,
+          445,
+          243,
+          242,
+          444,
+          195,
+          218,
+          446,
+          236
+        ],
+        "CD2MaxPow": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          137,
+          91,
+          446,
+          445,
+          242,
+          243,
+          236,
+          194,
+          218,
+          195,
+          170
+        ]
+      },
+      {
+        "Time": {
+          "h": 23,
+          "m": 59
+        },
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          446,
+          445,
+          242,
+          243,
+          236,
+          194,
+          218,
+          195,
+          170,
+          190,
+          169
+        ],
+        "Comment": "Max P/T"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          2,
+          3,
+          6,
+          7,
+          8,
+          10,
+          11
+        ],
+        "Comment": "Stats + Adv + Beard-E/M + PP + Blood + Exp"
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "List": [
+          3,
+          8,
+          4,
+          5,
+          11,
+          6,
+          7
+        ],
+        "Comment": "Adv + NGU-E/M + Beard E/M + PP + Exp",
+        "DiggerOptions": "0-Drops, 1-Wandoos, 2-Stats, 3-Adv, 4/5-E/M NGU, 6/7-E/M Beards, 8-PP, 9-DayCare, 10-Blood, 11-XP",
+        "Priorities1": "3+8 should be always on to maximize PP gains, swap 8 to 0 if farming from a zone other than ITOPOD",
+        "Priorities2": "4+5 should be on all of the time after the initial setup (when boosting NGUs)",
+        "Priorities3": "11 > 9 should always be on if possible",
+        "Priorities4": "10 should always be on when blood can be easily capped",
+        "Priorities6": "1+2 are only needed if held back by floor restrictions or during challenges",
+        "Priorities7": "6+7 are only useful mid-game (early to mid evil), early on there aren't the diggers to spare and beards provide small bonuses, and late beards can be BB capped without digger support"
+      },
+      {
+        "Time": {
+          "h": 23,
+          "m": 59
+        },
+        "List": [
+          2,
+          3,
+          4,
+          5,
+          8,
+          9,
+          11
+        ],
+        "Comment": "Max Stats prior to rebirth"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          5,
+          6,
+          1,
+          3,
+          0
+        ],
+        "Comment": "Adv + GPS + Drops + NGU + Stats",
+        "BeardOptions": "0-Stats, 1-Drops, 2-Number, 3-NGU, 4-Wandoos, 5-Adv, 6-GPS",
+        "Priorities1": "The BEARd should be always on to maximize adventure stats",
+        "Priorities2": "The LadyBeard helps to run Wandoos at lower cost",
+        "Priorities3": "The Neckbeard helps with drop chance, the Beard Cage helps with NGUs"
+      },
+      {
+        "Time": {
+          "m": 30
+        },
+        "List": [
+          5,
+          1,
+          3,
+          6,
+          0
+        ],
+        "Comment": "Adv + Drops + NGU + GPS + Stats"
+      }
+    ],
+    "NGUDiff": [
+      {
+        "Time": 0,
+        "Diff": 0
+      },
+      {
+        "Time": {
+          "h": 22
+        },
+        "Diff": 1
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Time",
+        "Time": {
+          "h": 24,
+          "m": 1
+        }
+      }
+    ],
+    "Challenges": []
+  }
+}

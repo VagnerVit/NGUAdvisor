@@ -1,0 +1,112 @@
+{
+  "Breakpoints": {
+    "_Preset": "Mini-CBlock leg 3 of 4 (No Rebirth), guide chapter 3, NORMAL (auto-installed). Runs No Rebirth 1, the entry chapter 3 names first for the block ('No Rebirth 1, Blind 1, No Time Machine 1'). Expect it to take a while, potentially 12+ hours. Energy opens on Basic Training and capped Wandoos, moves onto AT-3/AT-4 at 25 minutes, drops the Basic Training cap at the hour and picks up the Time Machine and the best affordable Augment from hour 4, once the Fruit of Power eaten at hours 2 and 4 has unlocked it; magic runs Time Machine and Wandoos throughout. Number 100 rebirth plan, the same one the other three C-Miniblock2.x legs use - it is what engages the challenge, and once No Rebirth is running the game blocks rebirth by itself, so the target only fires the next rebirth after the challenge ends. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target Cave of Many Things with Fallthrough (ITOPOD after boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0. Eat the Yggdrasil Fruit of Power - the run leans on it at hours 2 and 4 to unlock the Time Machine. Put low targets on AT-0/1/2 and high or infinite targets on AT-3/4: a No Rebirth run is long enough to unlock Advanced Training, and with no rebirths to farm it is Wandoos and AT that carry the power.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPWAN"
+        ]
+      },
+      {
+        "Time": {
+          "m": 25
+        },
+        "Priorities": [
+          "CAPALLBT",
+          "AT-3",
+          "AT-4"
+        ]
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "Priorities": [
+          "WAN",
+          "AT-3",
+          "AT-4"
+        ]
+      },
+      {
+        "Time": {
+          "h": 4
+        },
+        "Priorities": [
+          "TM",
+          "WAN",
+          "BESTAUG"
+        ],
+        "Comment": "FoP is eaten at hour 2 and 4, the boost from these fruit should unlock TM"
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "TM",
+          "WAN"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          130,
+          131,
+          132,
+          133,
+          134,
+          101,
+          138,
+          440
+        ],
+        "Comment": "Max P/T Gear - AT/Wandoos Accessories"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 1
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2
+        ],
+        "Comment": "Wandoos and Stats"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          4
+        ],
+        "Comment": "Stats and Wandoos"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "NORB-1"
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "Breakpoints": {
+    "_Preset": "Laser Sword ALLOCATION profile for Challenge Block 2, guide chapter 4, NORMAL (auto-installed). This is not a challenge queue and its rotation is deliberately empty: LscAdvisor owns Laser Sword and redirects an already-scheduled rebirth into it, so select this profile to have the right allocation, gear and rebirth plan in place WHILE the advisor takes you through those runs. LSC is the only challenge that does not reset your Number, which is why this file carries a Number 100000 rebirth target found in no other profile, two Energy breakpoints that push Augment 12 to 80% and hand over to Augment 13 at 15 minutes, and a gear set balancing Time Machine, Wandoos, Blood Ritual and Augments. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target A Very Strange Place with Fallthrough (ITOPOD after TM, for PP). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0. Put low targets on AT-0/1/2 and high or infinite on AT-3/4. Make a 1/1 Laser Sword first - that is the unlock. Turn Advisor Challenges ON: that is the switch LscAdvisor and the in-challenge sword focus both run off, and with it off nothing completes Laser Sword at all.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPWAN",
+          "CAPAUG-12",
+          "BESTAUG"
+        ]
+      },
+      {
+        "Time": {
+          "m": 15
+        },
+        "Priorities": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPAUG-12",
+          "AUG-13"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPWAN",
+          "BR-300",
+          "TM"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          173,
+          185,
+          186,
+          187,
+          168,
+          189,
+          160,
+          443,
+          442,
+          161,
+          138,
+          441
+        ],
+        "Comment": "Balance TM, Wandoos, BR and Augs"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 1
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          2,
+          3,
+          10,
+          11
+        ],
+        "Comment": "Wandoos + Stats + Adventure + Exp"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          5,
+          4,
+          1,
+          3
+        ],
+        "Comment": "Adv + Wandoos + Drops + NGU"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100000
+      }
+    ],
+    "Challenges": []
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "Breakpoints": {
+    "_Preset": "Mini-CBlock leg 2 of 4, guide chapter 3, NORMAL (auto-installed). One No Time Machine Challenge, taken for its first-completion reward. With TM gone the run leans on Wandoos and Advanced Training: energy opens on Basic Training plus an augment, moves onto AT-3/AT-4 at 25 minutes and caps Wandoos from the hour; magic runs Blood Ritual and Wandoos; the digger list is deliberately empty, because no Time Machine means no diggers. Number 100 rebirth plan. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target High Security Base with Fallthrough. Gold tab: CBlock Mode OFF for this leg. Allocation tab: Spaghetti/Counterfeit % to 0. Buy only the one or two most expensive augments you can afford and put the rest of the gold into the first Blood Ritual once it unlocks. Optional: disable rebirth when you are close and eat a Fruit of Power to finish the run.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "AUG-4",
+          "WAN"
+        ],
+        "Comment": "Swap to AUG-4 later in the run"
+      },
+      {
+        "Time": {
+          "m": 25
+        },
+        "Priorities": [
+          "CAPALLBT",
+          "AT-3",
+          "AT-4",
+          "WAN"
+        ]
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "Priorities": [
+          "CAPWAN",
+          "AT-3",
+          "AT-4"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "BR",
+          "WAN"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          130,
+          131,
+          132,
+          133,
+          134,
+          101,
+          138,
+          136
+        ],
+        "Comment": "Max P/T Gear - Gold + Wandoos Accessories, maybe use 440 instead of 136 for maximum Wandoos speed?"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [],
+        "Comment": "No TM means no diggers"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          2,
+          4,
+          5
+        ],
+        "Comment": "Stats + Number + Wandoos + Adv"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100,
+        "Comment": "Option: Disable rebirth when close and eat a Fruit of Power to get past the final stretch, maybe also bump up the Target once rebirths last >20 minutes?"
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "NOTM-1"
+    ]
+  }
+}

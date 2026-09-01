@@ -1,0 +1,302 @@
+{
+  "Breakpoints": {
+    "_Preset": "Final CBlock, guide chapter 8, SADISTIC (auto-installed). The post-T11 sweep of everything that still has a reward on it: Trolls 3-7, all 10 Blinds, and 24 Hours 3-7. No Time Machine and No NGU are deliberately absent - the guide says to skip them, and PostEND-Challenges picks them up later. Five gear breakpoints swap between two sets across the first hour. Number 1000 with a 32 minute rebirth ceiling. Enter post-T11 / T11v1 AutoKill with the T11 set maxed; hands back to muff rebirths from T11v1 to T11v2. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill/Guff A&B to 0, Number to 1E+20.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPAUG-8",
+          "CAPAUG-9",
+          "CAPALLNGU"
+        ]
+      },
+      {
+        "Time": {
+          "m": 8
+        },
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPWAN",
+          "CAPAUG-8",
+          "CAPAUG-9",
+          "CAPALLNGU"
+        ],
+        "Priorities_bak": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPWAN",
+          "CAPAUG-12",
+          "CAPAUG-13"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPTM",
+          "BR",
+          "CAPALLNGU"
+        ]
+      },
+      {
+        "Time": {
+          "m": 8
+        },
+        "Priorities": [
+          "CAPTM",
+          "CAPWAN",
+          "BR",
+          "CAPALLNGU"
+        ],
+        "Priorities_bak": [
+          "CAPTM",
+          "CAPWAN",
+          "BR"
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "HACK-1"
+        ],
+        "PrioritiesDefault": []
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          407,
+          366,
+          392,
+          374,
+          354,
+          403,
+          136,
+          118,
+          171,
+          121,
+          505,
+          386,
+          413,
+          431,
+          382,
+          351,
+          421,
+          383,
+          422,
+          384,
+          381,
+          385
+        ],
+        "Default (Respawn4EMPC0Aug6Wandoos2EMPC + 9mm Baretta)": "[ 407, 366,   392, 374, 354, 403,   136, 118, 171, 121,   505, 386, 413, 431, 382, 351,   421, 383,   422, 384, 381 ]",
+        "OldDefault (MeepleMolotovEBars1EMPC)": "[ ]",
+        "LSC (MeepleMolotovAugmentation0EBars1EMPC)": "[ ]",
+        "NoTM (MeepleMolotovEBars1Gold3EMPC+HatOfGreed)": "[ ]"
+      },
+      {
+        "Time": {
+          "m": 30
+        },
+        "ID": [
+          420,
+          423,
+          416,
+          417,
+          418,
+          419,
+          505,
+          504,
+          430,
+          422,
+          421,
+          431,
+          414,
+          413,
+          406,
+          405,
+          385,
+          386,
+          397,
+          383,
+          398,
+          384
+        ]
+      },
+      {
+        "Time": {
+          "m": 31
+        },
+        "ID": [
+          407,
+          366,
+          392,
+          374,
+          354,
+          403,
+          136,
+          118,
+          171,
+          121,
+          505,
+          386,
+          413,
+          431,
+          382,
+          351,
+          421,
+          383,
+          422,
+          384,
+          381,
+          385
+        ]
+      },
+      {
+        "Time": {
+          "h": 1
+        },
+        "ID": [
+          420,
+          423,
+          416,
+          417,
+          418,
+          419,
+          505,
+          504,
+          430,
+          422,
+          421,
+          431,
+          414,
+          413,
+          406,
+          405,
+          385,
+          386,
+          397,
+          383,
+          398,
+          384
+        ]
+      },
+      {
+        "Time": {
+          "h": 1,
+          "m": 3
+        },
+        "ID": [
+          407,
+          366,
+          392,
+          374,
+          354,
+          403,
+          136,
+          118,
+          171,
+          121,
+          505,
+          386,
+          413,
+          431,
+          382,
+          351,
+          421,
+          383,
+          422,
+          384,
+          381,
+          385
+        ]
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 1
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          8,
+          9,
+          10,
+          11
+        ],
+        "Comment": "All but Beards"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          4,
+          2,
+          6,
+          5,
+          1,
+          3
+        ],
+        "Comment": "All beards"
+      }
+    ],
+    "NGUDiff": [
+      {
+        "Time": 0,
+        "Diff": 2
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "TC-3",
+      "TC-4",
+      "TC-5",
+      "TC-6",
+      "TC-7",
+      "BLIND-1",
+      "BLIND-2",
+      "BLIND-3",
+      "BLIND-4",
+      "BLIND-5",
+      "BLIND-6",
+      "BLIND-7",
+      "BLIND-8",
+      "BLIND-9",
+      "BLIND-10",
+      "24HR-3",
+      "24HR-4",
+      "24HR-5",
+      "24HR-6",
+      "24HR-7"
+    ]
+  }
+}

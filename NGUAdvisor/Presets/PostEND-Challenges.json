@@ -1,0 +1,249 @@
+{
+  "Breakpoints": {
+    "_Preset": "Post-END challenge sweep, SADISTIC (auto-installed). Not a guide block - it is the shipped mop-up for everything the Sadistic Final CBlock deliberately skipped: all 10 No NGUs and No Time Machines, the last three 24 Hours, and Laser Sword 1-20. This is the only profile anywhere that starts Laser Sword at 1, so unlike the Normal and Evil LSC runs its entries can actually fire (the advisor also runs LSC on its own). Number 1000 with a 31 minute rebirth ceiling, and a second energy/magic breakpoint at 5 minutes. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill/Guff A&B to 0, Number to 1E+30. Set the hardcap input in the Gear Optimizer, and lock Duck-t Tape and the Max Ascended Looty as the first two items of every gear set so EMPC stops being a constraint. Ignore Respawn, NGU and Adventure stats now - this is pure Number/Attack/Defense. R3 no longer matters either: hacks are maxed and wishes give no meaningful progression.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ],
+        "PrioritiesLSC": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPAUG-12",
+          "CAPAUG-13",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLBT",
+          "CAPTM",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ]
+      },
+      {
+        "Time": {
+          "m": 5
+        },
+        "Priorities": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ],
+        "PrioritiesLSC": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPAUG-12",
+          "CAPAUG-13",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPAUG-10",
+          "CAPAUG-11",
+          "ALLNGU"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPTM",
+          "BR",
+          "ALLNGU"
+        ]
+      },
+      {
+        "Time": {
+          "m": 5
+        },
+        "Priorities": [
+          "CAPWAN",
+          "BR",
+          "ALLNGU"
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": []
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          366,
+          514,
+          507,
+          470,
+          509,
+          510,
+          501,
+          505,
+          382,
+          386,
+          351,
+          247,
+          474,
+          479,
+          478,
+          477,
+          512,
+          513,
+          428,
+          429,
+          475,
+          467
+        ],
+        "GO Notes": "9mm Beretta + Power0AugmentationEBars1Power"
+      },
+      {
+        "Time": 5,
+        "ID": [
+          366,
+          514,
+          507,
+          470,
+          509,
+          411,
+          501,
+          505,
+          382,
+          386,
+          351,
+          247,
+          466,
+          421,
+          383,
+          479,
+          478,
+          477,
+          512,
+          513,
+          428,
+          429
+        ],
+        "GO Notes": "9mm Beretta/Fuzzy Boots + Power0AugmentationWandoos3Power"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 1,
+        "Default": 1,
+        "NoNGU": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          8,
+          9,
+          10,
+          11
+        ],
+        "Comment": "All but DC and Beards"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          5,
+          1,
+          3,
+          6,
+          0,
+          4,
+          2
+        ],
+        "Comment": "All beards"
+      }
+    ],
+    "NGUDiff": [
+      {
+        "Time": 0,
+        "Diff": 2
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 31
+        }
+      }
+    ],
+    "Challenges": [
+      "LSC-1",
+      "LSC-2",
+      "LSC-3",
+      "LSC-4",
+      "LSC-5",
+      "LSC-6",
+      "LSC-7",
+      "LSC-8",
+      "LSC-9",
+      "LSC-10",
+      "LSC-11",
+      "LSC-12",
+      "LSC-13",
+      "LSC-14",
+      "LSC-15",
+      "LSC-16",
+      "LSC-17",
+      "LSC-18",
+      "LSC-19",
+      "LSC-20",
+      "NONGU-1",
+      "NONGU-2",
+      "NONGU-3",
+      "NONGU-4",
+      "NONGU-5",
+      "NONGU-6",
+      "NONGU-7",
+      "NONGU-8",
+      "NONGU-9",
+      "NONGU-10",
+      "NOTM-1",
+      "NOTM-2",
+      "NOTM-3",
+      "NOTM-4",
+      "NOTM-5",
+      "NOTM-6",
+      "NOTM-7",
+      "NOTM-8",
+      "NOTM-9",
+      "NOTM-10",
+      "24HR-8",
+      "24HR-9",
+      "24HR-10"
+    ]
+  }
+}

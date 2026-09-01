@@ -1,0 +1,174 @@
+{
+  "Breakpoints": {
+    "_Preset": "Challenge Block 4, guide chapter 6, EVIL (auto-installed). A 32-entry queue: No Rebirth to 10, Troll to 5, No NGU to 7, all 5 No Equipment, plus the Blind, 24 Hour and No Time Machine runs the guide leaves open-ended. Troll 5 and No NGU 7 are the ones that matter - they carry the Hack Speed for Hack Day 1 - and only 8 No Rebirths are strictly needed to get T9's timer down to an hour. Number 1000 with a 32 minute rebirth ceiling. Enter after the Typo snipe; hands back to Hack Day 1. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Snipe 1 of each Typo item BEFORE starting: entering a challenge resets Advanced Training, Temp Beards and Banks, so otherwise you climb back up to Typo for Hack Day 1 gear. Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill/Guff A&B to 0, Number to 1E+20. Put low targets on AT-0/1/2 and high or infinite on AT-3/4. Gear: EM bars matter here to get Magic Beards working ASAP - best Aug item (Meeple), best Wandoos item (Cocktail), then as much EMPC as keeps cap time at 3 minutes.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "AUG-8",
+          "AUG-9"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "AUG-8",
+          "AUG-9"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesForNOTM": [
+          "CAPWAN",
+          "RIT-7",
+          "WAN"
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "HACK-0"
+        ],
+        "PrioritiesDefault": [
+          "HACK-0"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          305,
+          301,
+          302,
+          267,
+          304,
+          247,
+          273,
+          448,
+          272,
+          263,
+          306,
+          447,
+          449,
+          270,
+          248,
+          296,
+          271
+        ],
+        "Comment": "MeepleMolotovEBars3EMPC"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 1
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          8,
+          9,
+          10,
+          11
+        ],
+        "Comment": "All but DC and Beards"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          4,
+          2,
+          6,
+          5
+        ],
+        "Comment": "Stats + Wandoos + Number + GPS + Adv"
+      }
+    ],
+    "NGUDiff": [
+      {
+        "Time": 0,
+        "Diff": 0
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "24HR-2",
+      "24HR-3",
+      "24HR-4",
+      "NONGU-2",
+      "NONGU-3",
+      "NONGU-4",
+      "NONGU-5",
+      "NONGU-6",
+      "NONGU-7",
+      "TC-3",
+      "TC-4",
+      "TC-5",
+      "BLIND-2",
+      "BLIND-3",
+      "BLIND-4",
+      "BLIND-5",
+      "BLIND-6",
+      "BLIND-7",
+      "NOTM-2",
+      "NOTM-3",
+      "NOTM-4",
+      "NOTM-5",
+      "NOEC-1",
+      "NOEC-2",
+      "NOEC-3",
+      "NOEC-4",
+      "NOEC-5",
+      "NORB-7",
+      "NORB-8",
+      "NORB-9",
+      "NORB-10",
+      "24HR-5"
+    ]
+  },
+  "_Injector": "[fork] R3 lane taken from the sample profile: the upstream preset queues MILEHACK-* and this fork has no MileHackBP to parse it."
+}

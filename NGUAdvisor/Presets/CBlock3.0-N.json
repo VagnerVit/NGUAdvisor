@@ -1,0 +1,177 @@
+{
+  "Breakpoints": {
+    "_Preset": "Challenge Block 3, Normal leg, guide chapter 5 (auto-installed). This is chapter 5 work that runs on NORMAL difficulty, not a chapter 4 leftover: after the Evil part of CBlock 3 the guide sends you back to Normal to clear the last 5 No Time Machine and the remaining 24 Hour challenges chapter 4 told you to leave. Challenge completions are per difficulty, which is the whole reason the return trip works. Number 1000 rebirth plan; the block hands back to 24h rebirths focusing Adventure stats, then the Adventure Hack. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Rebirth to NORMAL difficulty and wait 3 minutes before starting the challenges. Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill to 0, Number to 1E+20. Put low targets on AT-0/1/2 and high or infinite on AT-3/4.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLNGU",
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "CAPBESTAUG",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLNGU",
+          "CAPALLBT",
+          "CAPALLAT",
+          "CAPWAN",
+          "CAPTM",
+          "CAPBESTAUG",
+          "WAN"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "CAPTM",
+          "BR",
+          "WAN"
+        ],
+        "PrioritiesForNOTM": [
+          "CAPALLNGU",
+          "CAPWAN",
+          "RIT-0",
+          "WAN"
+        ]
+      }
+    ],
+    "R3": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "HACK-0"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          445,
+          243,
+          242,
+          444,
+          195,
+          218,
+          446,
+          189,
+          161
+        ],
+        "Default-NGU4TM3Wan": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          445,
+          243,
+          242,
+          444,
+          195,
+          218,
+          446,
+          189,
+          161
+        ],
+        "NOTM-Gold3Wan3AT": [
+          241,
+          164,
+          232,
+          233,
+          240,
+          192,
+          142,
+          136,
+          189,
+          161,
+          218,
+          138,
+          446
+        ],
+        "Comment": "Maximize TM & Wandoos, maximize gold drop accessories for NOTM"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 2
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          4,
+          5,
+          8,
+          10,
+          11
+        ],
+        "Comment": "Wandoos + Stats + E/MNGU + PP + Blood + Exp"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          2,
+          4,
+          6
+        ],
+        "ListForNOTM": [
+          0,
+          2,
+          4,
+          5
+        ],
+        "Comment": "Stats + Number + Wandoos + GPS"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "NOTM-6",
+      "NOTM-7",
+      "NOTM-8",
+      "NOTM-9",
+      "NOTM-10",
+      "24HR-7",
+      "24HR-8",
+      "24HR-9",
+      "24HR-10"
+    ]
+  }
+}

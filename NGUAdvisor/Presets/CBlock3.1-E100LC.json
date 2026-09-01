@@ -1,0 +1,115 @@
+{
+  "Breakpoints": {
+    "_Preset": "Challenge Block 3, Evil leg 1 of 2, guide chapter 5, EVIL (auto-installed). Runs all five Evil 100 Level Challenges first, on a Number 1000 rebirth plan, with beards off. Energy caps Basic Training then an augment, the Time Machine and the NGUs; magic runs a Blood Ritual then TM and the NGUs. Enter CBlock 3 after T7 is killed and Boss 125 is reachable inside an hour, with Incriminating Evidence maxed and the Grey Heart bought. CBlock3.2-E is the other Evil leg, and CBlock3.0-N is the Normal return trip that closes the block. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON in ITOPOD (a lower zone for gold before boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit/Iron Pill to 0, Number to 1E+20. Disable all beards and stat advancement, and set targets on the Time Machine and Augments tabs. Stop allocating Wandoos after boss 30 and save the levels for TM.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "AUG-8",
+          "CAPTM",
+          "CAPALLNGU"
+        ],
+        "Before30": [
+          "CAPALLBT",
+          "AUG-4",
+          "WAN"
+        ],
+        "After30": [
+          "CAPALLBT",
+          "CAPTM",
+          "AUG-8"
+        ],
+        "Comment": "If WAN levels get to 90 prior to TM, remove WAN"
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "RIT-7",
+          "CAPTM",
+          "CAPALLNGU"
+        ],
+        "Before30": [
+          "WAN"
+        ],
+        "After30": [
+          "CAPTM",
+          "RIT-7"
+        ],
+        "Note": "RIT-7 is the EIGHTH ritual and it only exists once the NORMAL Troll challenge has 6+ completions (ritualsUnlocked() returns a count, 7 or 8). CBlock2-Normal runs TC-5/6/7 and finishes before Evil entry, so the ritual is unlocked by the time this block starts; boss 105 is under the boss 125 this profile is entered at. If you skipped those Trolls the lane reports locked and is dropped before the share is divided - it costs nothing, it just does nothing."
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          241,
+          237,
+          238,
+          239,
+          240,
+          446,
+          445,
+          236,
+          242,
+          243,
+          194,
+          218,
+          195,
+          170
+        ],
+        "Comment": "Max P/T"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          3,
+          7,
+          8,
+          10,
+          11
+        ],
+        "Comment": "Wandoos + Stats + Adventure + MBeard + PP + Blood + Exp"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [],
+        "Comment": "No beards"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "100LC-1",
+      "100LC-2",
+      "100LC-3",
+      "100LC-4",
+      "100LC-5"
+    ]
+  }
+}

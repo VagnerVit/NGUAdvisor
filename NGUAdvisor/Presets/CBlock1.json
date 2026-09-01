@@ -1,0 +1,169 @@
+{
+  "Breakpoints": {
+    "_Preset": "Challenge Block 1, guide chapter 3, NORMAL (auto-installed). The 27-entry queue the guide lists: all 5 No Augs and No Equipment, No Rebirth to 4, Blind to 4, No NGU to 4, Troll to 4 (the guide calls the fourth optional for a beard slot - it is taken here), No Time Machine to 3, finishing on a 24 Hour to climb Number. Troll 3 and No Rebirth 4 are the ones that matter. Number 1000 rebirth plan. Enter after T5 with the CCoD, PAWGs at 5k each and a 1k% Rich Jerks Attack/Defense boost; hands back to 24h rebirths with NGUs and Beards on Adventure. No Rebirth 2-4 stay idle until No Rebirth 1 is completed, and no preset supplies it. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target A Very Strange Place with Fallthrough (ITOPOD after TM unlocks, for PP). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0. Put low targets on AT-0/1/2 and high or infinite on AT-3/4 - a run long enough to unlock AT is a run whose power has to come from Wandoos. Eat the Yggdrasil Fruit of Power during the No Rebirth challenges.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPTM",
+          "BESTAUG",
+          "CAPALLAT",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPALLBT",
+          "CAPWAN",
+          "CAPTM",
+          "BESTAUG",
+          "CAPALLAT",
+          "WAN"
+        ]
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPWAN",
+          "BR-300",
+          "CAPTM",
+          "WAN"
+        ],
+        "PrioritiesDefault": [
+          "CAPWAN",
+          "BR-300",
+          "CAPTM",
+          "WAN"
+        ],
+        "PrioritiesForNORB": [
+          "CAPWAN",
+          "CAPTM",
+          "WAN"
+        ]
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          155,
+          144,
+          132,
+          146,
+          159,
+          148,
+          139,
+          140,
+          441,
+          440
+        ],
+        "IDDefault": [
+          155,
+          144,
+          132,
+          146,
+          159,
+          148,
+          139,
+          140,
+          441,
+          440
+        ],
+        "IDForNOTM": [
+          155,
+          144,
+          132,
+          146,
+          159,
+          136,
+          94,
+          116,
+          110,
+          148
+        ],
+        "Comment": "Maximize TM & Wandoos, maximize gold drop accessories for NOTM"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0,
+        "OSDefault": 0,
+        "OSForNORB": 1
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2,
+          3
+        ],
+        "Comment": "Wandoos + Stats + Adventure"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          2,
+          4,
+          6
+        ],
+        "ListForNOTM": [
+          0,
+          2,
+          4,
+          5
+        ],
+        "Comment": "Stats + Number + Wandoos + GPS"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 1000
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "NOAUG-1",
+      "NOAUG-2",
+      "NOAUG-3",
+      "NOAUG-4",
+      "NOAUG-5",
+      "NOEC-1",
+      "NOEC-2",
+      "NOEC-3",
+      "NOEC-4",
+      "NOEC-5",
+      "NORB-2",
+      "NORB-3",
+      "NORB-4",
+      "BLIND-2",
+      "BLIND-3",
+      "BLIND-4",
+      "NONGU-1",
+      "NONGU-2",
+      "NONGU-3",
+      "NONGU-4",
+      "TC-1",
+      "TC-2",
+      "TC-3",
+      "TC-4",
+      "NOTM-2",
+      "NOTM-3",
+      "24HR-3"
+    ]
+  }
+}

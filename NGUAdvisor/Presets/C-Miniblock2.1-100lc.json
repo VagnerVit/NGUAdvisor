@@ -1,0 +1,84 @@
+{
+  "Breakpoints": {
+    "_Preset": "Mini-CBlock leg 1 of 4, guide chapter 3, NORMAL (auto-installed). Runs all five 100 Level Challenges back to back on a Number 100 rebirth plan; the guide wants 100LCs on fast rebirths (ideally 3 minutes, under 10). Energy caps Basic Training and the Time Machine then feeds one augment, magic caps TM then Blood Ritual, and beards are off for the whole leg. Enter the Mini-CBlock after T4 AutoKill with the PAWGs (Power/Augments/Wandoos/Gold NGUs) at 500 each. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target High Security Base with Fallthrough (ITOPOD after boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0. Disable stat advancement and set targets on the Time Machine and Augments tabs (6-10 Milk Infusion before TM, 10-20 Energy Cannon after). Stop allocating Wandoos after boss 30 - past 90 levels it just eats levels TM wants.",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "CAPTM",
+          "AUG-8"
+        ],
+        "Comment": "If WAN levels get to 90 prior to TM, remove WAN. [ CAPALLBT, AUG-2, WAN ] Swap after boss 30: [ CAPALLBT, CAPTM, AUG-8 ]"
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPTM",
+          "BR"
+        ],
+        "Comment": "[ WAN ] Swap after boss 30: [ CAPTM, BR ]"
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          130,
+          131,
+          132,
+          133,
+          134,
+          440,
+          117,
+          108
+        ],
+        "Comment": "Max P/T"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [],
+        "Comment": "Turn off all beards"
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          2
+        ],
+        "Comment": "Stats"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "100LC-1",
+      "100LC-2",
+      "100LC-3",
+      "100LC-4",
+      "100LC-5"
+    ]
+  }
+}

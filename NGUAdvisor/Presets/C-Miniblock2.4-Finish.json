@@ -1,0 +1,95 @@
+{
+  "Breakpoints": {
+    "_Preset": "Mini-CBlock leg 4 of 4, guide chapter 3, NORMAL (auto-installed). Closes the block with Blind 1 for its first-completion reward and a 24 Hour Challenge to climb Number back towards the Beardverse. Energy and magic both run Time Machine and Wandoos on a Number 100 rebirth plan. The block then hands back to 24h rebirths focusing NGU Adventure. The No Rebirth leg ships separately as C-Miniblock2.3-NoRB. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Injector": "Adventure: Combat ON, Idle, target Ancient Battlefield with Fallthrough (ITOPOD after boss 30). Gold tab: CBlock Mode ON. Allocation tab: Spaghetti/Counterfeit % to 0. AUG commands reserve idle energy they cannot spend at these levels - if that happens, trigger augments by hand or use AUG-X with a target level on the Augments tab (a capped target frees the energy again).",
+    "Energy": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "CAPALLBT",
+          "TM",
+          "WAN",
+          "AUG-8"
+        ],
+        "PrioritiesX": [
+          "CAPALLBT",
+          "TM",
+          "WAN"
+        ],
+        "Comment": "AUG commands do not seem to work well at low levels, as it will reserve idle energy it cannot use. Best way to improve AUG is to manually trigger it or use AUG-X and set target levels (if the target is capped the energy will be freed)."
+      }
+    ],
+    "Magic": [
+      {
+        "Time": 0,
+        "Priorities": [
+          "TM",
+          "WAN"
+        ],
+        "PrioritiesX": [
+          "BR"
+        ],
+        "Comment": "BR commands do not seem to work well at low levels. Best way to improve BR is to manually trigger it or make a BR breakpoint with no other priorities."
+      }
+    ],
+    "Gear": [
+      {
+        "Time": 0,
+        "ID": [
+          130,
+          131,
+          132,
+          133,
+          134,
+          101,
+          138,
+          440,
+          136
+        ],
+        "Comment": "Max P/T Gear - Aug/Wandoos Accessories"
+      }
+    ],
+    "Wandoos": [
+      {
+        "Time": 0,
+        "OS": 0
+      }
+    ],
+    "Diggers": [
+      {
+        "Time": 0,
+        "List": [
+          1,
+          2
+        ],
+        "Comment": "Wandoos and Stats"
+      }
+    ],
+    "Beards": [
+      {
+        "Time": 0,
+        "List": [
+          0,
+          4
+        ],
+        "Comment": "Stats and Wandoos"
+      }
+    ],
+    "Rebirth": [
+      {
+        "Type": "Number",
+        "Target": 100
+      },
+      {
+        "Type": "Time",
+        "Time": {
+          "m": 32
+        }
+      }
+    ],
+    "Challenges": [
+      "BLIND-1",
+      "24HR-2"
+    ]
+  }
+}
