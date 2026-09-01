@@ -159,7 +159,7 @@ namespace NGUAdvisor.Managers
                     row.Affordable = buy.Affordable;
                     row.Note = $"tier {buy.CurLevel} → {buy.TargetLevel}";
                 }
-                else row.Note = "no fruit tier queued at this chapter";
+                else row.Note = Banked(SpendPlanner.NextFruitPlanned());
             }
             catch (Exception e) { row.Note = Fail(e); }
             return row;
@@ -190,7 +190,11 @@ namespace NGUAdvisor.Managers
         private static string Banked(SpendPlanner.PlannedBuy planned)
         {
             if (!planned.Known) return "plan complete";
-            string gate = planned.DifficultyGated ? "higher difficulty" : $"chapter {planned.MinChapter}";
+            // Cap first: it is the hard GAME gate (AllYggdrasil.capTier()), while the chapter is only
+            // the guide's schedule -- reporting the chapter over a cap block names the wrong cause.
+            string gate = planned.CapGated ? "tier cap 24 - Troll Challenge 3x"
+                : planned.DifficultyGated ? "higher difficulty"
+                : $"chapter {planned.MinChapter}";
             return $"banking for {planned.Name?.Trim()} ({gate})";
         }
 

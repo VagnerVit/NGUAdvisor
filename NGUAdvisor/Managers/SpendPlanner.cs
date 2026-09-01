@@ -29,7 +29,13 @@ namespace NGUAdvisor.Managers
             public string Match;    // matched against live name list
             public long Target;     // 0 = max level (perks/quirks); tier for fruits
             public int MinChapter;  // step ignored before this chapter
-            public Step(string m, long t, int ch) { Match = m; Target = t; MinChapter = ch; }
+            // Fruits only: tier cap the step needs (0 = ungated). The guide schedules the tier-24
+            // push for ch4, but the GAME gate is AllYggdrasil.capTier() -- 10 until Troll Challenge
+            // 3x, then 24. Those come apart (cap earned before T6), and gating on the chapter alone
+            // stalled the plan with seeds banked and nowhere to spend them.
+            public int MinCap;
+            public Step(string m, long t, int ch) { Match = m; Target = t; MinChapter = ch; MinCap = 0; }
+            public Step(string m, long t, int ch, int cap) { Match = m; Target = t; MinChapter = ch; MinCap = cap; }
         }
 
         // ---- ITOPOD perk order (guide ch2-4; ch5+ partial) ----
@@ -124,16 +130,16 @@ namespace NGUAdvisor.Managers
             new Step("Luck", 1, 3),
             new Step("Pomegranate", 10, 3),
             new Step("Luck", 5, 3),
-            new Step("Gold", 24, 4),          // post-TC3 (cap 24): FoG -> Pom -> FoK -> FoL ->
-            new Step("Pomegranate", 24, 4),   // FoPa/FoA -> FoAP -> FoPb/FoN -> FoR
-            new Step("Knowledge", 24, 4),
-            new Step("Luck", 24, 4),
-            new Step("Power α", 24, 4),
-            new Step("Adventure", 24, 4),
-            new Step("Arbitrariness", 24, 4),
-            new Step("Power β", 24, 4),
-            new Step("Numbers", 24, 4),
-            new Step("Rage", 24, 4),
+            new Step("Gold", 24, 3, 24),          // post-TC3 (cap 24): FoG -> Pom -> FoK -> FoL ->
+            new Step("Pomegranate", 24, 3, 24),   // FoPa/FoA -> FoAP -> FoPb/FoN -> FoR
+            new Step("Knowledge", 24, 3, 24),
+            new Step("Luck", 24, 3, 24),
+            new Step("Power α", 24, 3, 24),
+            new Step("Adventure", 24, 3, 24),
+            new Step("Arbitrariness", 24, 3, 24),
+            new Step("Power β", 24, 3, 24),
+            new Step("Numbers", 24, 3, 24),
+            new Step("Rage", 24, 3, 24),
         };
 
         // 0 = stage unknown: every chapter-gated step then skips, so NextPerk/NextQuirk go un-Known
@@ -339,6 +345,7 @@ namespace NGUAdvisor.Managers
             public long Cost;
             public int MinChapter;        // chapter the guide schedules it for
             public bool DifficultyGated;  // also needs a higher rebirth difficulty
+            public bool CapGated;         // fruits: blocked by the Yggdrasil tier cap, not the chapter
         }
 
         // The first quirk buy the guide still has QUEUED but which is gated by chapter or difficulty
@@ -421,6 +428,7 @@ namespace NGUAdvisor.Managers
                 foreach (var step in FruitPlan)
                 {
                     if (chapter < step.MinChapter) continue;
+                    if (cap < step.MinCap) continue;
                     int id = FindByName(ycon.fruitName, step.Match, "fruit");
                     if (id < 0 || id >= fruits.Count || id >= ycon.baseSeedCost.Count) continue;
                     long target = Math.Min(step.Target, cap);
@@ -437,6 +445,43 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception e) { Main.LogDebug($"SpendPlanner fruits: {e.Message}"); }
             return b;
+        }
+
+        // The first fruit tier the guide still has QUEUED but which is gated by the chapter or by the
+        // Yggdrasil tier cap -- what banked seeds are FOR. Seeds' only fallback used to be "no fruit
+        // tier queued at this chapter", which names the WRONG cause whenever the real gate is the cap
+        // (AllYggdrasil.capTier(): 10 until Troll Challenge 3x, then 24). Mirrors NextPerkPlanned:
+        // gates are reported, not applied, so a step blocked by either one still gets named.
+        public static PlannedBuy NextFruitPlanned()
+        {
+            var f = new PlannedBuy();
+            try
+            {
+                var c = Main.Character;
+                if (c == null) return f;
+                var ycon = c.yggdrasilController;
+                var fruits = c.yggdrasil.fruits;
+                if (ycon == null || fruits == null) return f;
+                int cap = ycon.capTier();
+
+                foreach (var step in FruitPlan)
+                {
+                    int id = FindByName(ycon.fruitName, step.Match, "fruit");
+                    if (id < 0 || id >= fruits.Count || id >= ycon.baseSeedCost.Count) continue;
+                    long tier = fruits[id].maxTier;
+                    if (tier >= step.Target) continue;
+                    if (tier == 0 && !CanUnlockFruit(c, ycon.fruitName[id])) continue;
+
+                    f.Known = true;
+                    f.Name = ycon.fruitName[id]?.Trim();
+                    f.Cost = ycon.baseSeedCost[id] * (long)Math.Ceiling(Math.Pow(tier + 1, 2));
+                    f.MinChapter = step.MinChapter;
+                    f.CapGated = cap < step.MinCap;
+                    return f;
+                }
+            }
+            catch (Exception e) { Main.LogDebug($"SpendPlanner planned fruit: {e.Message}"); }
+            return f;
         }
 
         // Unlock gates for the special fruits (from FruitController's unlock checks).
