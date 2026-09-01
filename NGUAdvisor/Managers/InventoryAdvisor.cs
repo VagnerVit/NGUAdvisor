@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -5,7 +6,8 @@ namespace NGUAdvisor.Managers
 {
     // KEEP/TRASH verdicts for owned equipment. KEEP = an item earns a slot in at least one gear
     // objective's optimal loadout (the same optimizer the modes use), or appears in a configured
-    // static loadout, or is currently worn. TRASH = owned equipment that wins nothing anywhere at
+    // static loadout, or is currently worn, or is on the community guide's "Items to Keep" list for
+    // the current chapter (GuideGear). TRASH = owned equipment that wins nothing anywhere at
     // max level. Verdicts are per item ID: duplicate copies of a KEEP item are merge fodder, not
     // trash — the UI carries that caveat.
     public static class InventoryAdvisor
@@ -16,10 +18,18 @@ namespace NGUAdvisor.Managers
             public List<KeyValuePair<int, string>> Trash = new List<KeyValuePair<int, string>>();
             // id -> how many objective-optimal loadouts include it (drives the auto boost priority).
             public Dictionary<int, int> Usage = new Dictionary<int, int>();
+            public string GuideChapter;  // chapter label the guide horizons were evaluated at ("" = unknown)
         }
 
         // Most recent verdict (BoostsPanel readout reuses it instead of re-running 30+ optimizations).
         public static Verdict Last;
+
+        private static void LogDebugSafe(Exception e) => Main.LogDebug($"InventoryAdvisor guide chapter: {e.Message}");
+
+        // One line when the guide's contribution CHANGES. Every other decision source in this codebase
+        // has a debug line (SpendDbg, ZoneDbg, TitanGoldDbg) and a new KEEP source should not be the
+        // exception: without it, "did the guide hold anything" is only answerable by opening a panel.
+        private static string _lastGuideDbg;
 
         public static Verdict Compute()
         {
@@ -74,6 +84,20 @@ namespace NGUAdvisor.Managers
             }
             foreach (var id in LoadoutManager.CurrentGearIds()) keep.Add(id);
 
+            // Community-guide chapter for the GuideGear horizons below. ProgressionAnalyzer is the
+            // canonical titan-kill chapter engine (see its class note) and it LAGS boss progress,
+            // which errs toward keeping. Unknown (0) keeps every guide entry active — over-keeping is
+            // recoverable, over-trashing is not.
+            int guideCh = 0;
+            int guideHeld = 0, guideLapsed = 0;
+            try
+            {
+                ProgressionAnalyzer.Progression prog = ProgressionAnalyzer.Detect();
+                if (prog.Known) { guideCh = prog.Chapter; v.GuideChapter = prog.Label; }
+            }
+            catch (Exception e) { LogDebugSafe(e); }
+            if (v.GuideChapter == null) v.GuideChapter = "";
+
             // Never-maxed items and transform-chain tiers are excluded from TRASH (user rule):
             // an unmaxed item still owes its permanent item-list max bonus (farm it to 100 first),
             // and chain tiers are consolidation/climb fodder, never trash.
@@ -83,6 +107,19 @@ namespace NGUAdvisor.Managers
                 if (keep.Contains(kv.Key))
                 {
                     v.Keep.Add(kv);
+                    continue;
+                }
+                // Guide hold: the guide names this item on a chapter's "Items to Keep" list and its
+                // horizon has not passed. Checked AFTER the optimizer sweep (an optimizer win needs no
+                // tag) and BEFORE the chain/unmaxed fallbacks, because the guide reason is the more
+                // useful label. This is what protects a unique-special item the optimizer undervalues
+                // TODAY but a later chapter needs — the whole reason those lists exist.
+                GuideGear.Entry ge;
+                bool onGuide = GuideGear.TryGet(kv.Key, out ge);
+                if (onGuide && GuideGear.KeepActive(ge, guideCh))
+                {
+                    guideHeld++;
+                    v.Keep.Add(new KeyValuePair<int, string>(kv.Key, kv.Value + "  [guide: " + ge.Reason + "]"));
                     continue;
                 }
                 if (TransformManager.ChainItem(kv.Key))
@@ -97,8 +134,21 @@ namespace NGUAdvisor.Managers
                     v.Keep.Add(new KeyValuePair<int, string>(kv.Key, kv.Value + "  [max first]"));
                     continue;
                 }
-                v.Trash.Add(kv);
+                // A guide item past its horizon that also wins nothing is trash like anything else —
+                // but say why the protection lapsed, or the call looks like it contradicts the guide.
+                if (onGuide) guideLapsed++;
+                v.Trash.Add(onGuide
+                    ? new KeyValuePair<int, string>(kv.Key, kv.Value + "  [guide horizon passed]")
+                    : kv);
             }
+            string guideDbg = $"[GuideGearDbg] chapter={(v.GuideChapter.Length > 0 ? v.GuideChapter : "unknown")}"
+                            + $" held={guideHeld} lapsed={guideLapsed} keep={v.Keep.Count} trash={v.Trash.Count}";
+            if (guideDbg != _lastGuideDbg)
+            {
+                _lastGuideDbg = guideDbg;
+                Main.LogDebug(guideDbg);
+            }
+
             Last = v;
             return v;
         }
