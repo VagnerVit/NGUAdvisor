@@ -37,6 +37,40 @@ namespace NGUAdvisor.Managers
 
         public static bool IsCurrentlyFightingTitan { get; set; }
 
+        // WHERE THE CHARACTER WAS ACTUALLY SENT, AND WHICH BRANCH DECIDED IT.
+        //
+        // Main.SnipeZone() is a priority cascade and eight of its branches take control with a
+        // DoZone + return of their own: money pit (twice), gold snipe, titan, quest, GoldCBlockMode,
+        // the EVIL CLIMB override and the no-TM gold-starvation override. Main.ResolveAdventureZone
+        // models only the last three sources (gear hunt / Target ITOPOD / locked-zone fallback), so it
+        // never sees any of them — and reporting used to RE-DERIVE the zone from that resolver, which
+        // meant [ZoneDbg] could name the sniped zone while the character was gold-sniping or fighting
+        // a titan.
+        //
+        // That is the defect the pick-vs-override comment in AdvisorApply.LogZoneDbg was written for,
+        // one level deeper: three of these branches carry a "(user-caught)" note because the advisor
+        // was somewhere other than it said. So the winning branch records itself instead of leaving
+        // the answer to be guessed at afterwards.
+        //
+        // DIAGNOSTIC ONLY — nothing routes off these. Zone -1 means "not adventuring this pass".
+        public static int RoutedZone { get; private set; }
+
+        public static string RoutedBy { get; private set; }
+
+        // Cleared at the top of every SnipeZone() pass, beside the IsCurrently* flags, so a branch that
+        // stops winning cannot leave last pass's answer standing.
+        public static void ClearRoute()
+        {
+            RoutedZone = -1;
+            RoutedBy = null;
+        }
+
+        public static void NoteRoute(int zone, string by)
+        {
+            RoutedZone = zone;
+            RoutedBy = by;
+        }
+
         public static float BaseGlobalCooldown() => _character.inventory.itemList.redLiquidComplete ? 0.8f : 1f;
 
         public static float RemainingGlobalCooldown() => Mathf.Max(0f, _pc.moveTimer);

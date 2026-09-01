@@ -1260,6 +1260,7 @@ namespace NGUAdvisor
                 CombatHelpers.IsCurrentlyQuesting = false;
                 CombatHelpers.IsCurrentlyAdventuring = false;
                 CombatHelpers.IsCurrentlyFightingTitan = false;
+                CombatHelpers.ClearRoute();   // the winning branch below records itself
 
                 if (!Settings.GlobalEnabled)
                     return;
@@ -1289,11 +1290,13 @@ namespace NGUAdvisor
                 {
                     if (MoneyPitManager.NeedsGold())
                     {
+                        CombatHelpers.NoteRoute(0, "money pit — needs gold");
                         CombatManager.DoZone(0);
                     }
                     else // To avoid getting more gold
                     {
                         CombatHelpers.IsCurrentlyAdventuring = true;
+                        CombatHelpers.NoteRoute(1000, "money pit — avoiding gold");
                         CombatManager.DoZone(1000); // Checks fight timer and gold lock
                         ITOPODManager.Update();
                     }
@@ -1304,6 +1307,7 @@ namespace NGUAdvisor
                 {
                     if (Character.machine.realBaseGold == 0.0)
                     {
+                        CombatHelpers.NoteRoute(0, "Time Machine gold empty");
                         CombatManager.DoZone(0);
                         return;
                     }
@@ -1326,6 +1330,7 @@ namespace NGUAdvisor
                             else if (_furthestZone >= 0)
                             {
                                 CombatHelpers.IsCurrentlyGoldSniping = true;
+                                CombatHelpers.NoteRoute(_furthestZone, "gold snipe");
                                 CombatManager.DoZone(_furthestZone);
                                 return;
                             }
@@ -1351,6 +1356,7 @@ namespace NGUAdvisor
                     if (titanZone.HasValue && !ZoneHelpers.AutokillAvailable(Array.IndexOf(ZoneHelpers.TitanZones, titanZone.Value)))
                     {
                         CombatHelpers.IsCurrentlyFightingTitan = true;
+                    CombatHelpers.NoteRoute(titanZone.Value, "titan kill");
                         CombatManager.DoZone(titanZone.Value);
                         return;
                     }
@@ -1360,6 +1366,7 @@ namespace NGUAdvisor
                 if (questZone >= 0)
                 {
                     CombatHelpers.IsCurrentlyQuesting = true;
+                    CombatHelpers.NoteRoute(questZone, "quest");
                     CombatManager.DoZone(questZone);
                     return;
                 }
@@ -1372,6 +1379,7 @@ namespace NGUAdvisor
                         if (_furthestZone >= 0)
                         {
                             CombatHelpers.IsCurrentlyAdventuring = true; // Not equipping gold loadout
+                            CombatHelpers.NoteRoute(_furthestZone, "gold CBlock — no Time Machine");
                             CombatManager.DoZone(_furthestZone);
                             return;
                         }
@@ -1381,9 +1389,12 @@ namespace NGUAdvisor
                 }
 
                 if (!Settings.CombatEnabled)
+                {
+                    CombatHelpers.NoteRoute(-1, "combat disabled");
                     return;
+                }
 
-                int tempZone = ResolveAdventureZone(out _);
+                int tempZone = ResolveAdventureZone(out string resolvedBy);
 
                 // EVIL CLIMB pushes boss numbers to unlock T7 — that means adventuring the highest clearable
                 // zone (bosses + gold + the digger/aug income they feed), NEVER the ITOPOD, which pushes no
@@ -1398,6 +1409,7 @@ namespace NGUAdvisor
                     if (_furthestZone >= 0)
                     {
                         CombatHelpers.IsCurrentlyAdventuring = true;
+                        CombatHelpers.NoteRoute(_furthestZone, "EVIL CLIMB — furthest clearable");
                         CombatManager.DoZone(_furthestZone);
                         return;
                     }
@@ -1417,12 +1429,14 @@ namespace NGUAdvisor
                     if (_furthestZone >= 0)
                     {
                         CombatHelpers.IsCurrentlyAdventuring = true;
+                        CombatHelpers.NoteRoute(_furthestZone, "no Time Machine — gold starved for augs");
                         CombatManager.DoZone(_furthestZone);
                         return;
                     }
                 }
 
                 CombatHelpers.IsCurrentlyAdventuring = true;
+                CombatHelpers.NoteRoute(tempZone, resolvedBy);
                 CombatManager.DoZone(tempZone);
 
                 if (tempZone >= 1000)

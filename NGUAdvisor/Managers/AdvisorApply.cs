@@ -841,7 +841,9 @@ namespace NGUAdvisor.Managers
         private static string _lastZoneDbg;
         private static DateTime _lastZoneDbgAt = DateTime.MinValue;
 
-        private static string ZoneDbgName(int zone) => zone == 1000
+        private static string ZoneDbgName(int zone) => zone < 0
+            ? "not adventuring"
+            : zone == 1000
             ? "ITOPOD"
             : ZoneHelpers.ZoneList.TryGetValue(zone, out string zn) ? zn : $"Zone {zone}";
 
@@ -857,10 +859,21 @@ namespace NGUAdvisor.Managers
                 // locked zone override it downstream. The line used to report the pick and stayed
                 // silent about the override, so it named a zone nobody was farming (user-caught).
                 int advised = Main.Settings.SnipeZone;
-                int zone = Main.ResolveAdventureZone(out string overriddenBy);
+                // Ask the CASCADE what it did, do not re-derive it. ResolveAdventureZone knows only
+                // three of the ten things that can take control, so re-deriving named the sniped zone
+                // while a gold snipe, a titan or a quest actually owned the character. The branch that
+                // wins now records itself (CombatHelpers.NoteRoute); the resolver is the fallback for
+                // the first passes, before SnipeZone() has run once.
+                int zone; string overriddenBy;
+                if (CombatHelpers.RoutedZone != -1 || CombatHelpers.RoutedBy != null)
+                {
+                    zone = CombatHelpers.RoutedZone;
+                    overriddenBy = CombatHelpers.RoutedBy;
+                }
+                else zone = Main.ResolveAdventureZone(out overriddenBy);
                 string line = $"[ZoneDbg] layer={layer} zone={zone} ({ZoneDbgName(zone)})"
                             + (zone == advised
-                                ? ""
+                                ? (overriddenBy == null ? "" : $" routedBy={overriddenBy}")
                                 : $" advised={advised} ({ZoneDbgName(advised)}) overriddenBy={overriddenBy}")
                             + $" combat={BoostFarmAdvisor.ModeName(Main.Settings.CombatMode)} {render()}";
                 if (line == _lastZoneDbg) return;
