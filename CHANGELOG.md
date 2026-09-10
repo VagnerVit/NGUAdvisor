@@ -4,6 +4,10 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-10
+
+Existing settings and profile files remain compatible with version 1.1.0.
+
 ### Fixed
 
 - **The quest gear hold now holds for gear you can actually cap.** Its table of "what drops in this
