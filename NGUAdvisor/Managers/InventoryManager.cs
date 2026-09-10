@@ -278,10 +278,9 @@ namespace NGUAdvisor.Managers
             var quest = Main.Character.beastQuest;
             if (quest.inQuest)
             {
-                int num = quest.curDrops;
-                _ic.dumpAllIntoQuest(quest.questID);
-                if (quest.curDrops > num)
-                    Log($"Turning in {quest.curDrops - num} quest items");
+                int turnedIn = DumpIntoQuest(quest.questID);
+                if (turnedIn > 0)
+                    Log($"Turning in {turnedIn} quest items");
 
                 // Surplus purge (user-reported: a FULL INVENTORY of Diploma 287 after a capstone
                 // hold). The game rolls quest drops on every manual-mode kill with NO at-target
@@ -307,6 +306,43 @@ namespace NGUAdvisor.Managers
                     }
                 }
             }
+        }
+
+        // The game's own dumpAllIntoQuest ends with an UNCONDITIONAL
+        // tooltip.showTooltip("BLOOP! All applicable Quest Items have been deposited!", 2f)
+        // [DECOMP] InventoryController.cs:4859 — it fires even when nothing was consumed, and this
+        // runs on every inventory pass, so the popup sat on screen permanently while questing
+        // (user-reported). The body below is the game's, minus that line:
+        //
+        //   * the perk-66 gate and both checkItemConsumed overloads are verbatim
+        //     [DECOMP] InventoryController.cs:4852 — the levelled overload is what turns one
+        //     high-level copy into several drops, so it must not be flattened to the plain one.
+        //   * updateInventory() only when something actually moved (the game calls it either way).
+        //   * iterated BACKWARDS, like the surplus purge above: the game deletes while walking
+        //     forwards and so skips the item after every consumed one. Same end state, fewer passes.
+        private static int DumpIntoQuest(int questID)
+        {
+            var inv = Main.Character.inventory;
+            var qc = Main.Character.beastQuestController;
+            bool levelledHandin = Main.Character.adventure.itopod.perkLevel[66] > 0;
+            int before = Main.Character.beastQuest.curDrops;
+
+            for (int i = inv.inventory.Count - 1; i >= 0; i--)
+            {
+                var item = inv.inventory[i];
+                if (item == null || !item.removable) continue;
+
+                bool consumed = levelledHandin
+                    ? qc.checkItemConsumed(item.id, item.level)
+                    : qc.checkItemConsumed(item.id);
+                if (consumed)
+                    inv.deleteItem(i);
+            }
+
+            int gained = Main.Character.beastQuest.curDrops - before;
+            if (gained > 0)
+                _ic.updateInventory();
+            return gained;
         }
 
         public static void MergeInventory(ih[] ci)

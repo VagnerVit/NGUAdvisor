@@ -41,6 +41,8 @@
     <Compile Include="..\..\NGUAdvisor\Managers\PpEta.cs" Link="Linked\PpEta.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\AtMath.cs" Link="Linked\AtMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\QuestZoneItems.cs" Link="Linked\QuestZoneItems.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
   </ItemGroup>
 
 </Project>

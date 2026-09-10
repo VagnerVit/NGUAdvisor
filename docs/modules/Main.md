@@ -98,6 +98,14 @@ progression-related must use `ZoneHelpers.CurrentHighestBoss` instead.
   only way F10 (menu key) and F1 (help) are seen, and it fires with a TextBox focused. The map matches
   `keyData` exactly, so Shift+F10 and other modified combinations pass through to WinForms.
 - `SnipeZone`, `SetResnipe`, `UpdateFurthestZone`, `ResetFurthestZone`: gold-snipe routing.
+- `ResolveIntentZone` / `ResolveAdventureZone`: the adventure routing rule, in one place because
+  several callers need the SAME answer. `ResolveIntentZone` is the intent layer — gear hunt (which
+  outranks ITOPOD targeting, user-reported) > Target ITOPOD > `Settings.SnipeZone`;
+  `ResolveAdventureZone` adds the locked-zone rewrite on top. **Ask them, never re-derive a row of
+  the cascade** — both defects that produced this split were hand copies of the Target ITOPOD row
+  drifting from it (the `[ZoneDbg]` line, and QuestManager's stand-down: QuestStandDown.cs,
+  QuestManager.md). Callers above adventure routing want the intent; the Evil climb and
+  gold-starved detours in `Update()` sit AFTER these and are not modelled here.
   Two statics are deliberately seeded to **−1, not 0**: `_furthestZone` (a 0 baseline made
   SetResnipe read any real zone as "new zone fightable" and wipe a completed snipe) and
   `_lastNewZoneTrigger` (each zone arms the re-snipe ONCE — fightability is measured in current

@@ -58,7 +58,14 @@ time long after the restore, and clearing would delete a live setting.
   CLAMPS effective cube stats at base + gear).
 - `MergeEquipped` / `MergeInventory` / `MergeBoosts` / `MergeGuffs` — merge passes per class.
 - `ManageQuestItems` — quest item handling (they keep dropping past target and flood slots — see
-  QuestManager's capstone-hold inventory guard).
+  QuestManager's capstone-hold inventory guard). **Deposits through the local `DumpIntoQuest`, not
+  the game's `dumpAllIntoQuest`**: the game's version ends with an unconditional
+  `showTooltip("BLOOP! ...")` (`[DECOMP] InventoryController.cs:4859`), which fires even on a pass
+  that consumed nothing — and this runs every inventory pass, so the popup was permanently on screen
+  while questing (user-reported). The reimplementation is the game's body minus that line: the
+  perk-66 gate and both `checkItemConsumed` overloads verbatim (the levelled one is what turns a
+  high-level copy into several drops), `updateInventory()` only when something moved, and a backwards
+  walk because the game's forward walk deletes as it goes and skips the item after each consumed one.
 - `ManageConvertibles`, `ManageBoostConversion`, `ShowBoostProgress` — boost conversion + the
   progress readout (F-key / panel). **`ManageBoostConversion` no longer picks the auto-transform
   type.** It used to — locked boost, then `BoostPriority` against the gear's need, then `CubePriority`,

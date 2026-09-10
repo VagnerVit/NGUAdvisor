@@ -6,6 +6,37 @@ All notable changes to NGU Advisor are documented in this file.
 
 ### Fixed
 
+- **The quest gear hold now holds for gear you can actually cap.** Its table of "what drops in this
+  quest zone" had been transcribed from the game with two mistakes: it missed every unlevelled drop
+  (zone 9 listed one item where the game drops eight, and four more zones each missed a whole boss
+  set), and it listed five items that are not equipment at all — the three cooking dishes, the
+  busted Wandoos copy and the Buster of the Exile. Those can never reach level 100, so the hold
+  waited for something that could not happen: in the Beardverse and Mega Boss zones it never once
+  finished on gear and always burned its full three-hour budget. The 24 zones in the table that no
+  quest can send you to are gone too. Rewritten from the shipped game build, and now covered by
+  tests.
+
+- **A banked major quest now actually gets run.** Whenever the advisor was farming a zone — which is
+  most of the time — questing treated that as "already committed to a zone" and majors were skipped,
+  every pass. Only an imminent quest-bank overflow could force one through, and turning on Pool Major
+  Quests did not help either, because the burst was computed above the same gate. With majors allowed
+  and something in the bank, questing now wins over a boost or gear farm zone and the quest gets
+  done; Gear Hunt still comes first, and pooling still banks to cap before spending. Starting a major
+  is also written to the log now — it was the one quest action that logged nothing, so a major that
+  never started looked exactly like one that did.
+
+- **Questing no longer fights the gear hunt, and no longer refuses to run in the ITOPOD.** It
+  decided "am I already committed to a zone?" from its own copy of one routing rule, which never
+  learned about the two rules that outrank it. With Target ITOPOD on, a running gear hunt read as
+  "not committed" and quests pre-empted the hunt; conversely, whenever the advisor parked you in the
+  ITOPOD to farm boosts, questing stood down there — the opposite of the intended "don't quest while
+  sniping a zone". Both now ask the routing cascade what it would do.
+
+- **No more permanent "BLOOP!" popup while questing.** Depositing quest items uses the game's own
+  button action, which always shows its confirmation tooltip — even when there was nothing to
+  deposit — and the advisor presses it on every inventory pass. Items are now deposited the same way
+  without the popup, and a pass with nothing to hand in does nothing at all.
+
 - **Hotkeys now work with the advisor window focused.** F1-F10 are read through Unity's input, which
   only reports keys while the *game* window is in front — the advisor is a window of its own, so with
   it focused every hotkey did nothing, silently. Both advisor windows now pick the same keys up

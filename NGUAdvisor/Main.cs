@@ -1558,24 +1558,32 @@ namespace NGUAdvisor
         //
         // The EVIL CLIMB and gold-starved detours in Update() sit AFTER this and are not modelled
         // here: both resolve through UpdateFurthestZone(), which the logger must not drive.
-        internal static int ResolveAdventureZone(out string overriddenBy)
+        // The INTENT layer of the rule above, split out because QuestManager needs exactly this and
+        // nothing below it: which zone WOULD be adventured, before the locked-zone rewrite. Questing
+        // sits ABOVE adventure routing, so it must not be handed the zone that actually routed — it
+        // would then be reading its own output (quests win -> character stands in the quest zone ->
+        // "that's a snipe" -> quests stand down -> routing returns -> quests win), a self-latching
+        // oscillator. It also must not hand-copy a row of this cascade: QuestManager's own copy of
+        // the Target ITOPOD row never learned about the gear-hunt row above it.
+        internal static int ResolveIntentZone(out string overriddenBy)
         {
             overriddenBy = null;
-            int zone;
             if (GearHunter.Active && GearHunter.ZoneReachable())
             {
                 overriddenBy = "gear hunt";
-                zone = Settings.GearHuntZone;
+                return Settings.GearHuntZone;
             }
-            else if (Settings.AdventureTargetITOPOD)
+            if (Settings.AdventureTargetITOPOD)
             {
                 overriddenBy = "Target ITOPOD";
-                zone = 1000;
+                return 1000;
             }
-            else
-            {
-                zone = Settings.SnipeZone;
-            }
+            return Settings.SnipeZone;
+        }
+
+        internal static int ResolveAdventureZone(out string overriddenBy)
+        {
+            int zone = ResolveIntentZone(out overriddenBy);
 
             if (zone < 1000 && !CombatManager.IsZoneUnlocked(zone))
             {

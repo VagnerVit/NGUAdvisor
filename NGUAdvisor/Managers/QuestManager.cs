@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using static NGUAdvisor.Main;
 
 namespace NGUAdvisor.Managers
@@ -14,47 +13,6 @@ namespace NGUAdvisor.Managers
         private static BeastQuest Quest => _character.beastQuest;
 
         public static bool BankOverfill => questBankOverfill;
-
-        // Gear item IDs droppable per adventure zone (extracted from the game's LootDrop.zoneNDrop
-        // functions; static game data like the titan AK table). Drives the capstone hold.
-        public static readonly Dictionary<int, int[]> ZoneItems = new Dictionary<int, int[]>
-        {
-            { 0, new[] { 62,63,64,65,75,120 } },
-            { 1, new[] { 40,41,42,43,44,45,46,77 } },
-            { 2, new[] { 47,48,49,50,51,52,135,432 } },
-            { 3, new[] { 53,433 } },
-            { 4, new[] { 53,434 } },
-            { 5, new[] { 53,66,435 } },
-            { 7, new[] { 66,368,436 } },
-            { 9, new[] { 437 } },
-            { 10, new[] { 66,110,438 } },
-            { 12, new[] { 66,127,439 } },
-            { 13, new[] { 339,440 } },
-            { 15, new[] { 76,143,144,145,146,147,148,367,441 } },
-            { 17, new[] { 67,94,128,163,164,165,166,167,168,442 } },
-            { 18, new[] { 94,128,163,173,174,175,176,177,178,443 } },
-            { 19, new[] { 179 } },
-            { 20, new[] { 142,221,222,223,224,225,226,227,369,444 } },
-            { 21, new[] { 142,213,214,215,216,217,218,219,220,445 } },
-            { 22, new[] { 142,231,232,233,234,235,236,370,446 } },
-            { 24, new[] { 128,142,251,252,253,254,255,256,257,447 } },
-            { 25, new[] { 128,142,258,259,260,261,262,263,264,448 } },
-            { 27, new[] { 128,142,301,302,303,304,305,306,307,449 } },
-            { 28, new[] { 128,142,308,309,310,311,312,313,314,450 } },
-            { 29, new[] { 128,142,315,316,317,318,319,320,321,371,451 } },
-            { 30, new[] { 336 } },
-            { 31, new[] { 169,170,345,346,347,348,349,350,351,452 } },
-            { 32, new[] { 229,230,352,353,354,355,356,357,358 } },
-            { 33, new[] { 229,230,359,360,361,362,363,364,365,366 } },
-            { 35, new[] { 229,230,392,393,394,395,396,397,398,399 } },
-            { 36, new[] { 229,230,400,401,402,403,404,405,406,407 } },
-            { 37, new[] { 229,230,408,409,410,411,412,413,414,415 } },
-            { 39, new[] { 295,296,453,454,455,456,457,458,459,460 } },
-            { 40, new[] { 295,296,496,497,498,499,500,501,502,503 } },
-            { 41, new[] { 295,296,461,462,463,464,465,466,467,468 } },
-            { 43, new[] { 295,296,507,508,509,510,511,512,513,514 } },
-            { 45, new[] { 180,181,182,183,337,491,495 } },
-        };
 
         // Capstone hold (advisor): a major quest is free forced-farming time in its zone — if the
         // zone's gear isn't all maxed, hold the turn-in and keep fighting so drops keep merging.
@@ -90,7 +48,7 @@ namespace NGUAdvisor.Managers
                 if (FreeInventorySlots() < 4) return false;
 
                 int zone = _qc.curQuestZone();
-                if (!ZoneItems.TryGetValue(zone, out var ids)) return false;
+                if (!QuestZoneItems.ZoneItems.TryGetValue(zone, out var ids)) return false;
 
                 // Unmaxed AND actually farmable: a loot-filtered item never drops, so holding for
                 // it would wait forever (log-audit find: holds expiring without progress).
@@ -190,6 +148,24 @@ namespace NGUAdvisor.Managers
             questBankOverfill = time * 1.1f < eta;
         }
 
+        // A banked major beats a farm zone (user rule 2026-09-10). Banked majors are CAPPED and
+        // regenerate on a timer, so farming while one waits throws that regen away — while the farm
+        // zone keeps paying whenever we return to it. Without this, majors reached the game only
+        // through the overfill predictor: any zone the boost/gear farm routed read as a committed
+        // snipe, `majorQuests &= shouldQuest` cleared them, and pooling could not get past it either
+        // (the burst is computed above that same line). Two owners still outrank a waiting major:
+        //   * Gear Hunt — the deliberate gear-farming tool, which the capstone hold also yields to.
+        //   * pooling before its burst — banking to cap IS the pooled strategy; spending one major
+        //     early is exactly what pooling exists to prevent.
+        private static bool BankedMajorOutranksFarming()
+        {
+            if (!Settings.AdvisorQuests || !Settings.AllowMajorQuests) return false;
+            if (Quest.curBankedQuests <= 0) return false;
+            if (Settings.PoolMajorQuests && !Settings.QuestBurstActive) return false;
+            try { if (GearHunter.Active) return false; } catch { }
+            return true;
+        }
+
         private static void UpdateShouldQuest()
         {
             if (!Settings.AutoQuest)
@@ -197,14 +173,22 @@ namespace NGUAdvisor.Managers
                 shouldQuest = false;
             }
             // Major quests take precedence over adventure zones
-            else if (Quest.inQuest && !Quest.reducedRewards || Settings.QuestsFullBank && questBankOverfill)
+            else if (Quest.inQuest && !Quest.reducedRewards
+                  || Settings.QuestsFullBank && questBankOverfill
+                  || BankedMajorOutranksFarming())
             {
                 shouldQuest = true;
             }
             else if (Settings.CombatEnabled)
             {
-                // Don't quest if combat is enabled, the snipe zone is unlocked, not farming ITOPOD and Fallthrough is not allowed
-                var isSniping = CombatManager.IsZoneUnlocked(Settings.SnipeZone) && !Settings.AdventureTargetITOPOD && !Settings.AllowZoneFallback;
+                // Don't quest if combat is enabled, the zone that would route is unlocked, it is not
+                // the ITOPOD, and Fallthrough is not allowed. The zone comes from
+                // Main.ResolveIntentZone — the single owner of the routing cascade — instead of the
+                // old hand copy of its Target ITOPOD row; QuestStandDown carries the argument,
+                // including why THIS consumer wants the intent rather than the routed zone.
+                int intentZone = Main.ResolveIntentZone(out _);
+                var isSniping = QuestStandDown.IsSniping(intentZone,
+                    CombatManager.IsZoneUnlocked(intentZone), Settings.AllowZoneFallback);
 
                 if (isSniping)
                 {
@@ -371,6 +355,9 @@ namespace NGUAdvisor.Managers
                     SetIdleMode(false);
                     EquipQuestingLoadout();
                     startQuest = true;
+                    // Starting a major was the one quest action that logged nothing, so a major that
+                    // never started and a major that started looked identical in the log.
+                    Log($"Starting a major quest ({Quest.curBankedQuests} banked)");
                 }
                 else if (!Settings.ManualMinors || shouldQuest)
                 {
