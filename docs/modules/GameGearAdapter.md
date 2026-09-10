@@ -5,16 +5,45 @@ Phase 1b: bridges live game data into the scorer — reads a game `Equipment` in
 (`external/gear-optimizer/src/assets/Items.js`) with game-truth values. **Main thread only**
 (reads live game objects).
 
-## Stat extraction (`BuildItem`)
+## Stat extraction (`BuildItem(equip, isWeapon, maxed)`)
 
-Uses the item's MAX (boosted-to-cap) values scaled to its level — the advisor boosts gear to cap,
-matching how the site optimizes for maxed gear:
+`maxed` is a **required** parameter — there is no default, because getting it wrong is silent and
+the two answers genuinely differ (see below).
 
-- `CalcCap(cap, level) = floor(cap * (1 + level/100))` — same maxing formula as the game.
-- **Power/Toughness** = `CalcCap(capAttack/capDefense, level)` (raw, base-0 stats).
-- **Specs 1–3** = `getBonusFactor(CalcCap(speciCap, level), specType) * 100` — the game's own
-  method applies the correct per-stat divisor, so percentages match the site's item DB exactly.
-  The spec value is added to every stat its `specType` feeds (`GearObjectives.SpecTypeToStats`).
+| `maxed` | Power / Toughness | Spec *i* | Question it answers |
+|---|---|---|---|
+| `false` | `curAttack` / `curDefense` | `getBonusFactor(specNCur, type) * 100` | what the item gives **now** |
+| `true` | `CalcCap(capAttack/capDefense, level)` | `getBonusFactor(CalcCap(specNCap, level), type) * 100` | what it gives **once boosted to cap** |
+
+- `CalcCap(cap, level) = floor(cap * (1 + level/100))` — the game's own maxing formula.
+- `getBonusFactor` applies the correct per-stat divisor either way, so the `maxed: true` percentages
+  match the site's item DB exactly. The spec value is added to every stat its `specType` feeds
+  (`GearObjectives.SpecTypeToStats`).
+
+### Why the split exists (2026-09-07)
+
+**Boosts and item level are independent.** Applying a boost raises `curAttack`/`curDefense`/
+`specNCur` and **never** `level` (`docs/modules/TransformManager.md`, and the `boostEquip` clamp in
+`docs/NGU-KNOWLEDGE.md`); level comes from merging and daycare, and a merge raises
+`cap × (1 + level/100)` while leaving `cur` where it was. A level-100 item can therefore sit at a
+fraction of its cap indefinitely, and an item on the boost blacklist never leaves it.
+
+`BuildItem` used to return cap values unconditionally, on the assumption "the advisor boosts gear to
+cap". The optimizer consequently ranked a freshly merged, barely-boosted item above a genuinely
+maxed one — **and equipped it**, dropping the character's live stats. User-reported.
+
+### Which valuation each caller wants
+
+| Caller | `maxed` | Why |
+|---|---|---|
+| `GearOptimizer.BuildPools` (default of `Optimize`/`OptimizeIds`) | `false` | it EQUIPS the result |
+| `GearOptimizer.CurrentScore` | `false` | it is the other side of AdvisorApply's re-equip bar |
+| `GearHunter.OwnedAccessories` | `false` | it equips, and "best of two copies" is the boost question |
+| `InventoryAdvisor.Compute` (KEEP/TRASH + `AutoBoostPriority`) | `true` | a verdict is about future value; the boost list exists to fill exactly those items |
+| `GearOptimizerDiagnostic` | both | `MAXED` is the site oracle, `NOW` is live behaviour |
+
+Anything new that **wears** gear takes `false`; anything that decides what to **keep, boost or hunt**
+takes `true`.
 
 ## Fixed pseudo-items (present in every loadout)
 

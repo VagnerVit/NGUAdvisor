@@ -9,7 +9,9 @@ KEEP/TRASH verdicts for owned equipment, plus the advisor's boost-priority list.
 optimizer passes, hence the cached `Last`), OR appears in a configured static loadout
 (Titan/Gold/Quest/Ygg/Cooking), OR is currently worn.
 
-**TRASH** = owned equipment that wins nothing anywhere at max level — with two user-rule
+**TRASH** = owned equipment that wins nothing anywhere at max level (this is the one caller that
+passes `maxed: true` to `GearOptimizer.OptimizeIds` — see GameGearAdapter.md; scoring verdicts at the
+items' current boost fill would trash exactly the items `AutoBoostPriority` exists to fill) — with two user-rule
 exemptions that are relabeled KEEP instead:
 
 - `[chain]` — a `TransformManager.ChainItem` tier: consolidation/climb fodder, never trash.

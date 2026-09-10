@@ -81,8 +81,22 @@ progression-related must use `ZoneHelpers.CurrentHighestBoss` instead.
   date + rebirth seconds. `LootFeed` is an in-memory newest-first ring (400) mirroring loot.log.
 - `Version` (hand-bumped SemVer) + `BuildTag` (parsed from the assembly name
   `NGUAdvisor.r<yyMMddHHmmss>` → `yyMMdd-HHmm`).
-- Hotkeys via `QuickStuff` (F1 window, F2 pause, F3 quicksave, F5 dump gear, F7 quickload,
-  F8 quick swap, F9 profile editor) and the in-game overlay (`OnGUI`, `RefreshOverlayText`).
+- **Hotkeys** — F1 window, F2 pause, F3 quicksave, F5 dump gear, F7 quickload, F8 quick swap,
+  F9 profile editor, F10 gear diagnostic; F11 is a reserved test stub. Plus the in-game overlay
+  (`OnGUI`, `RefreshOverlayText`).
+
+  Two input paths, ONE key map. `Main.DispatchHotkey(Keys)` is the map; `RunHotkey(Hotkey)` holds the
+  bodies and is **main-thread only**.
+  - **Game window focused** → `Input.GetKeyDown` in `Update()` calls `RunHotkey` directly.
+  - **Advisor window focused** → Unity Input sees nothing at all (the advisor is its own top-level
+    HWND), so `ProcessCmdKey` on `SettingsForm`/`ProfileEditorForm` calls `DispatchHotkey`, which only
+    QUEUES via `RequestHotkey`; `Update()` drains the queue on the Unity thread. Same main-thread rule
+    as the file-watcher flags — a hotkey body touches live `Character`/WinForms state. Every F-key was
+    dead in the advisor window until 2026-09-07.
+
+  `ProcessCmdKey` rather than `KeyDown` because it runs ahead of WinForms' own command handling, the
+  only way F10 (menu key) and F1 (help) are seen, and it fires with a TextBox focused. The map matches
+  `keyData` exactly, so Shift+F10 and other modified combinations pass through to WinForms.
 - `SnipeZone`, `SetResnipe`, `UpdateFurthestZone`, `ResetFurthestZone`: gold-snipe routing.
   Two statics are deliberately seeded to **−1, not 0**: `_furthestZone` (a 0 baseline made
   SetResnipe read any real zone as "new zone fightable" and wipe a completed snipe) and

@@ -99,6 +99,50 @@ namespace NGUAdvisor
         private static volatile bool _stateExportPending;
         public static void RequestStateExport() => _stateExportPending = true;
 
+        // HOTKEYS ARE UNITY INPUT, so Update() only ever sees them while the GAME window is the
+        // foreground window. The advisor is its own top-level HWND (Mono WinForms), so with the advisor
+        // focused Unity receives no keystroke at all and every F-key was dead there (user-reported
+        // 2026-09-07). Both forms therefore route the same keys through DispatchHotkey, which only
+        // REQUESTS: a hotkey body reads live Character/scene objects, and running it from the WinForms
+        // handler would hard-crash the game for the same reason the watcher handlers above may not.
+        public enum Hotkey
+        {
+            ShowWindow, ToggleAdvisor, QuickSave, DumpEquipped, QuickLoad, QuickSwap, ProfileEditor,
+            GearDiagnostic
+        }
+
+        private static readonly object _hotkeyLock = new object();
+        private static readonly List<Hotkey> _hotkeyQueue = new List<Hotkey>();
+        private static volatile bool _hotkeyPending;
+
+        public static void RequestHotkey(Hotkey key)
+        {
+            lock (_hotkeyLock) _hotkeyQueue.Add(key);
+            _hotkeyPending = true;
+        }
+
+        // THE key map: the Unity path (Update) and the WinForms path (ProcessCmdKey) both resolve keys
+        // here, so a key cannot come to mean two different things in the two windows. Returns true when
+        // the key was consumed.
+        //
+        // Matched on keyData EXACTLY, so every modified combination -- Shift+F10 (the context menu) above
+        // all -- falls through to WinForms untouched.
+        public static bool DispatchHotkey(Keys keyData)
+        {
+            switch (keyData)
+            {
+                case Keys.F1: RequestHotkey(Hotkey.ShowWindow); return true;
+                case Keys.F2: RequestHotkey(Hotkey.ToggleAdvisor); return true;
+                case Keys.F3: RequestHotkey(Hotkey.QuickSave); return true;
+                case Keys.F5: RequestHotkey(Hotkey.DumpEquipped); return true;
+                case Keys.F7: RequestHotkey(Hotkey.QuickLoad); return true;
+                case Keys.F8: RequestHotkey(Hotkey.QuickSwap); return true;
+                case Keys.F9: RequestHotkey(Hotkey.ProfileEditor); return true;
+                case Keys.F10: RequestHotkey(Hotkey.GearDiagnostic); return true;
+                default: return false;
+            }
+        }
+
         public static FileSystemWatcher ConfigWatcher;
         public static FileSystemWatcher AllocationWatcher;
         public static FileSystemWatcher ZoneWatcher;
@@ -501,88 +545,136 @@ namespace NGUAdvisor
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.F1))
+            // Keys pressed while the ADVISOR window had focus. Drained here, in the same place in the
+            // frame the game's own keys are handled, so a hotkey means the same thing and lands at the
+            // same point in the loop whichever window was focused.
+            if (_hotkeyPending)
             {
-                if (!settingsForm.Visible)
-                    settingsForm.Show();
-
-                settingsForm.BringToFront();
+                Hotkey[] queued;
+                lock (_hotkeyLock)
+                {
+                    queued = _hotkeyQueue.ToArray();
+                    _hotkeyQueue.Clear();
+                    _hotkeyPending = false;
+                }
+                foreach (var key in queued)
+                {
+                    // One bad hotkey must not take the frame loop down with it.
+                    try { RunHotkey(key); }
+                    catch (Exception e) { LogDebug($"Hotkey {key} failed: {e.Message}"); }
+                }
             }
 
-            if (Input.GetKeyDown(KeyCode.F2))
-                Settings.GlobalEnabled = !Settings.GlobalEnabled;
-
-            if (Input.GetKeyDown(KeyCode.F3))
-                QuickSave();
-
-            if (Input.GetKeyDown(KeyCode.F7))
-                QuickLoad();
-
-            if (Input.GetKeyDown(KeyCode.F5))
-                DumpEquipped();
-
-            if (Input.GetKeyDown(KeyCode.F9))
-                ProfileEditorForm.ShowEditor(_profilesDir, Settings.AllocationFile);
-
-            if (Input.GetKeyDown(KeyCode.F10))
-                Managers.GearOptimizerDiagnostic.Run();
-
-            if (Input.GetKeyDown(KeyCode.F8))
-            {
-                if (Settings.QuickLoadout.Length > 0)
-                {
-                    if (_tempSwapped)
-                    {
-                        Log("Restoring Previous Loadout");
-                        LoadoutManager.RestoreTempLoadout();
-                    }
-                    else
-                    {
-                        Log("Equipping Quick Loadout");
-                        LoadoutManager.SaveTempLoadout();
-                        LoadoutManager.ChangeGear(Settings.QuickLoadout);
-                    }
-                }
-
-                if (Settings.QuickDiggers.Length > 0)
-                {
-                    if (_tempSwapped)
-                    {
-                        Log("Equipping Previous Diggers");
-                        DiggerManager.RestoreTempDiggers();
-                        DiggerManager.RecapDiggers();
-                    }
-                    else
-                    {
-                        Log("Equipping Quick Diggers");
-                        DiggerManager.SaveTempDiggers();
-                        DiggerManager.EquipDiggers(Settings.QuickDiggers);
-                        DiggerManager.RecapDiggers();
-                    }
-                }
-
-                if (Settings.QuickBeards.Length > 0)
-                {
-                    if (_tempSwapped)
-                    {
-                        Log("Equipping Previous Beards");
-                        BeardManager.RestoreTempBeards();
-                    }
-                    else
-                    {
-                        Log("Equipping Quick Beards");
-                        BeardManager.SaveTempBeards();
-                        BeardManager.EquipBeards(Settings.QuickBeards);
-                    }
-                }
-
-                _tempSwapped = !_tempSwapped;
-            }
+            // Keys pressed while the GAME window had focus. Unity Input only reports those.
+            if (Input.GetKeyDown(KeyCode.F1)) RunHotkey(Hotkey.ShowWindow);
+            if (Input.GetKeyDown(KeyCode.F2)) RunHotkey(Hotkey.ToggleAdvisor);
+            if (Input.GetKeyDown(KeyCode.F3)) RunHotkey(Hotkey.QuickSave);
+            if (Input.GetKeyDown(KeyCode.F5)) RunHotkey(Hotkey.DumpEquipped);
+            if (Input.GetKeyDown(KeyCode.F7)) RunHotkey(Hotkey.QuickLoad);
+            if (Input.GetKeyDown(KeyCode.F8)) RunHotkey(Hotkey.QuickSwap);
+            if (Input.GetKeyDown(KeyCode.F9)) RunHotkey(Hotkey.ProfileEditor);
+            if (Input.GetKeyDown(KeyCode.F10)) RunHotkey(Hotkey.GearDiagnostic);
 
             // F11 reserved for testing
             if (Input.GetKeyDown(KeyCode.F11))
             {
             }
+        }
+
+        // Every hotkey body. MAIN THREAD ONLY -- these touch Unity objects, live Character state and
+        // WinForms; the WinForms path reaches this only through RequestHotkey + the drain above.
+        private void RunHotkey(Hotkey key)
+        {
+            switch (key)
+            {
+                case Hotkey.ShowWindow:
+                    if (!settingsForm.Visible)
+                        settingsForm.Show();
+                    settingsForm.BringToFront();
+                    break;
+
+                case Hotkey.ToggleAdvisor:
+                    Settings.GlobalEnabled = !Settings.GlobalEnabled;
+                    break;
+
+                case Hotkey.QuickSave:
+                    QuickSave();
+                    break;
+
+                case Hotkey.QuickLoad:
+                    QuickLoad();
+                    break;
+
+                case Hotkey.DumpEquipped:
+                    DumpEquipped();
+                    break;
+
+                case Hotkey.ProfileEditor:
+                    ProfileEditorForm.ShowEditor(_profilesDir, Settings.AllocationFile);
+                    break;
+
+                case Hotkey.GearDiagnostic:
+                    Managers.GearOptimizerDiagnostic.Run();
+                    break;
+
+                case Hotkey.QuickSwap:
+                    QuickSwap();
+                    break;
+            }
+        }
+
+        // F8: swap to the quick loadout/diggers/beards, or back out of it. _tempSwapped is ONE flag for
+        // all three, so the three blocks must stay in lockstep -- half a swap leaves no way back.
+        private void QuickSwap()
+        {
+            if (Settings.QuickLoadout.Length > 0)
+            {
+                if (_tempSwapped)
+                {
+                    Log("Restoring Previous Loadout");
+                    LoadoutManager.RestoreTempLoadout();
+                }
+                else
+                {
+                    Log("Equipping Quick Loadout");
+                    LoadoutManager.SaveTempLoadout();
+                    LoadoutManager.ChangeGear(Settings.QuickLoadout);
+                }
+            }
+
+            if (Settings.QuickDiggers.Length > 0)
+            {
+                if (_tempSwapped)
+                {
+                    Log("Equipping Previous Diggers");
+                    DiggerManager.RestoreTempDiggers();
+                    DiggerManager.RecapDiggers();
+                }
+                else
+                {
+                    Log("Equipping Quick Diggers");
+                    DiggerManager.SaveTempDiggers();
+                    DiggerManager.EquipDiggers(Settings.QuickDiggers);
+                    DiggerManager.RecapDiggers();
+                }
+            }
+
+            if (Settings.QuickBeards.Length > 0)
+            {
+                if (_tempSwapped)
+                {
+                    Log("Equipping Previous Beards");
+                    BeardManager.RestoreTempBeards();
+                }
+                else
+                {
+                    Log("Equipping Quick Beards");
+                    BeardManager.SaveTempBeards();
+                    BeardManager.EquipBeards(Settings.QuickBeards);
+                }
+            }
+
+            _tempSwapped = !_tempSwapped;
         }
 
         public void LateUpdate() => SnipeZone();

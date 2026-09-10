@@ -329,6 +329,20 @@ namespace NGUAdvisor
             _status.ForeColor = isError ? UiTheme.Danger : UiTheme.Ink;
         }
 
+        // The advisor's F-keys, for when THIS window has focus instead of the game. Unity Input never
+        // sees those keystrokes (see Main.DispatchHotkey), so without this every hotkey is dead here.
+        //
+        // ProcessCmdKey, not KeyDown: it runs before WinForms' own command handling, which is the only
+        // way to see F10 (the menu key) and F1 (help) at all, and it fires with a TextBox focused, so
+        // the keys work wherever the caret is. Main.DispatchHotkey only QUEUES -- the work runs on the
+        // Unity thread in Main.Update, because these bodies touch live game objects.
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (Main.DispatchHotkey(keyData))
+                return true;
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (e.CloseReason == CloseReason.UserClosing)

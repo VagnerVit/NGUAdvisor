@@ -61,14 +61,15 @@ namespace NGUAdvisor.Managers
         // Optimize for an objective and return the item IDs (for writing into a loadout / profile).
         // forceTopRespawn pins the single best Respawn item so the loadout always keeps some respawn.
         // pinnedIds: null = the global pins (this path EQUIPS); new int[0] = none (VALUATION -- see below).
+        // maxed: see the note on Optimize -- false (default) ranks what the gear gives NOW.
         public static int[] OptimizeIds(GearObjectives.Objective obj, bool forceTopRespawn = false,
-                                        IReadOnlyList<int> pinnedIds = null)
-            => Optimize(obj, forceTopRespawn, pinnedIds).AllIds().Where(x => x > 0).Distinct().ToArray();
+                                        IReadOnlyList<int> pinnedIds = null, bool maxed = false)
+            => Optimize(obj, forceTopRespawn, pinnedIds, maxed).AllIds().Where(x => x > 0).Distinct().ToArray();
 
         // Same, for a priority chain plus pinned item ids.
         public static int[] OptimizeIds(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
-                                        bool forceTopRespawn = false)
-            => Optimize(chain, pinnedIds, forceTopRespawn).AllIds().Where(x => x > 0).Distinct().ToArray();
+                                        bool forceTopRespawn = false, bool maxed = false)
+            => Optimize(chain, pinnedIds, forceTopRespawn, maxed).AllIds().Where(x => x > 0).Distinct().ToArray();
 
         // Optimize for an objective by name (as stored in profiles/settings); null if unknown.
         public static GearObjectives.Objective FindObjective(string name)
@@ -165,6 +166,9 @@ namespace NGUAdvisor.Managers
 
         // Score the CURRENTLY-equipped loadout for an objective (same scoring the optimizer uses), so callers
         // can compare "how good is my gear now" vs Optimize().Score. Read-only; main thread. 0 on failure.
+        //
+        // CURRENT boost fill, not cap: this number sits on one side of AdvisorApply's re-equip bar and
+        // Optimize's default is the other side, so both must be the same quantity.
         public static double CurrentScore(GearObjectives.Objective obj)
         {
             try
@@ -172,7 +176,7 @@ namespace NGUAdvisor.Managers
                 var inv = Main.Character.inventory;
                 var ic = Main.InventoryController;
                 var list = new List<GearScorer.Item>(16);
-                void Add(Equipment e) { if (e != null && e.id != 0) list.Add(GameGearAdapter.BuildItem(e, e.type == part.Weapon)); }
+                void Add(Equipment e) { if (e != null && e.id != 0) list.Add(GameGearAdapter.BuildItem(e, e.type == part.Weapon, false)); }
                 Add(inv.weapon);
                 if (ic.weapon2Unlocked()) Add(inv.weapon2);
                 Add(inv.head); Add(inv.chest); Add(inv.legs); Add(inv.boots);
@@ -329,10 +333,16 @@ namespace NGUAdvisor.Managers
         // that only VALUE a loadout (score ratios, keep/trash verdicts, the GearOptimizerDiagnostic
         // regression baseline) pass new int[0] -- a pin is a user constraint on what gets worn, and
         // letting it into a valuation makes the number a function of the user's pin list.
+        //
+        // maxed is the ITEM VALUATION (GameGearAdapter.BuildItem): false scores every candidate at its
+        // CURRENT boost fill -- what the game adds to the character's stats right now -- and is the
+        // default because every caller that equips wants that. true scores candidates boosted to cap, the
+        // item's future value; only keep/trash verdicts and the site-comparison diagnostic want it. Level
+        // and boost fill are independent in NGU, so the two rankings genuinely differ.
         public static Result Optimize(GearObjectives.Objective obj, bool forceTopRespawn = false,
-                                      IReadOnlyList<int> pinnedIds = null)
+                                      IReadOnlyList<int> pinnedIds = null, bool maxed = false)
             => Optimize(new[] { new GearPriority { Objective = obj, MaxAccessorySlots = GearChain.Unlimited } },
-                        pinnedIds, forceTopRespawn);
+                        pinnedIds, forceTopRespawn, maxed);
 
         // Chain-aware optimize: an ordered list of objectives, each claiming at most its budget of the
         // accessory slots still free, on top of a list of pinned "always wear this" item ids.
@@ -344,14 +354,14 @@ namespace NGUAdvisor.Managers
         // and the slots it fills are frozen for every later priority. That sequencing -- not the search
         // inside a single priority -- is what produces mixed accessory sets.
         public static Result Optimize(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
-                                      bool forceTopRespawn = false)
+                                      bool forceTopRespawn = false, bool maxed = false)
         {
             // null means "caller didn't specify" -> fall back to the global pinned-items setting.
             // Callers that need NO pins (e.g. a live titan fight) must pass an empty list, not null.
             pinnedIds = pinnedIds ?? ActivePins();
 
             var idToItem = new Dictionary<int, GearScorer.Item>();
-            var pools = BuildPools(idToItem);
+            var pools = BuildPools(idToItem, maxed);
             var ic = Main.InventoryController;
             var cube = GameGearAdapter.BuildCubeItem();
             var baseItem = GameGearAdapter.BuildBaseItem();
@@ -692,7 +702,8 @@ namespace NGUAdvisor.Managers
         }
 
         // Build candidate pools by part from inventory + currently-equipped, deduped by item id.
-        private static Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>> BuildPools(Dictionary<int, GearScorer.Item> idToItem)
+        // maxed picks the item valuation -- see Optimize.
+        private static Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>> BuildPools(Dictionary<int, GearScorer.Item> idToItem, bool maxed)
         {
             var inv = Main.Character.inventory;
             var ic = Main.InventoryController;
@@ -704,7 +715,7 @@ namespace NGUAdvisor.Managers
                 var pt = e.type;
                 if (pt != part.Head && pt != part.Chest && pt != part.Legs &&
                     pt != part.Boots && pt != part.Weapon && pt != part.Accessory) return;
-                var item = GameGearAdapter.BuildItem(e, pt == part.Weapon);
+                var item = GameGearAdapter.BuildItem(e, pt == part.Weapon, maxed);
                 idToItem[e.id] = item;
                 if (!pools.TryGetValue(pt, out var list))
                 {

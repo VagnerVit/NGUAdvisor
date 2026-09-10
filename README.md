@@ -677,6 +677,9 @@ The stats for the zones can be manually overriden using the `zoneOverrides.json`
 | **F7** | Quickload — load the save made by F3. |
 | **F8** | Toggle your quick loadout / diggers / beards swap on and off. |
 | **F9** | Open the Profile Editor. |
+| **F10** | Write the gear-optimizer diagnostic to `logs\gearopt-diagnostic.log` — every worn item's stats at its current boost fill and at its cap, plus the optimizer's picks under both. The gap between the two is the boost debt on your loadout. |
+
+These work whether the game window or the advisor window has focus.
 
 # Acknowledgements
 

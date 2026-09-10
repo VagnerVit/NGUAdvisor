@@ -59,13 +59,18 @@ namespace NGUAdvisor.Managers
             // Winners of every objective, both with and without the respawn pin. No USER pins here (the
             // new int[0]): pinned items occupy slots and would crowd genuine winners out of the keep set,
             // and the pins themselves are added unconditionally below.
+            //
+            // maxed: true — the ONLY caller that wants the cap valuation. A verdict is about the item's
+            // FUTURE value: an unboosted item that would win once boosted is merge/boost fodder, not
+            // trash, and this list also drives AutoBoostPriority, which exists to boost it. Scoring it at
+            // its current fill would trash exactly the items the boost list is supposed to fill.
             foreach (var obj in GearObjectives.Objectives)
             {
                 try
                 {
                     var seen = new HashSet<int>();
-                    foreach (var id in GearOptimizer.OptimizeIds(obj, false, new int[0]) ?? new int[0]) { keep.Add(id); seen.Add(id); }
-                    foreach (var id in GearOptimizer.OptimizeIds(obj, true, new int[0]) ?? new int[0]) { keep.Add(id); seen.Add(id); }
+                    foreach (var id in GearOptimizer.OptimizeIds(obj, false, new int[0], true) ?? new int[0]) { keep.Add(id); seen.Add(id); }
+                    foreach (var id in GearOptimizer.OptimizeIds(obj, true, new int[0], true) ?? new int[0]) { keep.Add(id); seen.Add(id); }
                     foreach (var id in seen)
                         v.Usage[id] = (v.Usage.TryGetValue(id, out var n) ? n : 0) + 1;
                 }

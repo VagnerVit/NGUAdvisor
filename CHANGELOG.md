@@ -4,6 +4,24 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Hotkeys now work with the advisor window focused.** F1-F10 are read through Unity's input, which
+  only reports keys while the *game* window is in front — the advisor is a window of its own, so with
+  it focused every hotkey did nothing, silently. Both advisor windows now pick the same keys up
+  themselves. F10, which writes the gear diagnostic, was also missing from the hotkey list in the
+  README.
+
+- **The gear optimizer no longer equips an item for boosts it does not have yet.** Every candidate
+  was scored at its cap for its level, on the assumption that the advisor boosts gear to cap. But
+  boosts never raise an item's level — level comes from merging and daycare — so a freshly merged
+  level-100 item can sit at a fraction of its cap indefinitely, and a blacklisted one never leaves
+  it. The optimizer ranked such an item above a genuinely maxed one and wore it, dropping your live
+  Power and Toughness. Anything that equips gear now ranks it by what it gives right now. KEEP/TRASH
+  verdicts and the boost priority still judge items at their cap, because those are questions about
+  an item's future — an unboosted winner is boost fodder, not trash. The gear diagnostic log now
+  prints both valuations per item, so the gap between them shows the boost debt on your loadout.
+
 ## [1.4] - 2026-09-01
 
 Existing settings and profile files remain compatible with version 1.1.0.

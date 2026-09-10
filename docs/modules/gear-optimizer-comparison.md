@@ -25,7 +25,7 @@ sits above `ScoreContext`. `ScoreContext` is **not re-entrant** — see GearOpti
 
 | Concern | Native | Reference |
 |---|---|---|
-| Item stats | Live `Equipment` via `getBonusFactor` (exact per-stat divisors), maxed by `CalcCap(cap, level)` | Static DB `src/assets/Items.js` with hand-maintained maxed values |
+| Item stats | Live `Equipment` via `getBonusFactor` (exact per-stat divisors), at the item's CURRENT boost fill for anything that equips; `CalcCap(cap, level)` only for keep/trash verdicts and the diagnostic's oracle row (`GameGearAdapter.BuildItem`'s `maxed` flag, 2026-09-07) | Static DB `src/assets/Items.js` with hand-maintained maxed values — the site has no notion of an under-boosted copy |
 | Candidate set | Live inventory + equipped (you can only equip what you own) | Full item DB filtered by user-set zone/titan-version/looty/pendant limits (`util.js allowed_zone`) |
 | Offhand % | Live `weapon2Factor() * 100` (wish 28+45 progress), 30 s cache | User input (`state.offhand * 5`) |
 | Nude base stats | Live `adventureAttackBonus()` / `adventureDefenseBonus()` | User input (`basestats`) |

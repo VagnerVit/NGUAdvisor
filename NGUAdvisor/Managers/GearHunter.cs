@@ -41,6 +41,10 @@ namespace NGUAdvisor.Managers
         // Best OWNED copy of each accessory id (dupes exist at different levels). want == null
         // scans EVERYTHING — the inventory-wide fallback; a set restricts to the pool (entries not
         // in the inventory yet — future drops — simply don't resolve).
+        //
+        // Scored at CURRENT boost fill (BuildItem maxed: false), because this loadout gets EQUIPPED —
+        // and because "best copy" is exactly the question boost fill answers: of two copies at the same
+        // level, the boosted one is the one to wear.
         private static Dictionary<int, GearScorer.Item> OwnedAccessories(HashSet<int> want)
         {
             var bestScore = new Dictionary<int, double>();
@@ -50,7 +54,7 @@ namespace NGUAdvisor.Managers
             {
                 if (e == null || e.id == 0 || e.type != part.Accessory) return;
                 if (want != null && !want.Contains(e.id)) return;
-                var it = GameGearAdapter.BuildItem(e, false);
+                var it = GameGearAdapter.BuildItem(e, false, false);
                 double s = LootScore(it);
                 if (!bestScore.TryGetValue(e.id, out var old) || s > old) { bestScore[e.id] = s; items[e.id] = it; }
             }

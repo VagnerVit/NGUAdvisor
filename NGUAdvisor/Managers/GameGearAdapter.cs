@@ -6,11 +6,21 @@ namespace NGUAdvisor.Managers
 {
     // Phase 1b: read a live game Equipment into the scorer's per-item stat map.
     //
-    // Uses the item's MAX (boosted-to-cap) values scaled to its level - CalcCap(cap, level) - since the
-    // advisor boosts gear to cap; this matches how the gear-optimizer optimizes for maxed gear.
-    //   Power    = CalcCap(capAttack, level)
-    //   Toughness= CalcCap(capDefense, level)
-    //   spec i   = CalcCap(speciCap, level) added to the stat(s) that specType feeds (GearObjectives.SpecTypeToStats)
+    // TWO VALUATIONS, and the caller MUST pick (there is no default on purpose):
+    //
+    //   maxed: false - the item's CURRENT values (curAttack/curDefense/specNCur). This is what the game
+    //     actually adds to the character's stats right now, so it is the only correct valuation for a
+    //     path that EQUIPS: GearOptimizer's candidate pools and CurrentScore, GearHunter's loot loadout.
+    //   maxed: true  - the item boosted to cap at its current level, CalcCap(cap, level) = the item's
+    //     FUTURE value. Correct for keep/trash verdicts and boost priority (InventoryAdvisor), and the
+    //     valuation the web gear-optimizer uses (its item DB is hand-maintained maxed values), so it is
+    //     also what GearOptimizerDiagnostic compares against the site.
+    //
+    // BOOSTS AND LEVEL ARE INDEPENDENT - this is why the split exists. Applying a boost raises
+    // curAttack/curDefense/specNCur and NEVER `level` (docs/modules/TransformManager.md); level comes from
+    // merging/daycare, and a merge raises cap * (1 + level/100) while leaving cur where it was. So a
+    // level-100 item can sit at a fraction of its cap indefinitely, and scoring every candidate at cap
+    // ranked such an item above a genuinely maxed one and equipped it (user-reported 2026-09-07).
     //
     // NOT YET INCLUDED (next iteration, needed to match the website exactly): set bonuses. The infinity cube
     // IS included (see BuildCube). Per-item spec stats dominate ranking, so this is a valid cut to validate the pipeline.
@@ -18,7 +28,7 @@ namespace NGUAdvisor.Managers
     {
         private static float CalcCap(float cap, int level) => Mathf.Floor(cap * (1f + level / 100f));
 
-        public static GearScorer.Item BuildItem(Equipment equip, bool isWeapon)
+        public static GearScorer.Item BuildItem(Equipment equip, bool isWeapon, bool maxed)
         {
             var item = new GearScorer.Item { IsWeapon = isWeapon };
             if (equip == null || equip.id == 0)
@@ -27,24 +37,24 @@ namespace NGUAdvisor.Managers
             int level = equip.level;
             var ic = Main.InventoryController;
 
-            // Power/Toughness: maxed raw attack/defense (base-0 stats; scale-invariant for ranking).
-            float power = CalcCap(equip.capAttack, level);
+            // Power/Toughness: raw attack/defense (base-0 stats; scale-invariant for ranking).
+            float power = maxed ? CalcCap(equip.capAttack, level) : equip.curAttack;
             if (power != 0) Add(item, GearObjectives.Stat.Power, power);
-            float tough = CalcCap(equip.capDefense, level);
+            float tough = maxed ? CalcCap(equip.capDefense, level) : equip.curDefense;
             if (tough != 0) Add(item, GearObjectives.Stat.Toughness, tough);
 
             // Spec %s: the game's getBonusFactor applies the correct per-stat divisor; ×100 = displayed %.
-            AddSpec(ic, item, equip.spec1Type, CalcCap(equip.spec1Cap, level));
-            AddSpec(ic, item, equip.spec2Type, CalcCap(equip.spec2Cap, level));
-            AddSpec(ic, item, equip.spec3Type, CalcCap(equip.spec3Cap, level));
+            AddSpec(ic, item, equip.spec1Type, maxed ? CalcCap(equip.spec1Cap, level) : equip.spec1Cur);
+            AddSpec(ic, item, equip.spec2Type, maxed ? CalcCap(equip.spec2Cap, level) : equip.spec2Cur);
+            AddSpec(ic, item, equip.spec3Type, maxed ? CalcCap(equip.spec3Cap, level) : equip.spec3Cur);
             return item;
         }
 
-        private static void AddSpec(InventoryController ic, GearScorer.Item item, specType type, float rawMaxed)
+        private static void AddSpec(InventoryController ic, GearScorer.Item item, specType type, float raw)
         {
-            if (type == specType.None || rawMaxed == 0) return;
+            if (type == specType.None || raw == 0) return;
             if (!GearObjectives.SpecTypeToStats.TryGetValue((int)type, out var stats)) return;
-            double pct = ic.getBonusFactor(rawMaxed, type) * 100.0;
+            double pct = ic.getBonusFactor(raw, type) * 100.0;
             if (pct == 0) return;
             foreach (var stat in stats)
                 Add(item, stat, pct);
