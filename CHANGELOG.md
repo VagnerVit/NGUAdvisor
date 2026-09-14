@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.5] - 2026-09-14
+
 ### Added
 
 - **Lock a quest item and the advisor farms it to 100.** Quest items only drop while a quest runs in
