@@ -6,7 +6,7 @@ namespace NGUAdvisor.Tests
     public class ExpRatioTablesTests
     {
         private static ExpRatioTables.Targets Ch(int chapter) =>
-            ExpRatioTables.For(chapter, true, 1, false, true);
+            ExpRatioTables.For(chapter, true, 1, true);
 
         [Theory]
         [InlineData(1)]
@@ -54,14 +54,14 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void Chapter3_BeforeT5_IsEnergyOnly()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(3, false, 1, false, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(3, false, 1, true);
             Assert.Equal(1.0, t.PoolE);
         }
 
         [Fact]
         public void Chapter3_AfterT5_Targets5To1Values()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(3, true, 1, false, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(3, true, 1, true);
             Assert.Equal(0.625, t.PoolE, 10);
             Assert.Equal(0.375, t.PoolM, 10);
         }
@@ -69,33 +69,44 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void Chapter4_Targets3To1Values_AsAnEvenExpSplit()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, 1, false, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, 1, true);
             Assert.Equal(0.5, t.PoolE, 10);
             Assert.Equal(0.5, t.PoolM, 10);
         }
 
+        // Guide ch.4: "After T6v2, focus Magic to get up to a 2:1 E:M ratio".
         [Theory]
-        [InlineData(2, false)]   // T6v2 reached
-        [InlineData(1, true)]    // ...or the CBlock2 proxy
-        [InlineData(3, false)]
-        public void PostCBlock2_Targets2To1Values(int t6Version, bool cblock2Done)
+        [InlineData(2)]
+        [InlineData(3)]
+        public void T6v2ToV3_Targets2To1Values(int t6VersionsBeaten)
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, t6Version, cblock2Done, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, t6VersionsBeaten, true);
             Assert.Equal(0.4, t.PoolE, 10);
             Assert.Equal(0.6, t.PoolM, 10);
+        }
+
+        // Beating T6 v1 is what moves the CHAPTER to 4; it does not by itself move the E:M ratio.
+        // Nor does anything else: the old "CBlock2 done" proxy handed 2:1 to players still on v1.
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        public void BeforeT6v2_StaysOn3To1Values(int t6VersionsBeaten)
+        {
+            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, t6VersionsBeaten, true);
+            Assert.Equal(0.5, t.PoolE, 10);
         }
 
         [Fact]
         public void T6v4_RevertsTo3To1Values()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, 4, true, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(4, true, 4, true);
             Assert.Equal(0.5, t.PoolE, 10);
         }
 
         [Fact]
         public void MagicLocked_ForcesEnergyOnly_EvenLate()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(5, true, 3, true, false);
+            ExpRatioTables.Targets t = ExpRatioTables.For(5, true, 3, false);
             Assert.Equal(1.0, t.PoolE);
             Assert.Equal(0.0, t.PoolM);
         }
@@ -103,7 +114,7 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void UnknownChapter_FallsBackToMidGameRatio()
         {
-            ExpRatioTables.Targets t = ExpRatioTables.For(0, true, 1, false, true);
+            ExpRatioTables.Targets t = ExpRatioTables.For(0, true, 1, true);
             Assert.Equal(750.0 / 1710, t.ShareP, 10);
             Assert.Equal(0.5, t.PoolE, 10);
         }

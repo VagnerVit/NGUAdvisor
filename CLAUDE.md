@@ -74,6 +74,7 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `small-managers.md` | BeardManager, CookingManager, ChallengeDetector |
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |
 | `TitanTables.md` | TitanTables + NumberFormatter |
+| `BloodPlanner.md` | BloodPlanner + BloodRouter (**single-sink routing: the ladder, the per-sink verdicts, and why the cost-curve knee needs hysteresis AND a dwell**) |
 | `ZoneCadence.md` | ZoneCadence + BoostValueMath + BoostSinks (**farm-rate substrate: kill cadence, idle-vs-manual truth, boost pricing — read before touching either farm advisor**) |
 | `ItopodFarmAdvisor.md` | ItopodFarmAdvisor + ItopodRewards (**the pod's four currencies and where each one saturates — read before pricing ITOPOD against anything**) |
 | `ITOPODManager.md` | ITOPODManager + ItopodConstants (**the one-shot floor solve; the defense term is NOT divided by the multiplier**) |

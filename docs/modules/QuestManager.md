@@ -48,6 +48,55 @@ Guards, each from a report:
 - Budget **180 min** (was 20 — user: "10 majors, nothing capped"); the overfill guard is the real
   cost control, the clock is only a runaway stop. Hold logged at most every 5 min.
 
+## The 50-item minor re-roll — free, and therefore default ON
+
+`startQuest` rolls `targetDrops = Random.Range(50, 60)` — **50..59, mean 54.5** — collapsing to a
+flat 50 once itopod **perk 94 ≥ 610** (`[DECOMP] BeastQuestController.cs:450-454`). Three facts make
+re-rolling a minor strictly dominant:
+
+- **The reward never reads `targetDrops`.** `giveRewardsAndClear` pays
+  `minorQuestReward() * questRewardFactor() * allActiveModifier()` — a 59-item minor pays exactly
+  what a 50-item one does (`[DECOMP] BeastQuestController.cs:482-503`).
+- **`skipQuest()` is just `clearQuest()`** — no cost, no cooldown, no confirmation on this path
+  (`[DECOMP] BeastQuestController.cs:949-954`), and a minor consumes no bank.
+- `ManageQuests` runs from `QuickStuff` every 0.5 s, so the ~10 rolls it takes to land a 50 cost
+  about ten seconds.
+
+The test is **marginal, not average**: `targetDrops - curDrops > 50` compares the work REMAINING
+against a fresh 50-item quest, so drops already banked are correctly treated as sunk. Average saving
+≈ 8 % of quest kills for identical QP/AP.
+
+**With perk 94 the rule is a no-op** (50 − 0 is not > 50), which is why `ApplyQuests` asserting it
+from `perk94 >= 610` was inverted: on exactly the accounts where re-rolling pays, it turned the rule
+off. It is now always on, and the SavedSettings default is ON.
+
+It stands down while a quest item is being levelled (below): `curDrops` never moves there, so the
+test would hold forever, and each re-roll can return a different zone — which stops the locked item
+dropping at all.
+
+## Levelling a quest item to 100 — the padlock is the whole switch
+
+`InventoryManager.LevellingQuestItem()` (a LOCKED, un-maxxed id 278-287) is the intent, and there is
+no setting: the same padlock already decides which quest items the merge pass touches
+(InventoryManager.cs:268 merges locked copies only). **Why quest strategy has to ask:** an IDLE quest
+drops NOTHING — `updateIdleQuest` ticks `idleProgress` and advances `curDrops` directly
+(`[DECOMP] BeastQuestController.cs:787-799`) — so while the advisor forced `ManualMinors = false`
+(AdvisorApply.cs:600), no copy ever reached the inventory and the item could not gain a level.
+
+While one is being levelled, four things change, each because the previous one alone does nothing:
+
+| Change | Why |
+|---|---|
+| `ManualMinors = true` (AdvisorApply) | manual is the only mode that drops items at all |
+| questing outranks the farm zone (`LevellingQuestItemOutranksFarming`) | the drops are kills IN the quest zone |
+| banked majors are NOT started | minors are unlimited, the bank is not; both drop the item equally per kill |
+| no progress-based minor abandon | `mergeAll` consumes every unlocked copy before it can count, so progress stays under the threshold BY DESIGN — abandoning would skip-loop forever |
+
+It ends itself: at level 100 the item is `itemMaxxed`, the predicate goes false, and the ordinary
+strategy (idle minors, majors from the bank) resumes. **Gear Hunt still outranks all of it**, and an
+imminent bank overflow still forces a major through — the pooled burst too, since that is an explicit
+request to empty the bank.
+
 ## Turn-in (`CheckQuestTurnin`)
 
 `readyToHandIn()` → capstone hold check → **one butter attempt per quest** (`_butterAttempted`;

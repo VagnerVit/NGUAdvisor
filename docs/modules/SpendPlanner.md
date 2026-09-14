@@ -19,6 +19,23 @@ while the guide still had buys queued (user-reported).
 - `Chapter()` returns **0 when stage detection is unknown** → every chapter-gated step skips →
   nothing is bought. The old "unknown = chapter 1" default made a transient detection failure
   read as "plan complete".
+- **A step scheduled in the WRONG chapter is silent the same way (user-reported 2026-09-13).** Every
+  quirk but the Adventure baby quirk carried `MinChapter 5` while the guide puts them in ch.4, so a
+  player sitting on 144 QP in ch.4 got no purchases and a panel reading "banking for X (chapter 5)" —
+  the FUTURE-buy card, which looks like a recommendation and is not one. Guide ch.4 Questing, verbatim:
+  "Quirks: Baby Quirks, Beast's Seed, Beasted Boosts 1, MPow/MCap 1, Gold, EPow/ECap 1"; ch.5 "Quirk
+  Order": "Finish EM Pow/Cap 1 / Beard / AT Banks 1 / Beasted Boosts 2 / Adventure Quirk in LRB to T8".
+  Four of that ch.4 list (Beast's Seed, Gold, and the Generic E/M Pow/Cap I quirks) were missing from
+  `QuirkPlan` entirely. Because `MinChapter` is a FLOOR and steps are sequential, leaving the Generic I
+  steps ahead of the banks is what implements ch.5's "Finish EM Pow/Cap 1" — no duplicate step needed.
+- **Step names are SCENE data and cannot be checked from the decompile.** `FindByName` logs one miss
+  per step to `debug.log` and skips it, so a typo costs a step silently. Read the live list first:
+  the state export's BEAST QUIRKS / ITOPOD PERKS sections print every entry with its index and cost.
+- **A WRONG chapter is as silent as an unknown one.** The whole `QuirkPlan` is `MinChapter` 4 or 5,
+  so while `ProgressionAnalyzer.Chapter` was pinned at 3 by the `titan{N}Version` misread, this
+  planner bought no quirk at all and QP banked forever, with no error anywhere (user-reported
+  2026-09-12, fixed in ProgressionAnalyzer — see that doc). When a spend plan "does nothing",
+  check the chapter it is being handed before looking at the plan.
 - **A fruit step is gated on the CAP, not only the chapter** (`Step.MinCap`). The guide
   schedules the tier-24 push for ch4, but the game gate is `AllYggdrasil.capTier()` — 10 until
   Troll Challenge ×3 completions, then 24. The two come apart: a player can hold the cap while

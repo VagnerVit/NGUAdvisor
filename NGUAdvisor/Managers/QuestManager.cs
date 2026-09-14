@@ -162,8 +162,28 @@ namespace NGUAdvisor.Managers
             if (!Settings.AdvisorQuests || !Settings.AllowMajorQuests) return false;
             if (Quest.curBankedQuests <= 0) return false;
             if (Settings.PoolMajorQuests && !Settings.QuestBurstActive) return false;
-            try { if (GearHunter.Active) return false; } catch { }
-            return true;
+            return !GearHuntOwnsFarming();
+        }
+
+        // A MANUAL minor progresses ONLY from kills in the quest zone: an idle quest advances its own
+        // bar, a manual one needs the drops. So "Manual Minors" is itself a request for the zone —
+        // without this the toggle produced a quest parked at 0/N while the farm kept the character in
+        // its boost zone (user-reported, screenshot: MINOR Forest 0/50 · fighting). Deliberately NOT
+        // gated on AdvisorQuests: in MANUAL decisions the user's rulebook is the decision, and this
+        // toggle is that rulebook saying it.
+        private static bool ManualMinorNeedsTheZone()
+            => Settings.ManualMinors && !GearHuntOwnsFarming();
+
+        // Levelling a quest item to 100 needs kills IN THE QUEST ZONE — the drops are the levels — so
+        // questing has to win the zone or the padlock means nothing. Also ungated on AdvisorQuests:
+        // the padlock is the user's own signal either way (InventoryManager.LevellingQuestItem).
+        private static bool LevellingQuestItemOutranksFarming()
+            => InventoryManager.LevellingQuestItem()
+            && !GearHuntOwnsFarming();
+
+        private static bool GearHuntOwnsFarming()
+        {
+            try { return GearHunter.Active; } catch { return false; }
         }
 
         private static void UpdateShouldQuest()
@@ -175,7 +195,9 @@ namespace NGUAdvisor.Managers
             // Major quests take precedence over adventure zones
             else if (Quest.inQuest && !Quest.reducedRewards
                   || Settings.QuestsFullBank && questBankOverfill
-                  || BankedMajorOutranksFarming())
+                  || BankedMajorOutranksFarming()
+                  || LevellingQuestItemOutranksFarming()
+                  || ManualMinorNeedsTheZone())
             {
                 shouldQuest = true;
             }
@@ -306,7 +328,12 @@ namespace NGUAdvisor.Managers
                 return;
             }
 
-            var majorQuests = Settings.AllowMajorQuests && Quest.curBankedQuests > 0;
+            // While a locked quest item is being levelled, minors are the farm: they are unlimited and
+            // the bank is not, and both quest types drop the item equally per manual kill. Overfill
+            // below still overrides — banked regen must never be wasted — and so does a pooled burst,
+            // which is an explicit request to empty the bank.
+            var majorQuests = Settings.AllowMajorQuests && Quest.curBankedQuests > 0
+                && !InventoryManager.LevellingQuestItem();
             // Check if Quest Bank will overfill before we can finish the current idle quest
             majorQuests |= Settings.QuestsFullBank && questBankOverfill;
 
@@ -394,13 +421,21 @@ namespace NGUAdvisor.Managers
                 // the pooling trade-off; the burst is what spends the bank.
                 var abandonQuest = Settings.QuestsFullBank && questBankOverfill
                     && !(Settings.PoolMajorQuests && !Settings.QuestBurstActive);
-                if (majorQuests && Settings.AbandonMinors && Quest.targetDrops > 0)
+                // Never abandon on progress while levelling a quest item: the merge pass eats the
+                // drops before they can count, so progress STAYS under the threshold by design and
+                // the minor would be skipped and restarted forever.
+                if (majorQuests && Settings.AbandonMinors && Quest.targetDrops > 0
+                    && !InventoryManager.LevellingQuestItem())
                 {
                     float progress = Quest.curDrops / (float)Quest.targetDrops * 100;
                     // If all this is true get rid of this minor quest
                     abandonQuest |= progress <= Settings.MinorAbandonThreshold;
                 }
-                abandonQuest |= Settings.FiftyItemMinors && Quest.targetDrops - Quest.curDrops > 50;
+                // The 50-item re-roll is OFF while levelling a quest item: curDrops never moves (the
+                // merge pass eats the drops), so the test would hold forever, and every re-roll can
+                // hand back a DIFFERENT zone — which stops the locked item dropping at all.
+                abandonQuest |= Settings.FiftyItemMinors && Quest.targetDrops - Quest.curDrops > 50
+                    && !InventoryManager.LevellingQuestItem();
 
                 if (abandonQuest)
                 {

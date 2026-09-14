@@ -46,6 +46,20 @@ is not a reading of the pod.
 The old `ItopodRate` evaluated one floor from `OptimalFloorForMode` (regular attack, no buffs, no big
 moves) and assumed one swing per kill at it.
 
+## `DcFor(zone)` — where drop chance stops paying
+
+Every roll is `Mathf.Min(chance × dcFactor, cap)`, so a zone stops rewarding drop chance once EVERY
+roll sits at its cap. That factor is `max(cap_i / chance_i)`, compared against the zone's own factor
+(cube-rooted where `Rooted`). This is the same saturation the table's own note describes — "at high
+drop chance AVSP saturates at its 0.25 cap while BDW's T7+T8 values keep going" — made answerable.
+
+Caps of `1.0` are carried through rather than skipped: for the early zones that really is the roll's
+ceiling ("zones 0 and 1 fire a single uncapped tier-1 roll"), and a probability of 1 is a genuine
+saturation point, just a distant one.
+
+Consumers: `OptimizationAdvisor.CurrentDiggerSet` (the DC digger displaces the PP one during a boost
+farm only while DC still pays) and the `[ZoneDbg] boostfarm` line's `dc=` field.
+
 ## Data provenance — these bugs are encoded in the comments, don't regress them
 
 1. **Per-roll caps (zones 0–18)**: the old table lacked the game's `Mathf.Min(cap, chance×DC)`

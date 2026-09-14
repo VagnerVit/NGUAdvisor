@@ -1,7 +1,10 @@
-# BloodPlanner (`Managers/BloodPlanner.cs`)
+# BloodPlanner (`Managers/BloodPlanner.cs` + `Managers/BloodRouter.cs`)
 
 Blood Magic planner: Iron Pill cast timing + investment-spell routing from breakpoint math, all
-live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` toggle).
+live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` toggle). The routing
+LADDER itself lives in `BloodRouter` — Unity-free and unit-tested (`BloodRouterTests`); BloodPlanner
+supplies the game reads as lazy predicates so evaluation order is unchanged and an expensive read
+never runs for a sink a cheaper gate already rejected.
 
 ## Game-truth formulas (decomp)
 
@@ -47,15 +50,45 @@ live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` tog
 2. **NUMBER floor**: `BloodNumberThreshold` is a FLOOR, not a ceiling — below it NUMBER outranks
    the in-run sinks. (Old code stopped at the target, capping a linear uncapped multiplier AND
    cutting ritual funding for the rest of the run.)
-3. **Gold** — the user allows it (`BloodWantCounterfeit`) and its bonus is under the user's
-   ceiling (`CounterfeitThreshold`), the investment window is open (first 50 % of the run; log
-   sinks must earn back before the wipe), TM has base gold, gold demand exists (augs ×2 hysteresis
-   OR digger upgrades), and the next +1 % is within ~20 min of full income (`GoldBelowKnee`).
-4. **Spaghetti** — allowed + under `SpaghettiThreshold`, and zone-farming below the zone's
-   `RecommendedDcPercent` (GoldCBlockMode only).
+3. **A PUSH sink** — gold before loot.
+4. **An AUTO sink** — gold before loot.
 5. **NUMBER default sink** — rebirth scheduled and not NORB; the rebirth force-cast banks
    leftovers anyway, so routing early costs nothing.
 6. **All off** — NORB / no rebirth: nothing to bank; keep rituals from draining the marathon.
+
+Whether a sink is a candidate at all is `BloodRouter.JudgeSink`, in this order — the FIRST one that
+fails is the `SinkVerdict` the panel shows, so the reason the user reads is the reason that decided:
+
+| gate | Counterfeit | Spaghetti | Push overrules it? |
+|---|---|---|---|
+| `Off` | `BloodWantCounterfeit` | `BloodWantSpaghetti` | — (Push implies on) |
+| `TargetReached` | `CounterfeitThreshold` %, 0 = none | `SpaghettiThreshold` %, 0 = none | no — it IS the target |
+| `NotFeasible` | TM has base gold to multiply | (none — unlocks with the others) | **no** |
+| `WindowClosed` | first 50 % of the run | same | **no** — both are wiped at rebirth, so this is arithmetic, not opinion |
+| `NoDemand` | augs (×2 hysteresis) OR digger upgrades unfunded | zone-farming below the zone's `RecommendedDcPercent` | **yes** |
+| `PastKnee` | next +1 % within the knee (below) | — (cost doubles per +1 %; the ceiling is the stopping rule) | **yes** |
+
+## The flip-flop, and the two fixes (user-reported 2026-09-12)
+
+Reported as "Counterfeit set to 500 % and it still farms NUMBER". `inject.log` showed the toggle
+bouncing Counterfeit ↔ NUMBER roughly once a minute for the whole run, so Counterfeit ran at about a
+20 % duty cycle — the 500 % ceiling was never even close to binding (the bonus stood at 272 %).
+
+**The knee is self-retriggering.** Route gold → it buys the next +1 % → the step after costs ~2× → its
+ETA jumps past the threshold → gold drops out to NUMBER → blood income grows → the same step fits
+again. Two independent fixes, because they answer different halves:
+
+- **Hysteresis**: entering the gold sink costs an ETA under `KneeEnterSeconds` (20 min), but HOLDING
+  it is allowed up to `KneeHoldSeconds` (60 min), so a sink that owns the pool finishes the step it
+  started instead of handing it back halfway.
+- **Minimum dwell** (`MinDwellSeconds`, 5 min, `BloodRouter.HoldPrevious`): a sink that wins holds the
+  pool — but only against gates that fix themselves (`NoDemand`, `PastKnee`). Off, target reached,
+  not feasible and window-closed hand it over at once. The latch lives in `FillRouting`, not in
+  `ApplyBlood`, so the panel renders the route that will actually be written.
+
+**And the ceiling was not an intent.** `SinkMode` (Off / Auto / **Push**) is now what the user states;
+Push overrules the advisor's discretionary gates up to the ceiling. See the table above for what it
+does NOT overrule.
 
 ## `BloodMatters()` — the deadlock fix
 
@@ -65,12 +98,14 @@ intent-reads broke a real deadlock — NUMBER gated behind a default-0 threshold
 → no rituals → no blood → NUMBER stuck at 1.0 forever. When the advisor does NOT own blood, the
 live toggles ARE the intent. Cached 10 s; fail-safe returns true (keep rituals).
 
-## User targets — permission and ceiling (2026-08-28)
+## User targets — permission, push and ceiling (2026-08-28, extended 2026-09-12)
 
 Neither log sink is capped by the game, so once one wins the routing it holds the pool for the rest
 of the run. The two Systems > BLOOD fields are now that ceiling:
 
-- **Checkbox** (`BloodWantSpaghetti` / `BloodWantCounterfeit`) = permission. Unchecked -> never routed.
+- **Dropdown** = intent, stored as two flags: `BloodWantSpaghetti` / `BloodWantCounterfeit` =
+  permission, `BloodPushSpaghetti` / `BloodPushCounterfeit` = push. Two flags rather than one enum so a
+  settings file written before Push reads back as the Off/Auto it already meant.
 - **Number** (`SpaghettiThreshold` / `CounterfeitThreshold`) = ceiling in %, **0 = no ceiling**
   (mirroring `BloodNumberThreshold`'s 0 = no floor). Reached -> the sink drops out of the routing.
 - Inside what they allow, every existing gate still decides — the targets FILTER the candidates,
@@ -95,3 +130,12 @@ when the magic lanes hit their blitz-boost ceiling the surplus idles, making rit
 sample in the 2026-08-24 session reports `bb out of reach` with `held` 4x-136x below `bb`, and the
 two `STOOD DOWN` lines are both `energy` — which rituals do not consume. There is no such surplus at
 this scale; revisit only if the magic cap grows an order of magnitude.
+
+## `BloodNumberThreshold` must be FINITE (2026-09-12)
+
+Found in a live `settings.json` as `NaN`, and in that morning's log as a floor of `1e+308`
+(`NUMBER (below floor 1e+308)`) — a floor that can never be reached, so NUMBER owned the routing
+unconditionally and no other sink could ever run. The panel's free-text box took any double and
+round-tripped huge values back through `ToString("0")`. Guarded in three places now: the panel's
+parse, the `SavedSettings` setter, and the load-time predicate (which rejects Infinity explicitly —
+NaN already fails `>= 0`, Infinity does not).

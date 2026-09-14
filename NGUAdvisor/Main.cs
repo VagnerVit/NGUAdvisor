@@ -473,6 +473,14 @@ namespace NGUAdvisor
                     Loader.Unload();
                     return;
                 }
+                // Shares the unload poll's once-a-second budget rather than adding a second File.Exists
+                // to the frame. Sets the same pending flag the LOGS button does, so the export itself
+                // still runs through the one drain below.
+                if (Managers.StateExport.Requested())
+                {
+                    Log("State export requested from disk");
+                    RequestStateExport();
+                }
             }
 
             // Drain deferred file-watcher work on the main thread (see the watcher handlers). Doing this

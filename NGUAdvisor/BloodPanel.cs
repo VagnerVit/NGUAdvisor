@@ -31,8 +31,11 @@ namespace NGUAdvisor
         private Label _cNum, _cLoot, _cGold;     // route chips: created ONCE, recolored in place (never per-tick churn)
         private NumericUpDown _guffAThr, _guffBThr, _spag, _counter;
         private TextBox _numberThr;
-        private ScaledCheckBox _wantSpag, _wantGold;   // sink PERMISSION; the numeric beside it is the CEILING
+        // Sink INTENT, three states (Off / Advisor decides / Push to): the old checkbox said only
+        // "allowed", so a ceiling the user typed read like a goal and behaved like a filter.
+        private LineComboBox _spagMode, _goldMode;
         private Label _spagStat, _goldStat, _numStat, _swapNote;
+        private Label _spagWhy, _goldWhy, _numWhy;   // WHY this sink is / isn't taking blood right now
         private bool _syncing;
 
         public BloodPanel(int canvasW = 0)
@@ -80,25 +83,43 @@ namespace NGUAdvisor
             return n;
         }
 
-        // Sink-row geometry: caption | "up to"/"floor" | value | live status.
-        private const int SinkCapX = 226, SinkNumX = 276, SinkStatX = 372;
+        // Sink-row geometry: caption | intent dropdown | ceiling | live status, with a muted WHY line
+        // under it. The ceiling column is measured, never tuned: UiTheme.Num is font-derived, so a
+        // hardcoded spinner width goes stale silently (ui-infra.md, "bigger digits are WIDER").
+        private const int SinkCapX = 10, SinkModeX = 214;
+        private static int SinkNumX => UiTheme.S(SinkModeX) + UiTheme.S(146);
+        private static int SinkStatX => SinkNumX + UiTheme.NumWidthFor("100000") + UiTheme.S(14);
 
-        private ScaledCheckBox MkWant(string caption, int y, Func<bool> get, Action<bool> set)
+        private void MkSinkCaption(string text, int y)
         {
-            var cb = new ScaledCheckBox { Text = caption, AutoSize = true, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y) };
-            cb.CheckedChanged += (s, e) => { if (_syncing || Settings == null) return; set(cb.Checked); RefreshStatus(); };
-            Controls.Add(cb);
-            return cb;
+            Controls.Add(new Label { Text = text, AutoSize = false, Size = new Size(UiTheme.S(198), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(SinkCapX), y + UiTheme.S(4)) });
         }
 
         private void MkColLabel(string text, int y)
         {
-            Controls.Add(new Label { Text = text, AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(SinkCapX), y + UiTheme.S(4)) });
+            Controls.Add(new Label { Text = text, AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(SinkModeX), y + UiTheme.S(4)) });
+        }
+
+        // Off / Advisor decides / Push to — the three states a sink can be in. LineComboBox, not
+        // ComboBox: Mono snaps a plain dropdown back to a 96-DPI height (ui-infra.md).
+        private LineComboBox MkMode(int y, Action<SinkMode> set)
+        {
+            var cb = new LineComboBox { Location = new Point(UiTheme.S(SinkModeX), y), Width = UiTheme.S(138), Font = UiTheme.Ui, DropDownStyle = ComboBoxStyle.DropDownList };
+            cb.Items.AddRange(new object[] { "Off", "Advisor decides", "Push to" });
+            UiTheme.StyleCombo(cb);
+            cb.SelectedIndexChanged += (s, e) =>
+            {
+                if (_syncing || Settings == null || cb.SelectedIndex < 0) return;
+                try { set((SinkMode)cb.SelectedIndex); } catch (Exception ex) { LogDebug($"Blood mode: {ex.Message}"); }
+                SyncFromSettings();
+            };
+            Controls.Add(cb);
+            return cb;
         }
 
         private NumericUpDown MkSinkNum(int y, int min, int max, Action<decimal> set)
         {
-            var n = new NumericUpDown { Location = new Point(UiTheme.S(SinkNumX), y), Width = UiTheme.S(80), Minimum = min, Maximum = max, Font = UiTheme.Ui };
+            var n = new NumericUpDown { Location = new Point(SinkNumX, y), Width = UiTheme.NumWidthFor("100000"), Minimum = min, Maximum = max, Font = UiTheme.Ui };
             UiTheme.StyleNum(n);
             n.ValueChanged += (s, e) => { if (_syncing || Settings == null) return; try { set(n.Value); RefreshStatus(); } catch (Exception ex) { LogDebug($"Blood sink num: {ex.Message}"); } };
             Controls.Add(n);
@@ -111,11 +132,30 @@ namespace NGUAdvisor
             {
                 Text = "",
                 AutoSize = false,
-                Size = new Size(Math.Max(UiTheme.S(140), _w - UiTheme.S(SinkStatX) - UiTheme.S(30)), UiTheme.TextH),
+                Size = new Size(Math.Max(UiTheme.S(140), _w - SinkStatX - UiTheme.S(30)), UiTheme.TextH),
                 Font = UiTheme.Ui,
                 ForeColor = UiTheme.Muted,
                 BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(SinkStatX), y + UiTheme.S(4))
+                Location = new Point(SinkStatX, y + UiTheme.S(4))
+            };
+            Controls.Add(l);
+            return l;
+        }
+
+        // The WHY line: the gate that is actually deciding this sink, in plain words. Without it the
+        // panel named only the winner, so a user whose Counterfeit ceiling was nowhere near binding had
+        // no way to see that the cost-curve knee was what kept handing the pool back to NUMBER.
+        private Label MkSinkWhy(int y)
+        {
+            var l = new Label
+            {
+                Text = "",
+                AutoSize = false,
+                Size = new Size(_w - UiTheme.S(54), UiTheme.HeadH),
+                Font = UiTheme.ColHeader,
+                ForeColor = UiTheme.Muted,
+                BackColor = UiTheme.Ground,
+                Location = new Point(UiTheme.S(SinkCapX + 4), y)
             };
             Controls.Add(l);
             return l;
@@ -197,48 +237,86 @@ namespace NGUAdvisor
             // Checkbox = permission, number = ceiling (0 = none, as BloodNumberThreshold's 0 = no floor);
             // inside what they allow BloodPlanner's own gates still choose. Before this the two % fields
             // were read ONLY by Main's manual AutoSpellSwap path, so in ADVISOR mode they were dead.
-            MkHead("SINKS — WHAT THE ADVISOR MAY ROUTE BLOOD INTO", UiTheme.S(10), top + UiTheme.S(230));
+            MkHead("SINKS — ONE AT A TIME; THE GAME SPLITS BLOOD EVENLY BETWEEN WHICHEVER ARE ON", UiTheme.S(10), top + UiTheme.S(230));
 
+            // Row pitch is DERIVED from the two lines a row holds (a value line + a WHY line), never a
+            // tuned constant — that is what clipped stacked lines at 200 % scaling before.
+            int rowPitch = UiTheme.LinePitch + UiTheme.HeadPitch;
             int y = top + UiTheme.S(256);
-            _wantSpag = MkWant("Spaghetti — drop chance", y, () => Settings.BloodWantSpaghetti, v => Settings.BloodWantSpaghetti = v);
-            MkColLabel("up to", y);
+            MkSinkCaption("Spaghetti — drop chance", y);
+            _spagMode = MkMode(y, SetSpagMode);
             _spag = MkSinkNum(y, 0, 100000, v => Settings.SpaghettiThreshold = (int)v);
             _spagStat = MkSinkStatus(y);
+            _spagWhy = MkSinkWhy(y + UiTheme.LinePitch);
 
-            y = top + UiTheme.S(290);
-            _wantGold = MkWant("Counterfeit Gold — GPS", y, () => Settings.BloodWantCounterfeit, v => Settings.BloodWantCounterfeit = v);
-            MkColLabel("up to", y);
+            y += rowPitch;
+            MkSinkCaption("Counterfeit Gold — GPS", y);
+            _goldMode = MkMode(y, SetGoldMode);
             // Counterfeit has NO game-side cap (goldBonus = 1 + floor((log2(blood/min)+1)^2)/100,
             // decomp AllBloodMagicController:105) — the old max of 100 falsely capped the target.
             _counter = MkSinkNum(y, 0, 100000, v => Settings.CounterfeitThreshold = (int)v);
             _goldStat = MkSinkStatus(y);
+            _goldWhy = MkSinkWhy(y + UiTheme.LinePitch);
 
-            // NUMBER carries no checkbox: it is the FALLBACK sink (FillRouting's default branch), so
+            // NUMBER has no intent dropdown: it is the FALLBACK sink (FillRouting's default branch), so
             // "off" is not a state it can be in — and its number is a FLOOR, not a ceiling.
-            y = top + UiTheme.S(324);
-            Controls.Add(new Label { Text = "NUMBER — rebirth multi", AutoSize = false, Size = new Size(UiTheme.S(210), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y + UiTheme.S(4)) });
+            y += rowPitch;
+            MkSinkCaption("NUMBER — rebirth multi", y);
             MkColLabel("floor", y);
-            _numberThr = new TextBox { Location = new Point(UiTheme.S(SinkNumX), y), Width = UiTheme.S(96), Font = UiTheme.Ui, Height = UiTheme.LineH };
+            _numberThr = new TextBox { Location = new Point(SinkNumX, y), Width = UiTheme.NumWidthFor("100000"), Font = UiTheme.Ui, Height = UiTheme.LineH };
             _numberThr.TextChanged += (s2, e2) =>
             {
                 if (_syncing || Settings == null) return;
-                if (double.TryParse(_numberThr.Text, out var d)) { try { Settings.BloodNumberThreshold = d; } catch { } }
+                // Finite and non-negative only: an Infinity floor (typed, or round-tripped through this
+                // very box's ToString) is never reached, so NUMBER would own the routing forever.
+                if (double.TryParse(_numberThr.Text, out var d) && !double.IsNaN(d) && !double.IsInfinity(d) && d >= 0)
+                {
+                    try { Settings.BloodNumberThreshold = d; } catch { }
+                }
             };
             Controls.Add(_numberThr);
             _numStat = MkSinkStatus(y);
+            _numWhy = MkSinkWhy(y + UiTheme.LinePitch);
 
-            _advice = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), top + UiTheme.S(366)) };
+            _advice = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y + rowPitch + UiTheme.S(6)) };
             Controls.Add(_advice);
+        }
+
+        // The two flags behind one dropdown: permission (may this sink run at all) and push (does the
+        // user want the bonus regardless of the advisor's own opinion of its value).
+        private static void SetSpagMode(SinkMode m)
+        {
+            Settings.BloodWantSpaghetti = m != SinkMode.Off;
+            Settings.BloodPushSpaghetti = m == SinkMode.Push;
+        }
+
+        private static void SetGoldMode(SinkMode m)
+        {
+            Settings.BloodWantCounterfeit = m != SinkMode.Off;
+            Settings.BloodPushCounterfeit = m == SinkMode.Push;
         }
 
         private static string Fmt(double v) => NumberFormatter.Abbrev(v);
 
-        private static string SinkStatus(int now, int target, bool want)
+        private static string SinkStatus(int now, int target, SinkMode mode)
         {
-            if (!want) return $"now {now}% — off";
+            if (mode == SinkMode.Off) return $"now {now}% — off";
             if (target <= 0) return $"now {now}% — no ceiling";
             return now < target ? $"now {now}% → {target}%" : $"now {now}% — target reached";
         }   // consolidated (finding #31); handles negative deltas
+
+        // The WHY line. "not routed: <gate>" names the gate that is actually deciding — and when that
+        // gate is one Push may overrule, it says so, because the fix is a dropdown away.
+        private static string SinkWhy(bool routing, SinkVerdict v, SinkMode mode, string detail)
+        {
+            string head;
+            if (routing) head = "routing now";
+            else if (v == SinkVerdict.Eligible) head = "eligible — another sink holds the pool";
+            else head = "not routed: " + BloodRouter.Describe(v);
+            if (mode == SinkMode.Auto && (v == SinkVerdict.NoDemand || v == SinkVerdict.PastKnee))
+                head += " — switch to \"Push to\" to invest anyway";
+            return string.IsNullOrEmpty(detail) ? head : head + " · " + detail;
+        }
 
         private static Label MakeChip(string text) => new Label
         {
@@ -283,8 +361,14 @@ namespace NGUAdvisor
                 _guffBThr.Value = Clamp(_guffBThr, Settings.BloodMacGuffinBThreshold);
                 _spag.Value = Clamp(_spag, Settings.SpaghettiThreshold);
                 _counter.Value = Clamp(_counter, Settings.CounterfeitThreshold);
-                _wantSpag.Checked = Settings.BloodWantSpaghetti;
-                _wantGold.Checked = Settings.BloodWantCounterfeit;
+                var spagMode = BloodPlanner.Mode(false);
+                var goldMode = BloodPlanner.Mode(true);
+                _spagMode.SelectedIndex = (int)spagMode;
+                _goldMode.SelectedIndex = (int)goldMode;
+                // The ceiling is meaningless while the sink is Off — grey it rather than leaving a live
+                // spinner that changes nothing.
+                _spag.Enabled = spagMode != SinkMode.Off;
+                _counter.Enabled = goldMode != SinkMode.Off;
                 _numberThr.Text = Settings.BloodNumberThreshold.ToString("0");
             }
             catch (Exception e) { LogDebug($"Blood sync: {e.Message}"); }
@@ -343,14 +427,25 @@ namespace NGUAdvisor
                 // panel and the routing can never disagree about what "reached" means.
                 int spagNow = BloodPlanner.SpaghettiPercentNow(c);
                 int goldNow = BloodPlanner.CounterfeitPercentNow(c);
-                UiLayout.FitInto(_spagStat, SinkStatus(spagNow, Settings.SpaghettiThreshold, Settings.BloodWantSpaghetti));
-                UiLayout.FitInto(_goldStat, SinkStatus(goldNow, Settings.CounterfeitThreshold, Settings.BloodWantCounterfeit));
+                var spagMode = BloodPlanner.Mode(false);
+                var goldMode = BloodPlanner.Mode(true);
+                UiLayout.FitInto(_spagStat, SinkStatus(spagNow, Settings.SpaghettiThreshold, spagMode));
+                UiLayout.FitInto(_goldStat, SinkStatus(goldNow, Settings.CounterfeitThreshold, goldMode));
+                UiLayout.FitInto(_spagWhy, plan.RouteKnown
+                    ? SinkWhy(plan.WantLoot, plan.LootVerdict, spagMode, plan.LootDetail)
+                    : "auto-spells locked until boss 37");
+                UiLayout.FitInto(_goldWhy, plan.RouteKnown
+                    ? SinkWhy(plan.WantGold, plan.GoldVerdict, goldMode, plan.GoldDetail)
+                    : "auto-spells locked until boss 37");
                 double rp = 1;
                 try { rp = c.bloodMagic.rebirthPower; } catch { }
                 double floor = Settings.BloodNumberThreshold;
                 UiLayout.FitInto(_numStat, floor <= 0
                     ? $"now x{Fmt(rp)} — no floor"
                     : (rp < floor ? $"now x{Fmt(rp)} → floor {Fmt(floor)}" : $"now x{Fmt(rp)} — floor met"));
+                UiLayout.FitInto(_numWhy, plan.WantRebirth
+                    ? "routing now" + (plan.PoolForPill ? " (paused — pooling for the pill)" : "")
+                    : "fallback sink — takes the pool whenever nothing above it is eligible");
 
                 string advice = !plan.Known ? "Blood advisor idle." : plan.Text;
                 if (plan.Known && !string.IsNullOrEmpty(plan.RouteReason)) advice += $" — {plan.RouteReason}";

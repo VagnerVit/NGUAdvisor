@@ -60,6 +60,13 @@ namespace NGUAdvisor
         [SerializeField] private int _counterfeitThreshold;
         [SerializeField] private bool _bloodWantSpaghetti = true;
         [SerializeField] private bool _bloodWantCounterfeit = true;
+        // PUSH: the user states the bonus as a goal, not as a permission. It overrules the advisor's
+        // discretionary gates (demand, cost-curve knee) up to the ceiling beside it — but never the
+        // rebirth wipe, so the investment window still applies. Kept as a second bool rather than
+        // folding both into one mode enum so a settings file written before this reads back as the
+        // Off/Auto it already meant.
+        [SerializeField] private bool _bloodPushSpaghetti;
+        [SerializeField] private bool _bloodPushCounterfeit;
         [SerializeField] private bool _castBloodSpells;
         [SerializeField] private double _ironPillThreshold;
         [SerializeField] private int _bloodMacGuffinAThreshold;
@@ -403,7 +410,10 @@ namespace NGUAdvisor
             _autoRebirth = other?.AutoRebirth ?? false;
 
             _autoSpellSwap = other?.AutoSpellSwap ?? false;
-            AssignValue(ref _bloodNumberThreshold, other?.BloodNumberThreshold, (value) => value >= 0.0, 0.0);
+            // Non-finite is rejected, not just negative: a floor of Infinity (typed, or round-tripped
+            // through the panel's free-text box) is never reached, so NUMBER wins the routing forever
+            // and no other sink can ever run. NaN already fails `>= 0`; Infinity does not.
+            AssignValue(ref _bloodNumberThreshold, other?.BloodNumberThreshold, (value) => value >= 0.0 && !double.IsInfinity(value), 0.0);
             AssignValue(ref _atHourPlannedEnd, other?.AtHourPlannedEnd, (value) => value >= 0.0, 0.0);
             AssignValue(ref _atHourDecidedRunSec, other?.AtHourDecidedRunSec, (value) => value >= 0.0, 0.0);
             AssignValue(ref _counterfeitThreshold, other?.CounterfeitThreshold, (value) => value >= 0);
@@ -412,6 +422,8 @@ namespace NGUAdvisor
             // false default would silently switch that sink off on upgrade.
             _bloodWantSpaghetti = other?.BloodWantSpaghetti ?? true;
             _bloodWantCounterfeit = other?.BloodWantCounterfeit ?? true;
+            _bloodPushSpaghetti = other?.BloodPushSpaghetti ?? false;
+            _bloodPushCounterfeit = other?.BloodPushCounterfeit ?? false;
             _castBloodSpells = other?.CastBloodSpells ?? false;
             AssignValue(ref _ironPillThreshold, other?.IronPillThreshold, (value) => value >= 0.0);
             AssignValue(ref _bloodMacGuffinAThreshold, other?.BloodMacGuffinAThreshold, (value) => value >= 0);
@@ -483,7 +495,9 @@ namespace NGUAdvisor
             _questsFullBank = other?.QuestsFullBank ?? false;
             _manualMinors = other?.ManualMinors ?? false;
             _useButterMinor = other?.UseButterMinor ?? false;
-            _fiftyItemMinors = other?.FiftyItemMinors ?? false;
+            // Default ON: a minor asks for 50..59 items but pays the same either way, and skipping one
+            // costs nothing, so re-rolling to 50 is free (see AdvisorApply.ApplyQuests for the decomp).
+            _fiftyItemMinors = other?.FiftyItemMinors ?? true;
             _abandonMinors = other?.AbandonMinors ?? false;
             AssignValue(ref _minorAbandonThreshold, other?.MinorAbandonThreshold, (value) => value >= 0 && value <= 100, 30);
             _manageQuestLoadouts = other?.ManageQuestLoadouts ?? false;
@@ -1213,6 +1227,28 @@ namespace NGUAdvisor
             }
         }
 
+        public bool BloodPushSpaghetti
+        {
+            get => _bloodPushSpaghetti;
+            set
+            {
+                if (value == _bloodPushSpaghetti) return;
+                _bloodPushSpaghetti = value;
+                SaveSettings();
+            }
+        }
+
+        public bool BloodPushCounterfeit
+        {
+            get => _bloodPushCounterfeit;
+            set
+            {
+                if (value == _bloodPushCounterfeit) return;
+                _bloodPushCounterfeit = value;
+                SaveSettings();
+            }
+        }
+
         public bool AutoBuyAdventure
         {
             get => _autoBuyAdventure;
@@ -1229,6 +1265,9 @@ namespace NGUAdvisor
             get => _bloodNumberThreshold;
             set
             {
+                // Guard the WRITE too, not just the load: a non-finite floor that reaches the file is a
+                // permanently-NUMBER routing until someone edits settings.json by hand.
+                if (double.IsNaN(value) || double.IsInfinity(value) || value < 0.0) value = 0.0;
                 if (value == _bloodNumberThreshold) return;
                 _bloodNumberThreshold = value;
                 SaveSettings();

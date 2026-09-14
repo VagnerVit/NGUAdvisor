@@ -21,10 +21,22 @@ EXP purchase planner: walks purchased E/M power/cap/bars toward the guide's rati
 | ch.3, T5 not beaten | 5:160k:4 | 750:640:320 | energy only | 1.0 / 0 |
 | ch.3, T5 beaten (CBlock1) | 5:160k:4 | 750:640:320 | 5:1 | 0.625 / 0.375 |
 | ch.4-6 | 5:160k:4 | 750:640:320 | 3:1 | 0.5 / 0.5 |
-| ch.4, T6v2..v3 or CBlock2 done | 5:160k:4 | 750:640:320 | 2:1 | 0.4 / 0.6 |
+| ch.4, T6 v2–v3 beaten | 5:160k:4 | 750:640:320 | 2:1 | 0.4 / 0.6 |
 | ch.7+ | 4:150k:1 | 600:600:80 | 3:1 | 0.5 / 0.5 |
 
 - Chapter 0 (unknown) falls back to the ch.3-6 row — the guide's longest stretch.
+- **The 2:1 row's trigger is the T6 VERSION, and nothing else (user-caught 2026-09-12).** Guide ch.4
+  "EXP Spending", verbatim: 3:1 base, "After T6v2, focus Magic to get up to a 2:1 E:M ratio", "After
+  T6v4 accs and BB NGU Ygg/EXP, return to 3:1". There used to be a second trigger, a "CBlock2 done"
+  proxy reading `hour24Challenge.curCompletions >= 3`, and it was wrong twice over: the guide's EXP
+  section never names CBlock2, and CBlock2 is precisely the block that leaves the 24H challenges
+  UNfinished ("Finish all challenges aside from the last 5 NoTM and 24 H challenges"), so the count
+  was not a proxy for it either. Its only effect was handing 2:1 to players still on T6 v1.
+- **The T6 rows read BEATEN versions, not the selected one (user-reported 2026-09-12).** `t6Version`
+  used to be `ZoneHelpers.TitanVersion(5)` — the V1–V4 difficulty dropdown in the Beast's zone,
+  which never moves on its own. It is now `TitanVersionsBeaten(5)` (0 = none). The same misread
+  pinned `ProgressionAnalyzer.Chapter` at 3, which held this table on the post-T5 5:1 row for the
+  whole game; see ProgressionAnalyzer.md for the full blast radius.
 - Magic locked (all-time `highestBoss < 37`) forces energy-only regardless of phase.
 - The guide's ch.1-3 "only buy magic cap for Ygg unlocks/auto-activations" is a manual one-off
   call, so those phases are modelled as energy-only rather than reserving a magic share.

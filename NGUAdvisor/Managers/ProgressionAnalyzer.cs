@@ -150,23 +150,25 @@ namespace NGUAdvisor.Managers
             return _focus;
         }
 
-        // Versioned titans (T6..T12, index 5..11): beaten >= v1 when TitanVersion (which is version+1) >= 2.
-        // T5 via boss5Kills. Low titans (T1..T4) are inferred from highestBoss in the chapter logic.
+        // Titans T5..T12 (index 4..11) all report the same way: the all-time `boss{N}Kills` counter.
+        // Low titans (T1..T4) are inferred from highestBoss in the chapter logic.
+        //
+        // This used to read `TitanVersion(idx) >= 2` for the versioned titans — but `titan{N}Version`
+        // is the V1..V4 difficulty the player has SELECTED, not progress, and it stays 0 no matter how
+        // often the titan dies. So killing the Beast never registered: the chapter stuck at 3 and the
+        // EXP balancer kept handing out the post-T5 5:1 ratio for the rest of the game (user-reported
+        // 2026-09-12).
         public static bool TitanBeaten(int idx)
         {
-            try
-            {
-                if (idx >= 5 && idx <= 11) return ZoneHelpers.TitanVersion(idx) >= 2;
-                if (idx == 4) return Main.Character.adventure.boss5Kills >= 1;
-                return false;
-            }
+            try { return idx >= 4 && idx <= 11 && ZoneHelpers.TitanKills(idx) >= 1; }
             catch { return false; }
         }
 
-        // Versions of a versioned titan beaten (TitanVersion is version+1).
+        // Which VERSION of a versioned titan has been beaten — the game records that per enemy, in the
+        // bestiary, not on the titan (see ZoneHelpers.TitanVersionsBeaten).
         private static bool TitanVersionBeaten(int idx, int version)
         {
-            try { return ZoneHelpers.TitanVersion(idx) - 1 >= version; }
+            try { return ZoneHelpers.TitanVersionsBeaten(idx) >= version; }
             catch { return false; }
         }
 
@@ -181,7 +183,11 @@ namespace NGUAdvisor.Managers
                 case 2: return "B100 → kill T4";
                 case 3: return "Beards → kill T6";
                 case 4:
-                    if (!TitanVersionBeaten(5, 4)) return "Kill T6 v4";
+                    // Name the NEXT version, not the chapter's last one: ch.4 is the sequence
+                    // v1 -> v2 -> CBlock2 -> v3 -> v4, each a week or more apart, and "Kill T6 v4"
+                    // read as the goal while still on v1 skips every step that actually comes next.
+                    int t6v = ZoneHelpers.TitanVersionsBeaten(5);
+                    if (t6v < 4) return $"Kill T6 v{t6v + 1}";
                     if (boss < 300) return "Reach B300";
                     return "Atk boost → Evil";
                 case 5:

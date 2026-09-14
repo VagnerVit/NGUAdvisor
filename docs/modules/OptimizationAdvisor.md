@@ -41,11 +41,26 @@ order:
   progress (boss push / floor-restricted `!ceiling0` / challenge); Blood(10) needs a live ritual
   caster (`BloodPlanner.BloodMatters()` — ask the owning planner, never string-match another
   module's output; the old AutoTokens string-match was wrong three ways, see inline comment);
-  DC(0)/PP(8) picked by VENUE (titan window/gear hunt → DC in + PP benched; ITOPOD → PP in + DC
-  benched — ITOPOD rolls are FLAT, no DC scaling); Adv(3) always leads; **an active gear hunt
+  DC(0)/PP(8) picked by VENUE (titan window / gear hunt / **an unsaturated boost farm** → DC in +
+  PP benched; ITOPOD → PP in + DC benched — ITOPOD rolls are FLAT, no DC scaling); Adv(3) always leads; **an active gear hunt
   outranks even Adv — DC(0) first, applied last** (user-caught: at one digger slot the Adventure
   lead pushed DC out of `Take(slots)`, so the hunt farmed with zero drop chance). Titan window
   does NOT outrank Adv — only the hunt does.
+- **Boost farm counts as a drop farm, while DC still pays** (user rule 2026-09-14). Farm Best Boost
+  routed to a real zone earns drops and no PP at all, so the DC digger takes the PP digger's slot —
+  but only until the zone's rolls cap out. `BoostFarmAdvisor.DcFor(zone)` answers that from the
+  table's own caps: every roll is `Mathf.Min(chance × dcFactor, cap)`, so the saturation factor is
+  `max(cap_i / chance_i)` (cube-rooted zones compare against the rooted factor). At or past it more
+  DC buys nothing there, and the law stands down rather than benching PP for no gain. The same read
+  is printed as `dc=` on the `[ZoneDbg] boostfarm` line, so one line explains both the zone and the
+  digger set.
+- **...and it is allowed to cross the Hybrid pool, for that pair only.** A manual profile that names
+  PP but not DC — `LRB-AdvDC`'s `[4,3,5,8]` is one — made the venue law a no-op exactly where it was
+  asked for: PP could not be benched because nothing was allowed to take its slot. So the boost-farm
+  branch may add DC(0) to the pool when it displaces PP(8). It is a SWAP of a known pair, not the
+  fill-every-slot filler the pool rule exists to keep out: slot count unchanged, DC only ever enters
+  in PP's place. **The titan window and the gear hunt keep the old pool-respecting behaviour** — the
+  exception was granted for the boost farm and was not widened on its own.
 - **Titan window = 60 s** — sized to the machinery, not the event: digger applier ticks every
   30 s, titan gear lock engages < 20 s before spawn; 60 s guarantees exactly one swap pass lands
   ahead of the lock (user-reported: diggers swapped ~8 min early and lingered).

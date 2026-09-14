@@ -43,6 +43,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestZoneItems.cs" Link="Linked\QuestZoneItems.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\BloodRouter.cs" Link="Linked\BloodRouter.cs" />
   </ItemGroup>
 
 </Project>

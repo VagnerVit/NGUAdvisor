@@ -107,7 +107,10 @@ not a framework:
   starvation trigger and the new "gold drop improved" trigger go through GoldDropAdvisor**, so a
   snipe is never re-armed for a drop the Time Machine would discard (GoldDropAdvisor.md).
 - **Quests**: asserts the advisor strategy once (majors on, bank guard, abandon minors < 30 %,
-  butter majors only, 50-item rule follows perk 94 ≥ 610).
+  butter majors only, **50-item minors always on**, minors manual only while a quest item is being
+  levelled). The 50-item rule used to follow `perk 94 >= 610`, which was inverted — that perk is
+  exactly the case where the rule does nothing, because the game already hands out a flat 50
+  (QuestManager.md has the decomp).
 - **EXP buys**: one `ExpBalancer.BuyTick(0.10)` walk step per minute.
 - **Blood**: cast timing + single-sink routing from BloodPlanner (60 s throttle); pooling turns
   ALL auto-spells off so the pill can charge.

@@ -105,19 +105,41 @@ namespace NGUAdvisor.Managers
             new Step("Adventure Boost for Rich Perks III", 0, 5), // guide "Adventure Perk until T8" (B150)
         };
 
-        // ---- Beast quirk order (guide ch4 + ch5 partial) ----
+        // ---- Beast quirk order (guide ch4 + ch5) ----
+        //
+        // The CHAPTERS here were wrong until 2026-09-13 (user-reported: "144 QP, the planner shows a
+        // quirk I can afford, and it never buys it"). Everything but the Adventure baby quirk sat at
+        // MinChapter 5, so through the whole of chapter 4 `NextQuirk` matched nothing, `BuyQuirks`
+        // bought nothing, and the panel showed the harmless-looking "banking for X (chapter 5)" card —
+        // which is the FUTURE-buy card, not a recommendation. Guide ch.4, Questing section, verbatim:
+        // "Quirks: Baby Quirks, Beast's Seed, Beasted Boosts 1, MPow/MCap 1, Gold, EPow/ECap 1", and
+        // guide ch.5 "Quirk Order": "Finish EM Pow/Cap 1 / Beard / AT Banks 1 / Beasted Boosts 2 /
+        // Adventure Quirk in LRB to T8". So the baby quirks and Beasted Boosts I belong to ch.4.
         private static readonly Step[] QuirkPlan =
         {
             new Step("Baby's First Quirk: Adventure", 0, 4),  // guide ch4: 25% adventure for 300 QP
-            new Step("Baby's First Quirk: Energy Power", 0, 5),
-            new Step("Baby's First Quirk: Energy Cap", 0, 5),
-            new Step("Baby's First Quirk: Energy Bars", 0, 5),
-            new Step("Baby's First Quirk: Magic Power", 0, 5),
-            new Step("Baby's First Quirk: Magic Cap", 0, 5),
-            new Step("Baby's First Quirk: Magic Bars", 0, 5),
+            new Step("Baby's First Quirk: Energy Power", 0, 4),
+            new Step("Baby's First Quirk: Energy Cap", 0, 4),
+            new Step("Baby's First Quirk: Energy Bars", 0, 4),
+            new Step("Baby's First Quirk: Magic Power", 0, 4),
+            new Step("Baby's First Quirk: Magic Cap", 0, 4),
+            new Step("Baby's First Quirk: Magic Bars", 0, 4),
+            // The rest of the ch.4 sentence, in the order it lists them. These four were missing from
+            // the plan entirely, so once the baby quirks were done it went quiet again until ch.5.
+            // Names verified against the live list (state-export, BEAST QUIRKS) — they are scene data,
+            // so they cannot be checked from the decompile and a typo here just silently skips a step.
+            new Step("The Beast's Seed ;)", 0, 4),            // guide ch4: "Beast's Seed"
+            new Step("Beasted Boosts I", 0, 4),               // guide ch4: "Beasted Boosts 1"
+            new Step("Generic Magic Power Quirk I", 0, 4),    // guide ch4: "MPow/MCap 1"
+            new Step("Generic Magic Cap Quirk I", 0, 4),
+            new Step("GOOOOOLLLLLLLLLLLD!", 0, 4),            // guide ch4: "Gold"
+            new Step("Generic Energy Power Quirk I", 0, 4),   // guide ch4: "EPow/ECap 1"
+            new Step("Generic Energy Cap Quirk I", 0, 4),
+            // Guide ch5 "Quirk Order" opens with "Finish EM Pow/Cap 1" — MinChapter is a FLOOR and the
+            // steps are sequential, so the four Generic I steps above carry into ch.5 and finish there
+            // before the banks, which is exactly what that line asks for.
             new Step("Adv. Training Level Bank I", 0, 5),     // guide ch5: "Beard / AT Banks 1"
             new Step("Beard Temp Level Bank I", 0, 5),
-            new Step("Beasted Boosts I", 0, 5),
             new Step("Beasted Boosts II", 0, 5),              // guide ch5: "Beasted Boosts 2"
         };
 

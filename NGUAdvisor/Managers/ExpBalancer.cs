@@ -59,12 +59,11 @@ namespace NGUAdvisor.Managers
             try { var prog = ProgressionAnalyzer.Detect(); if (prog.Known) chapter = prog.Chapter; } catch { }
             bool t5Beaten = false;
             try { t5Beaten = ProgressionAnalyzer.TitanBeaten(4); } catch { }
-            int t6v = 1;
-            try { t6v = ZoneHelpers.TitanVersion(5); } catch { }
-            bool cblock2Done = false;
-            try { cblock2Done = c.challenges.hour24Challenge.curCompletions >= 3; } catch { }
-
-            return ExpRatioTables.For(chapter, t5Beaten, t6v, cblock2Done, magicUnlocked);
+            // Versions of T6 BEATEN, not the version selected in the zone — `titan6Version` is the
+            // difficulty dropdown and never moves on its own (user-reported 2026-09-12).
+            int t6v = 0;
+            try { t6v = ZoneHelpers.TitanVersionsBeaten(5); } catch { }
+            return ExpRatioTables.For(chapter, t5Beaten, t6v, magicUnlocked);
         }
 
         private struct Stat

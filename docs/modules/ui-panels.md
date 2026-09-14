@@ -182,19 +182,35 @@ was audited the reported issue count was a floor — the ✕/↑/↓ row buttons
 every tab, so a clipped caption on Energy or Misc had nothing reporting it. The 137 issues that showed
 up in `debug.log` were one tab's worth.
 
-## BloodPanel — the SINKS rows (2026-08-28)
+## BloodPanel — the SINKS rows (2026-09-12)
 
 The INPUTS block is split in two. The top half is unchanged (Auto Spell Swap + the three
-on-rebirth toggles + `Guff A/B >=`). Below it, **SINKS** is one row per blood sink:
+on-rebirth toggles + `Guff A/B >=`). Below it, **SINKS** is one row per blood sink, each row two
+lines tall — a value line and a muted WHY line:
 
 | column | Spaghetti / Counterfeit | NUMBER |
 |---|---|---|
-| caption | `ScaledCheckBox` = permission (`BloodWantSpaghetti` / `BloodWantCounterfeit`) | plain label — it is the fallback sink, so "off" is not a state |
-| `up to` / `floor` | ceiling in %, 0 = none | floor, 0 = none |
+| caption | plain label | plain label — it is the fallback sink, so "off" is not a state |
+| intent | `LineComboBox`: **Off / Advisor decides / Push to** | `floor` label — NUMBER has no intent to state |
+| number | ceiling in %, 0 = none; disabled while Off | floor, 0 = none; finite and non-negative only |
 | status | `now 19% -> 40%` / `target reached` / `no ceiling` / `off` | `now x500M -> floor 100M` / `floor met` |
+| WHY | `routing now` / `not routed: <gate>` / `eligible — another sink holds the pool` | `routing now` / `fallback sink — …` |
 
-Geometry is three scaled column constants (`SinkCapX`/`SinkNumX`/`SinkStatX`); the status labels are
-the only per-tick writes and go through `UiLayout.FitInto`.
+**The dropdown is the 2026-09-12 fix.** A checkbox could only say "allowed", so a ceiling the user
+typed read like a goal and behaved like a filter — Counterfeit set to 500 % kept losing the pool to
+NUMBER and the panel gave no hint why. `SinkMode` is now the intent; the panel writes it as the two
+flags behind it (`BloodWant*` = permission, `BloodPush*` = push), which is why a settings file from
+before this reads back as the Off/Auto it already meant.
+
+**The WHY line is the other half.** It names the gate that actually decided (`BloodRouter.Describe`),
+and when that gate is one Push may overrule (`NoDemand`, `PastKnee`) it says so in place — the fix is
+a dropdown away, and nothing else in the UI could tell the user that.
+
+Geometry: `SinkCapX`/`SinkModeX` are scaled constants, `SinkNumX`/`SinkStatX` are **derived** from
+`UiTheme.NumWidthFor` because `UiTheme.Num` is font-measured (ui-infra.md — a tuned spinner width
+goes stale silently and the audit will not catch it). Row pitch is derived from the two lines a row
+holds, never tuned. The status and WHY labels are the only per-tick writes and go through
+`UiLayout.FitInto`.
 
 **Auto Spell Swap is disabled and greyed while `CastBloodSpells` is on**, with `_swapNote` spelling
 out why: Main only runs that path when automation is OFF. It used to sit there lit green, doing

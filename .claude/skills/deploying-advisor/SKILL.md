@@ -52,6 +52,18 @@ and runs `Loader.Unload()`. Wait for the file to vanish — that is the confirma
 does, the running build predates this mechanism (then: click *Unload Advisor* in Settings, or restart
 the game).
 
+### Asking the live advisor what it sees
+
+```bash
+touch ~/AppData/LocalLow/NGUAdvisor/state-export.request
+```
+
+Same request/acknowledge shape as the unload file: `Main.Update()` polls it once a second on the
+Unity thread, deletes it, and writes `state-export.txt` beside it. Wait for the request file to
+vanish, then read the dump — it carries chapter, titans (and T6 version) beaten, the EXP ratio phase,
+resources, NGU/AT/aug/digger/beard levels, and the perk/quirk/fruit NAMES that exist only inside the
+running game. Use it instead of inferring live state from log lines.
+
 ### NEVER `smi.exe eject` — either form kills the game
 
 Both were tried on a live game on 2026-08-13. Both crashed it.
@@ -79,6 +91,7 @@ unnecessary now that the unload request file exists.
 |---|---|
 | Reload a new build | `pwsh build/reload-advisor.ps1` |
 | Unload only | `pwsh build/reload-advisor.ps1 -UnloadOnly` |
+| What does the advisor see right now? | drop `state-export.request`, wait for it to vanish, read `state-export.txt` |
 | Which build is live? | first `writer alive` line in `debug.log`, or `injected.txt` |
 | Is it injected at all? | `injected.txt` exists AND its pid is a running NGUIdle |
 | Open the advisor window | **F1** in the game window (Unity `Input`, so it needs real `SendInput` to the foreground game — `PostMessage` will not do) |

@@ -12,6 +12,18 @@ Zone/titan reference data + the titan spawn-snapshot machinery every swap decisi
   see `GetMaxReachableZone` below.
 - `TitanZones` = {6,8,11,14,16,19,23,26,30,34,38,42,44,45}; `IsVersionedTitan` = index 5..11
   (T6–T12 have versions via `titan{N}Version` reflection fields).
+- **Three different titan reads, routinely confused (user-reported 2026-09-12):**
+
+  | call | answers | game field |
+  |---|---|---|
+  | `TitanVersion(idx)` | which version is SELECTED right now, +1 | `titan{N}Version`, written only by `changeTitanDifficulty` (the zone's V1–V4 buttons) |
+  | `TitanKills(idx)` | has this titan EVER been beaten, any version | `boss{N}Kills`, incremented per kill in the zone's drop handler, never reset by a rebirth |
+  | `TitanVersionsBeaten(idx)` | the highest version actually beaten, 0 = none | `bestiary.enemies[spriteID].kills` per `bigBoss{N}V{v}` enemy |
+
+  `TitanVersion` is a dropdown, not progress — reading it as "beaten" pinned the chapter at 3 and
+  silently disabled the whole quirk plan (ProgressionAnalyzer.md). `TitanVersionsBeaten` matches on
+  `enemyType`, not on the display name: those are inconsistently cased across titans
+  ("THE BEAST V1" vs "The Godmother V1") and are the game's to change.
 - LIMITATION: zone 45 also needs the live flag `adventure.ratTitanDefeated`; the static table
   only has the 902 threshold, so `GetMaxReachableZone` can overcount by one zone at Sadistic
   endgame.

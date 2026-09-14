@@ -21,9 +21,35 @@ namespace NGUAdvisor.Managers
     public static class StateExport
     {
         public const string FileName = "state-export.txt";
+        public const string RequestFileName = "state-export.request";
 
         public static string FilePath =>
             Path.Combine(Main.GetSettingsDir() ?? ".", FileName);
+
+        public static string RequestPath =>
+            Path.Combine(Main.GetSettingsDir() ?? ".", RequestFileName);
+
+        // The export is otherwise reachable only by clicking LOGS > Export state, so nothing outside
+        // the game could ask for a fresh snapshot — every check of "what does the advisor actually see
+        // right now" had to be inferred from log lines. Same shape as Loader's unload request (and the
+        // same reason it has that shape): the caller drops a file, Main.Update() notices it ON THE
+        // UNITY THREAD, and the file is deleted as the acknowledgement, so a waiting script can watch
+        // it vanish and then read the export.
+        public static bool Requested()
+        {
+            try
+            {
+                string path = RequestPath;
+                if (!File.Exists(path)) return false;
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"StateExport request read failed: {e.Message}");
+                return false;
+            }
+        }
 
         // Returns the path written, or null on failure (already logged).
         public static string Write()
@@ -69,7 +95,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "DIGGERS", () => Diggers(sb, c));
             Section(sb, "BEARDS", () => Beards(sb, c));
             Section(sb, "ITOPOD PERKS (owned)", () => Perks(sb, c));
-            Section(sb, "BEAST QUIRKS (owned)", () => Quirks(sb, c));
+            Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
             return sb.ToString();
         }
@@ -103,13 +129,42 @@ namespace NGUAdvisor.Managers
             // printed beside it because they diverge on Evil and a state dump should show both.
             sb.AppendLine($"  boss          {ZoneHelpers.CurrentHighestBoss(c)} (raw stats.highestBoss {c.stats.highestBoss})");
             sb.AppendLine($"  ITOPOD floor  {c.adventure.highestItopodLevel} reached");
+            sb.AppendLine($"  titans beaten {TitansBeaten()}");
             sb.AppendLine($"  run time      {NumberFormatter.Duration(c.rebirthTime.totalseconds / 3600.0)}");
             sb.AppendLine($"  NGU track     {c.settings.nguLevelTrack}");
         }
 
+        // T5..T12, with the highest VERSION beaten for the versioned ones — the two reads that gate
+        // the chapter and the guide's E:M ratio, and the pair a `titan{N}Version` misread once made
+        // invisible (ProgressionAnalyzer.md). "T6 v1" here means v1 beaten, v2 not.
+        private static string TitansBeaten()
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            for (int i = 4; i <= 11; i++)
+            {
+                if (ZoneHelpers.TitanKills(i) < 1) continue;
+                int v = ZoneHelpers.IsVersionedTitan(i) ? ZoneHelpers.TitanVersionsBeaten(i) : 0;
+                parts.Add(v > 0 ? $"T{i + 1} v{v}" : $"T{i + 1}");
+            }
+            return parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "none past T4";
+        }
+
+        // Which guide ratio the EXP buys are walking toward. It is decided from the chapter and the T6
+        // version, both a step removed from anything else printed here, so without it a wrong ratio is
+        // only visible as EXP going somewhere surprising.
+        private static string ExpPhase()
+        {
+            try
+            {
+                var v = ExpBalancer.Analyze();
+                return v.Known && !string.IsNullOrEmpty(v.Phase) ? $"  · buying toward {v.Phase}" : "";
+            }
+            catch { return ""; }
+        }
+
         private static void Resources(StringBuilder sb, Character c)
         {
-            sb.AppendLine($"  EXP           {NumberFormatter.Abbrev(c.realExp)}");
+            sb.AppendLine($"  EXP           {NumberFormatter.Abbrev(c.realExp)}{ExpPhase()}");
             sb.AppendLine($"  AP            {NumberFormatter.Abbrev(c.arbitrary.curArbitraryPoints)}");
             sb.AppendLine($"  PP            {NumberFormatter.Abbrev(c.adventure.itopod.perkPoints)}");
             sb.AppendLine($"  QP            {NumberFormatter.Abbrev(c.beastQuest.quirkPoints)}");
@@ -119,6 +174,25 @@ namespace NGUAdvisor.Managers
             sb.AppendLine($"  magic cap     {NumberFormatter.Abbrev(c.totalCapMagic())} · power {NumberFormatter.Abbrev(c.totalMagicPower())}");
             sb.AppendLine($"  adv power     {NumberFormatter.Abbrev(c.totalAdvAttack())} attack · {NumberFormatter.Abbrev(c.totalAdvDefense())} defense");
             sb.AppendLine($"  cube          {NumberFormatter.Abbrev(c.inventoryController.cubePower())} P / {NumberFormatter.Abbrev(c.inventoryController.cubeToughness())} T");
+            sb.AppendLine($"  drop chance   {c.lootFactor() * 100:#,0}%{FarmZoneDcText()}");
+        }
+
+        // Drop chance is one half of a comparison the advisor makes constantly and nothing else here
+        // showed: whether more of it still buys boosts in the zone being farmed (BoostFarmAdvisor.DcFor,
+        // which also decides whether the DC digger takes the PP digger's slot).
+        private static string FarmZoneDcText()
+        {
+            try
+            {
+                int zone = Main.Settings != null ? Main.Settings.SnipeZone : 1000;
+                var h = BoostFarmAdvisor.DcFor(zone);
+                if (!h.Known) return "";
+                string where = $" in {(ZoneHelpers.ZoneList.TryGetValue(zone, out var n) ? n : $"zone {zone}")}";
+                return h.Saturated
+                    ? $" · boost rolls CAPPED{where} (needs {h.NeedFactor * 100:#,0}%)"
+                    : $" · {h.HaveFactor * 100:#,0}% of {h.NeedFactor * 100:#,0}% to cap the boost rolls{where}";
+            }
+            catch { return ""; }
         }
 
         // Levels come through NGUAdvisors' track rule, so an Evil run reports the levels it is actually
@@ -203,15 +277,27 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // EVERY quirk, not just the owned ones. SpendPlanner's QuirkPlan matches the game's list BY
+        // NAME, and those names exist only in the Unity scene — so an owned-only dump could confirm
+        // what a step bought but never tell you what the steps you have NOT reached are called, which
+        // is exactly what is needed to check a plan against the guide.
         private static void Quirks(StringBuilder sb, Character c)
         {
             var qc = c.beastQuestPerkController;
             var levels = c.beastQuest.quirkLevel;
             for (int id = 0; id < levels.Count && id < qc.quirkName.Count; id++)
             {
-                if (levels[id] <= 0) continue;
                 long max = id < qc.maxLevel.Count ? qc.maxLevel[id] : 0;
-                sb.AppendLine($"  {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}");
+                string cost = "";
+                try { cost = $" · {NumberFormatter.Abbrev(qc.quirkCost(id))} QP"; } catch { }
+                string req = "";
+                try
+                {
+                    if (id < qc.quirkDifficultyReq.Count && qc.quirkDifficultyReq[id] > difficulty.normal)
+                        req = $" · needs {qc.quirkDifficultyReq[id]}";
+                }
+                catch { }
+                sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}");
             }
         }
 

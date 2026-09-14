@@ -33,6 +33,10 @@ namespace NGUAdvisor.Managers
             public bool WantLoot;      // Spaghetti: log2(invested/min)% drop chance
             public bool WantGold;      // Counterfeit Gold: log2(invested/min)^2 % GPS (needs TM base gold)
             public string RouteReason;
+            // Per-sink verdicts, so the panel can say WHY a sink isn't taking blood instead of only
+            // naming the winner (user-reported: "Counterfeit set to 500 % and it still farms NUMBER").
+            public SinkVerdict GoldVerdict, LootVerdict;
+            public string GoldDetail, LootDetail;
             public double CdLeftSec, CdTotalSec;   // Iron Pill cooldown state — the panel bar charges toward ready
             public long PillPowerNow;              // what casting the current pool grants (game formula); 0 = below cast min
         }
@@ -322,18 +326,6 @@ namespace NGUAdvisor.Managers
 
                 bool numberEligible = !norb && rebirthOn;
 
-                // The "Number ≥" knob is a FLOOR, not a ceiling: while under it NUMBER outranks the
-                // in-run sinks. The old code stopped routing at the target, which capped a linear
-                // uncapped multiplier at a hand-typed number — and because the auto profile funds
-                // rituals only while a sink is live (ChallengeOverlay), stopping also cut blood income
-                // for the rest of the run.
-                if (numberEligible && numTarget > 0 && rebirthPower < numTarget)
-                {
-                    p.WantRebirth = true;
-                    p.RouteReason = $"NUMBER (below floor {ExpBalancer.Fmt(numTarget)} · now x{ExpBalancer.Fmt(rebirthPower)})";
-                    return;
-                }
-
                 // With NUMBER off the table (NORB / no rebirth scheduled) there is nothing to bank, so
                 // the in-run sinks are the only use for blood and the window never closes.
                 bool windowOpen = !numberEligible || InvestmentWindowOpen(c);
@@ -341,41 +333,66 @@ namespace NGUAdvisor.Managers
                 // Gold demand = augs OR diggers (user rule): once augs are funded the digger max-level
                 // upgrades are the next gold sink, and they need a far HIGHER gold cap — Counterfeit
                 // stays credited until those are funded too.
-                bool goldDemand = OptimizationAdvisor.GoldStarvedForAugs(c, 2.0)
-                    || OptimizationAdvisor.GoldStarvedForDiggers(c);
-                if (windowOpen && SinkWanted(true) && TargetOpen(GoldTarget(), CounterfeitPercentNow(c))
-                    && c.machine.realBaseGold > 0 && goldDemand && GoldBelowKnee(c, bps, out var goldReason))
+                string goldReason = null, dcReason = null;
+                var goldMode = Mode(true);
+                var lootMode = Mode(false);
+                p.GoldVerdict = BloodRouter.JudgeSink(goldMode, GoldTarget(), CounterfeitPercentNow(c), windowOpen,
+                    () => c.machine.realBaseGold > 0,
+                    () => OptimizationAdvisor.GoldStarvedForAugs(c, 2.0) || OptimizationAdvisor.GoldStarvedForDiggers(c),
+                    () => GoldBelowKnee(c, bps, _held == BloodRoute.Gold, out goldReason));
+                // Spaghetti has no feasibility gate of its own (it unlocks with the other auto-spells at
+                // boss 37) and no cost-curve knee worth gating on — its cost simply doubles per +1 %,
+                // so the ceiling IS the stopping rule. Zone-farming below the zone's recommended drop
+                // chance is DEMAND, which is exactly what Push is allowed to overrule.
+                p.LootVerdict = BloodRouter.JudgeSink(lootMode, LootTarget(), SpaghettiPercentNow(c), windowOpen,
+                    () => true, () => DcBelowZoneRec(c, out dcReason), () => true);
+                p.GoldDetail = goldReason ?? GoldStepDetail(c, bps);
+                p.LootDetail = dcReason;
+
+                var route = BloodRouter.DecideRoute(numberEligible, numTarget, rebirthPower,
+                    goldMode, p.GoldVerdict, lootMode, p.LootVerdict);
+                route = Commit(route, p.GoldVerdict, p.LootVerdict);
+
+                switch (route)
                 {
-                    p.WantGold = true;
-                    p.RouteReason = goldReason + (OptimizationAdvisor.GoldStarvedForAugs(c, 2.0) ? " · augs unfunded" : " · digger upgrades unfunded")
-                        + TargetSuffix(GoldTarget());
-                }
-                else if (windowOpen && SinkWanted(false) && TargetOpen(LootTarget(), SpaghettiPercentNow(c))
-                    && DcBelowZoneRec(c, out var dcReason))
-                {
-                    p.WantLoot = true;
-                    p.RouteReason = dcReason + TargetSuffix(LootTarget());
-                }
-                else if (numberEligible)
-                {
-                    // DEFAULT SINK. Any blood still pooled at rebirth is force-cast here anyway
-                    // (BaseRebirth.CastBloodSpellsForRebirth), so routing it now costs nothing and
-                    // starts compounding immediately.
-                    p.WantRebirth = true;
-                    bool ceiling = false;
-                    try { ceiling = c.bossID - 1 >= OptimizationAdvisor.BossUnlockCeiling(); } catch { }
-                    string why = windowOpen ? "default sink" : "banking the run's tail";
-                    p.RouteReason = ceiling
-                        ? $"NUMBER (boss EXP push · {why} · now x{ExpBalancer.Fmt(rebirthPower)})"
-                        : $"NUMBER ({why} · now x{ExpBalancer.Fmt(rebirthPower)})";
-                }
-                else
-                {
-                    // Genuinely nothing to bank: keep every auto-spell OFF so blood magic doesn't drain
-                    // the marathon's magic cap (BR-30 gates on a live sink).
-                    p.RouteReason = norb
-                        ? "blood idle — NORB: no rebirth to cash a NUMBER multi into"
-                        : "blood idle — no rebirth scheduled to bank NUMBER for";
+                    // The "Number ≥" knob is a FLOOR, not a ceiling: while under it NUMBER outranks the
+                    // in-run sinks. The old code stopped routing at the target, which capped a linear
+                    // uncapped multiplier at a hand-typed number — and because the auto profile funds
+                    // rituals only while a sink is live (ChallengeOverlay), stopping also cut blood
+                    // income for the rest of the run.
+                    case BloodRoute.NumberFloor:
+                        p.WantRebirth = true;
+                        p.RouteReason = $"NUMBER (below floor {ExpBalancer.Fmt(numTarget)} · now x{ExpBalancer.Fmt(rebirthPower)})";
+                        break;
+                    case BloodRoute.Gold:
+                        p.WantGold = true;
+                        p.RouteReason = (goldMode == SinkMode.Push ? "Counterfeit gold — your target" : goldReason)
+                            + TargetSuffix(GoldTarget());
+                        break;
+                    case BloodRoute.Loot:
+                        p.WantLoot = true;
+                        p.RouteReason = (lootMode == SinkMode.Push ? "Spaghetti drop chance — your target" : dcReason)
+                            + TargetSuffix(LootTarget());
+                        break;
+                    case BloodRoute.NumberDefault:
+                        // DEFAULT SINK. Any blood still pooled at rebirth is force-cast here anyway
+                        // (BaseRebirth.CastBloodSpellsForRebirth), so routing it now costs nothing and
+                        // starts compounding immediately.
+                        p.WantRebirth = true;
+                        bool ceiling = false;
+                        try { ceiling = c.bossID - 1 >= OptimizationAdvisor.BossUnlockCeiling(); } catch { }
+                        string why = windowOpen ? "default sink" : "banking the run's tail";
+                        p.RouteReason = ceiling
+                            ? $"NUMBER (boss EXP push · {why} · now x{ExpBalancer.Fmt(rebirthPower)})"
+                            : $"NUMBER ({why} · now x{ExpBalancer.Fmt(rebirthPower)})";
+                        break;
+                    default:
+                        // Genuinely nothing to bank: keep every auto-spell OFF so blood magic doesn't drain
+                        // the marathon's magic cap (BR-30 gates on a live sink).
+                        p.RouteReason = norb
+                            ? "blood idle — NORB: no rebirth to cash a NUMBER multi into"
+                            : "blood idle — no rebirth scheduled to bank NUMBER for";
+                        break;
                 }
             }
             catch (Exception e) { Main.LogDebug($"BloodPlanner routing: {e.Message}"); }
@@ -480,11 +497,30 @@ namespace NGUAdvisor.Managers
 
         public static bool TargetOpen(int target, int now) => target <= 0 || now < target;
 
-        private static bool SinkWanted(bool gold)
+        // Checkbox + Push flag -> the three states the panel offers.
+        public static SinkMode Mode(bool gold)
         {
             var s = Main.Settings;
-            if (s == null) return true;
-            return gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti;
+            if (s == null) return SinkMode.Auto;
+            bool want = gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti;
+            if (!want) return SinkMode.Off;
+            return (gold ? s.BloodPushCounterfeit : s.BloodPushSpaghetti) ? SinkMode.Push : SinkMode.Auto;
+        }
+
+        // MINIMUM DWELL. See BloodRouter.HoldPrevious for why: the knee is self-retriggering, and the
+        // shipped build bounced Counterfeit <-> NUMBER about once a minute. Latching here (rather than
+        // in ApplyBlood) keeps the panel honest — it renders the route that will actually be written.
+        private const double MinDwellSeconds = 300;
+        private static BloodRoute _held = BloodRoute.Idle;
+        private static DateTime _heldAt = DateTime.MinValue;
+
+        private static BloodRoute Commit(BloodRoute route, SinkVerdict gold, SinkVerdict loot)
+        {
+            double dwell = _heldAt == DateTime.MinValue ? double.MaxValue : (DateTime.UtcNow - _heldAt).TotalSeconds;
+            if (route != _held && BloodRouter.HoldPrevious(_held, gold, loot, dwell, MinDwellSeconds))
+                return _held;
+            if (route != _held) { _held = route; _heldAt = DateTime.UtcNow; }
+            return route;
         }
 
         private static int GoldTarget() => Main.Settings != null ? Main.Settings.CounterfeitThreshold : 0;
@@ -497,22 +533,52 @@ namespace NGUAdvisor.Managers
         // old "<100%" cutoff here discredited Counterfeit far too early). The only knee is the cost
         // curve itself: eligible while the next +1% is reachable within ~20min of the FULL blood
         // income (single-sink → no sharing). Past that the step is too slow to be worth the pool.
-        private static bool GoldBelowKnee(Character c, double bps, out string reason)
+        // HYSTERESIS (user-reported flip-flop). The knee is self-retriggering: routing gold buys the
+        // next +1 %, the step after it costs ~2x, its ETA jumps past the entry threshold, gold drops
+        // out — and blood income then grows until the very same step fits again. Entering costs 20 min,
+        // but staying is allowed up to 60 min, so a sink that already owns the pool finishes the step
+        // it started instead of handing the pool back to NUMBER halfway through.
+        private const double KneeEnterSeconds = 20 * 60;
+        private const double KneeHoldSeconds = 60 * 60;
+
+        private static bool GoldBelowKnee(Character c, double bps, bool holding, out string reason)
         {
             reason = null;
             try
             {
-                double gb = Math.Max(0, c.bloodMagic.goldSpellBlood);
-                double gm = c.bloodSpells.minGoldBlood();
-                if (gm <= 0) return false;
-                double cur = gb >= gm ? Math.Floor(Math.Pow(Math.Log(gb / gm, 2.0) + 1.0, 2.0)) : 0;
-                double nextInvest = gm * Math.Pow(2.0, Math.Sqrt(cur + 1.0) - 1.0);
-                double eta = bps > 0 ? (nextInvest - gb) / bps : double.MaxValue;
-                if (eta > 20 * 60) return false;
+                double eta = GoldNextStepEta(c, bps, out double cur);
+                if (eta > (holding ? KneeHoldSeconds : KneeEnterSeconds)) return false;
                 reason = $"Counterfeit gold +{cur:0}% GPS (next +1% in ~{Math.Max(1, eta / 60):0}m)";
                 return true;
             }
             catch { return false; }
+        }
+
+        // Seconds until the next +1 % GPS at the FULL current blood income (single-sink → no sharing).
+        // Game: +N% needs goldSpellBlood = minGold x 2^(sqrt(N)-1).
+        private static double GoldNextStepEta(Character c, double bps, out double cur)
+        {
+            cur = 0;
+            double gb = Math.Max(0, c.bloodMagic.goldSpellBlood);
+            double gm = c.bloodSpells.minGoldBlood();
+            if (gm <= 0) return double.MaxValue;
+            cur = gb >= gm ? Math.Floor(Math.Pow(Math.Log(gb / gm, 2.0) + 1.0, 2.0)) : 0;
+            double nextInvest = gm * Math.Pow(2.0, Math.Sqrt(cur + 1.0) - 1.0);
+            return bps > 0 ? (nextInvest - gb) / bps : double.MaxValue;
+        }
+
+        // What the gold row shows when gold ISN'T the reason string's author — the panel needs the step
+        // ETA even for a sink that lost, otherwise "blocked" has no number behind it.
+        private static string GoldStepDetail(Character c, double bps)
+        {
+            try
+            {
+                double eta = GoldNextStepEta(c, bps, out double cur);
+                return eta >= double.MaxValue
+                    ? $"+{cur:0}% GPS · no blood income"
+                    : $"+{cur:0}% GPS · next +1% in ~{FmtH(eta)}";
+            }
+            catch { return null; }
         }
 
         // Spaghetti drop chance: worth it only while zone-farming a zone whose recommended drop chance

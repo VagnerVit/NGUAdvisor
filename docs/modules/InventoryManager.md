@@ -57,6 +57,9 @@ time long after the restore, and clearing would delete a live setting.
 - `BoostInfinityCube` — cube feeding (see BoostFarmAdvisor.md for when it's worthwhile: the game
   CLAMPS effective cube stats at base + gear).
 - `MergeEquipped` / `MergeInventory` / `MergeBoosts` / `MergeGuffs` — merge passes per class.
+- `LevellingQuestItem` — is a quest item (278-287) locked and un-maxxed? The padlock is the user's
+  "level this to 100", the same signal the merge pass below already reads, and quest strategy asks
+  this to decide manual-vs-idle minors and zone priority (QuestManager.md).
 - `ManageQuestItems` — quest item handling (they keep dropping past target and flood slots — see
   QuestManager's capstone-hold inventory guard). **Deposits through the local `DumpIntoQuest`, not
   the game's `dumpAllIntoQuest`**: the game's version ends with an unconditional

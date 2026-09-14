@@ -146,12 +146,61 @@ namespace NGUAdvisor.Managers
             catch { return null; }
         }
 
+        // The version the player currently has SELECTED, +1. `titan{N}Version` is written only by
+        // AdventureController.changeTitanDifficulty — the V1..V4 buttons in the titan's zone — and it
+        // is free to change at any time, 0 by default. It is NOT progress: see TitanVersionsBeaten.
         public static int TitanVersion(int titanIndex)
         {
             if (!IsVersionedTitan(titanIndex))
                 return 1;
 
             return _character.adventure.GetFieldValue<Adventure, int>($"titan{titanIndex + 1}Version") + 1;
+        }
+
+        // ALL-TIME kills of a titan, every version counted. `boss{N}Kills` is incremented in the zone's
+        // drop handler for each of bigBoss{N}V1..V4 and is never reset by a rebirth (only by a new
+        // game) — so >= 1 is the game's own answer to "have I ever beaten this titan".
+        // Walderp is titan index 4 -> boss5Kills, the Beast index 5 -> boss6Kills, and so on.
+        public static int TitanKills(int titanIndex)
+        {
+            try
+            {
+                if (titanIndex < 4 || titanIndex > 11) return 0;
+                return _character.adventure.GetFieldValue<Adventure, int>($"boss{titanIndex + 1}Kills");
+            }
+            catch (Exception e) { Main.LogDebug($"TitanKills({titanIndex}): {e.Message}"); return 0; }
+        }
+
+        // The HIGHEST version of a versioned titan the player has actually beaten (0 = none). The game
+        // records this per enemy, not per titan: each version is its own Enemy with its own spriteID,
+        // and AdventureController credits `bestiary.enemies[currentEnemy.spriteID].kills++` on a kill.
+        // Read through the zone's enemy list rather than a transcribed id table, so it follows the game.
+        public static int TitanVersionsBeaten(int titanIndex)
+        {
+            try
+            {
+                if (!IsVersionedTitan(titanIndex)) return TitanKills(titanIndex) >= 1 ? 1 : 0;
+                var list = _character.adventureController.enemyList[TitanZones[titanIndex]];
+                if (list == null) return 0;
+                int best = 0;
+                for (int v = 1; v <= 4; v++)
+                {
+                    // Matched on enemyType, not on the name: the display names are inconsistently cased
+                    // across titans ("THE BEAST V1" vs "The Godmother V1") and are the game's to change.
+                    string type = $"bigBoss{titanIndex + 1}V{v}";
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var e = list[i];
+                        if (e == null || e.enemyType.ToString() != type) continue;
+                        if (e.spriteID > 0 && e.spriteID < _character.bestiary.enemies.Count
+                            && _character.bestiary.enemies[e.spriteID].kills >= 1)
+                            best = v;
+                        break;
+                    }
+                }
+                return best;
+            }
+            catch (Exception e) { Main.LogDebug($"TitanVersionsBeaten({titanIndex}): {e.Message}"); return 0; }
         }
 
         public static void SetTitanVersion(int titanIndex, int version)

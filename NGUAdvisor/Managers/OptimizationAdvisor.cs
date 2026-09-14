@@ -590,8 +590,12 @@ namespace NGUAdvisor.Managers
         // are DEAD — the game never increments them (only ImportExport zeroes them), so reading them
         // always yields 0 (user report: chip stuck on FIRST KILL (v2) after a confirmed v2 kill).
         // The real per-version record for T6 is achievements 148..151 (Beast v1..v4), marked in
-        // AdventureController.killedTitan (zone 19) and the AK path alike. T7+ keep NO per-version
-        // record at all (only a V4 achievement survives) — spawn-version proxy stays there.
+        // AdventureController.killedTitan (zone 19) and the AK path alike. For T7+ the record is the
+        // BESTIARY: every version is its own enemy with its own spriteID, and a kill credits
+        // `bestiary.enemies[spriteID].kills` (ZoneHelpers.TitanVersionsBeaten). The old fallback here
+        // read `TitanVersion(i)`, which is the difficulty the player has SELECTED in the zone and
+        // never moves on its own — so T7+ versions read as killed the moment the dropdown was touched,
+        // and as unkilled no matter how many times the titan actually died.
         private static bool VersionKilled(int i, int v)
         {
             try
@@ -603,11 +607,11 @@ namespace NGUAdvisor.Managers
                     catch (Exception e)
                     {
                         Main.LogDebug($"VersionKilled achievement {147 + v} read failed: {e.Message}");
-                        return ZoneHelpers.TitanVersion(i) - 1 >= v;
+                        return ZoneHelpers.TitanVersionsBeaten(i) >= v;
                     }
                 }
                 if (i >= 6)
-                    return ZoneHelpers.TitanVersion(i) - 1 >= v;
+                    return ZoneHelpers.TitanVersionsBeaten(i) >= v;
                 switch (i)
                 {
                     case 0: return adv.titan1Kills >= 1;
@@ -933,6 +937,22 @@ namespace NGUAdvisor.Managers
                 // LAW: Blood digger needs a live ritual caster.
                 if (!ritualsLive) { order.Remove(10); order.Add(10); }
 
+                // BOOST FARM (user rule): Farm Best Boost routed to a real zone is a drop farm too, and
+                // PP has nothing to earn outside the pod — so the DC digger takes the PP digger's slot
+                // for as long as drop chance still buys boosts. `DcFor` answers that from the zone's own
+                // roll caps (BoostFarmAdvisor): once every roll sits at its cap, more DC is worth
+                // nothing there and the venue law is left alone rather than benching PP for no gain.
+                bool boostFarmingForDrops = false;
+                try
+                {
+                    if (Main.Settings.AdvisorFarmBoost && !itopod && !hunting)
+                    {
+                        var dch = BoostFarmAdvisor.DcFor(Main.Settings.SnipeZone);
+                        boostFarmingForDrops = dch.Known && !dch.Saturated;
+                    }
+                }
+                catch { }
+
                 // LAW: DC/PP by venue. Titan window: DC for the kill drops, PP has nothing to earn.
                 // GEAR HUNT (user rule): a deliberate drop farm — DC in, PP benched, and it outranks
                 // the ITOPOD read (Target ITOPOD may still be toggled while the hunt owns routing).
@@ -940,8 +960,21 @@ namespace NGUAdvisor.Managers
                 // Each reorder is guarded on its OWN digger being present: in the fallback all 12 are, so
                 // this is unchanged there; in Hybrid it lifts whichever the pool actually contains and
                 // never demotes the venue earner just because its swap-partner isn't in the pool.
-                if (titanWindow || hunting)
+                if (titanWindow || hunting || boostFarmingForDrops)
                 {
+                    // BOOST FARM vs the Hybrid pool (user rule 2026-09-14, a deliberate exception to
+                    // "the profile's list is the whole candidate pool"). A profile that names PP but not
+                    // DC — LRB-AdvDC's [4,3,5,8] is one — would otherwise make the venue law a no-op
+                    // exactly where the user asked for it: PP cannot be benched, because nothing is
+                    // allowed to take its slot. This is a SWAP of a known pair, not the fill-every-slot
+                    // filler the pool rule exists to keep out: the slot count is unchanged and DC only
+                    // ever enters in PP's place. Confined to the boost farm on purpose — the titan
+                    // window and the gear hunt keep the old pool-respecting behaviour.
+                    if (boostFarmingForDrops && order.Contains(8) && !order.Contains(0) && IsDiggerUnlocked(0))
+                    {
+                        order.Add(0);
+                        if (poolFilter != null) poolFilter.Add(0);
+                    }
                     if (order.Contains(0)) { order.Remove(0); order.Insert(Math.Min(1, order.Count), 0); }
                     if (order.Contains(0) && order.Contains(8)) { order.Remove(8); order.Add(8); }
                 }

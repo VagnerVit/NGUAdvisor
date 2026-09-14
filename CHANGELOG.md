@@ -4,6 +4,84 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Lock a quest item and the advisor farms it to 100.** Quest items only drop while a quest runs in
+  MANUAL mode — an idle quest advances its own progress bar and nothing reaches your inventory — and
+  the advisor forced minors idle, so levelling one was impossible while it was running. Now a locked,
+  un-maxxed quest item is the instruction: minors switch to manual, questing wins the zone over a
+  boost or gear farm, banked majors are left alone (minors are unlimited, the bank is not), and the
+  minor is not abandoned for slow progress, because the merge pass eating the drops is the point. It
+  ends by itself when the item hits 100. Unlock the item to stop. Gear Hunt still outranks all of it,
+  and an imminent quest-bank overflow still forces a major through.
+
+- **Blood sinks now take a goal, not just a permission.** Each of Spaghetti and Counterfeit Gold has
+  a three-way setting — Off / Advisor decides / **Push to X %** — and Push means the advisor stops
+  second-guessing: it routes blood there until your number is reached, regardless of whether it
+  currently thinks the bonus is worth buying. Each sink also says, in place, why it is or is not
+  taking blood right now, so a sink that loses the pool names the gate that took it.
+
+- **The state export can be asked for from outside the game.** Drop a `state-export.request` file in
+  the advisor's data folder and it writes `state-export.txt` and deletes the request as the
+  acknowledgement — the same shape as the unload request. Previously the dump was reachable only by
+  clicking EXPORT STATE on the LOGS page. The dump also now names the titans you have beaten (with
+  the T6 version) and which guide E:M ratio the EXP buys are walking toward.
+
+- **Farming boosts now takes the drop-chance digger off the PP digger.** A boost farm is a drop farm,
+  and PP only ever comes from the ITOPOD — so while Farm Best Boost is routed to a zone, the drop
+  chance digger takes the PP digger's slot. It stands down once more drop chance stops paying: each
+  of a zone's boost rolls has a cap, and past the point where they are all capped the extra drop
+  chance buys nothing there. The zone log line now says which side of that line you are on.
+
+### Fixed
+
+- **Minor quests are re-rolled to 50 items by default, and the rule was previously switched on
+  backwards.** A minor asks for 50 to 59 items, averaging 54.5, and pays exactly the same QP and AP
+  whichever number it picks — while skipping a fresh one costs nothing at all and minors never touch
+  your bank. Re-rolling until the Beast asks for 50 is therefore free, and saves about 8 % of the
+  kills per quest. The advisor tied this to the ITOPOD perk that forces 50 anyway, which is the one
+  case where re-rolling does nothing — so it was on when it was pointless and off when it paid. Now
+  always on, and on by default for new installs. It pauses while you are levelling a quest item,
+  since a re-roll there can send you to a different zone.
+
+- **Killing the Beast now registers, and with it the whole chapter-4 plan.** The advisor asked the
+  game which titan version you had SELECTED in the zone — a dropdown that never moves on its own —
+  and read that as "beaten". So the Beast could die any number of times and progression stayed at
+  chapter 3 forever. Two plans were quietly stuck behind it: EXP kept buying at the post-T5 5:1
+  energy:magic ratio instead of 3:1, and the quirk plan bought **nothing at all** (every step in it
+  is scheduled for chapter 4+), so QP just banked. Titan kills are now read from the game's own
+  all-time kill counter, and per-version progress from the bestiary.
+
+- **Quirks are bought in chapter 4, where the guide actually schedules them.** Only the Adventure
+  baby quirk was tagged for chapter 4; every other quirk was tagged chapter 5, so through the whole
+  of chapter 4 nothing was ever bought no matter how much QP had piled up — and the panel's
+  "banking for X (chapter 5)" line, which names a purchase the advisor has no intention of making
+  yet, read like a recommendation. Four quirks the guide lists for chapter 4 (Beast's Seed, the gold
+  quirk, and the Generic Energy/Magic Power/Cap I quirks) were also missing from the plan outright
+  and have been added.
+
+- **The state export lists every Beast quirk, not only the ones you own** — with index, level, cost
+  and difficulty requirement.
+
+- **The 2:1 energy:magic ratio no longer starts early.** It was also triggered by a "CBlock2 done"
+  guess based on your 24-hour challenge completions. The guide ties that ratio to beating T6 v2, and
+  CBlock2 is the block that deliberately leaves the 24H challenges unfinished — so the guess could
+  only ever fire too early. The ratio now moves on the T6 version alone: 3:1 until v2, 2:1 through
+  v3, back to 3:1 after v4.
+
+- **The chapter-4 goal names the version you are actually going for.** It always read "Kill T6 v4",
+  the end of the chapter, even on v1 — skipping the v2 / CBlock2 / v3 steps that each take a week.
+
+- **Blood magic no longer flip-flops between Counterfeit and NUMBER every minute.** Routing gold
+  buys the next +1 % GPS, which makes the step after it twice as expensive, which pushed it past the
+  advisor's cost cutoff, which handed the pool straight back to NUMBER — and then blood income grew
+  and the same step fit again. Counterfeit ran about one minute in five. A sink that wins now holds
+  the pool long enough to finish the step it started.
+
+- **A blood NUMBER floor can no longer be set to infinity.** The floor accepted any number typed
+  into it, and a large enough one round-tripped to Infinity — a floor that can never be reached, so
+  NUMBER won the routing forever and no other blood spell could ever run.
+
 ## [1.4.1] - 2026-09-10
 
 Existing settings and profile files remain compatible with version 1.1.0.

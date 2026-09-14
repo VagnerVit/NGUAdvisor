@@ -45,10 +45,11 @@ namespace NGUAdvisor.Managers
 
         /// <param name="chapter">ProgressionAnalyzer.Chapter (titan-kill chapter, 1..8; 0 = unknown).</param>
         /// <param name="t5Beaten">T5 killed — the guide's CBlock1 gate inside chapter 3.</param>
-        /// <param name="t6Version">ZoneHelpers.TitanVersion(5), i.e. version+1.</param>
-        /// <param name="cblock2Done">CBlock2-done proxy (24HR challenge completions >= 3).</param>
+        /// <param name="t6VersionsBeaten">Highest T6 version actually BEATEN, 0 = none
+        /// (ZoneHelpers.TitanVersionsBeaten(5)). NOT the version selected in the zone: `titan6Version`
+        /// is the difficulty dropdown and never moves on its own.</param>
         /// <param name="magicUnlocked">Magic resource available (all-time highestBoss >= 37).</param>
-        public static Targets For(int chapter, bool t5Beaten, int t6Version, bool cblock2Done, bool magicUnlocked)
+        public static Targets For(int chapter, bool t5Beaten, int t6VersionsBeaten, bool magicUnlocked)
         {
             // Unknown chapter: the mid-game ratio is the safest default — it is what the guide uses
             // for the longest stretch (ch.3 through ch.6).
@@ -73,8 +74,17 @@ namespace NGUAdvisor.Managers
             if (chapter == 3)
                 return Build(PoolFromValueRatio(5), shP, shC, shB, $"post-T5 5:1 E:M ({pcb})");
 
-            // D4: post-CBlock2 / T6v2 the target value ratio drops to 2:1, reverting at T6v4.
-            if ((t6Version >= 2 || cblock2Done) && t6Version < 4)
+            // Guide ch.4 "EXP Spending", verbatim: 3:1 base, "After T6v2, focus Magic to get up to a
+            // 2:1 E:M ratio", "After T6v4 accs and BB NGU Ygg/EXP, return to 3:1". The T6 VERSION is
+            // the whole trigger.
+            //
+            // There used to be a second trigger here, a "CBlock2 done" proxy reading 24HR challenge
+            // completions >= 3. It was wrong twice over (user-caught 2026-09-12): the guide's EXP
+            // section never names CBlock2 as the trigger, and CBlock2 is the block that explicitly
+            // leaves the 24H challenges UNfinished ("Finish all challenges aside from the last 5 NoTM
+            // and 24 H challenges"), so the count it read was not a proxy for it either. Its only
+            // effect was to hand out 2:1 to players still on T6 v1.
+            if (t6VersionsBeaten >= 2 && t6VersionsBeaten < 4)
                 return Build(PoolFromValueRatio(2), shP, shC, shB, $"post-CBlock2 2:1 E:M ({pcb})");
 
             return Build(PoolFromValueRatio(3), shP, shC, shB, $"3:1 E:M ({pcb})");

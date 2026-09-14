@@ -366,6 +366,51 @@ namespace NGUAdvisor.Managers
             return d;
         }
 
+        // DROP-CHANCE HEADROOM for a boost farm zone. Every roll is `Mathf.Min(chance * dcFactor, cap)`,
+        // so a zone stops paying for drop chance once EVERY roll sits at its cap — the factor that does
+        // that is `max(cap_i / chance_i)`. Below it, more DC is still boosts per second; at or above it,
+        // DC buys nothing here and whatever the DC digger costs is pure waste.
+        //
+        // Caps of 1.0 are carried through rather than skipped: for the early zones that really is the
+        // roll's ceiling (the table's own note — "zones 0 and 1 fire a single uncapped tier-1 roll"),
+        // and a probability of 1 is a genuine saturation point, just a distant one.
+        public struct DcHeadroom
+        {
+            public bool Known;
+            public bool Saturated;
+            public double HaveFactor;   // the zone's own factor: cube-rooted where the zone roots it
+            public double NeedFactor;
+        }
+
+        public static DcHeadroom DcFor(int zone)
+        {
+            var h = new DcHeadroom();
+            try
+            {
+                var c = Main.Character;
+                if (c == null) return h;
+                ZoneBoost z = null;
+                foreach (ZoneBoost row in Table)
+                    if (row.Zone == zone) { z = row; break; }
+                if (z == null || z.Rolls == null || z.Rolls.Length == 0) return h;
+
+                double dc = c.lootFactor();
+                h.HaveFactor = z.Rooted ? Math.Pow(dc, 1.0 / 3.0) : dc;
+                foreach (double[] roll in z.Rolls)
+                {
+                    if (roll == null || roll.Length < 2 || roll[1] <= 0) continue;
+                    double cap = roll.Length > 2 ? roll[2] : 1.0;
+                    double need = cap / roll[1];
+                    if (need > h.NeedFactor) h.NeedFactor = need;
+                }
+                if (h.NeedFactor <= 0) return h;
+                h.Saturated = h.HaveFactor >= h.NeedFactor;
+                h.Known = true;
+            }
+            catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor.DcFor({zone}): {e.Message}"); }
+            return h;
+        }
+
         public static string ModeName(int mode)
         {
             switch (mode)

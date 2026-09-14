@@ -595,16 +595,39 @@ namespace NGUAdvisor.Managers
                 var s = Main.Settings;
                 if (!s.AutoQuest) return;
                 var changed = new List<string>();
-                if (!s.AllowMajorQuests) { s.AllowMajorQuests = true; changed.Add("majors on"); }
+                // Idle minors are the default (no combat time spent), but they drop NO quest items —
+                // idleProgress advances curDrops directly. So while a locked quest item is being
+                // levelled to 100, minors must run MANUAL or the item can never gain a level.
+                bool levellingQuestItem = InventoryManager.LevellingQuestItem();
+                // Majors are forced on because leaving them off wastes banked regen — EXCEPT while a
+                // quest item is being levelled, where keeping the finite bank shut is a legitimate
+                // choice and forcing it back every 60 s made the toggle unusable. QuestManager keeps
+                // majors out of that farm regardless; this is only about not fighting the user's UI.
+                if (!s.AllowMajorQuests && !levellingQuestItem) { s.AllowMajorQuests = true; changed.Add("majors on"); }
                 if (!s.QuestsFullBank) { s.QuestsFullBank = true; changed.Add("bank guard on"); }
-                if (s.ManualMinors) { s.ManualMinors = false; changed.Add("minors idle"); }
+                if (s.ManualMinors != levellingQuestItem)
+                {
+                    s.ManualMinors = levellingQuestItem;
+                    changed.Add(levellingQuestItem ? "minors manual (levelling a quest item)" : "minors idle");
+                }
                 if (!s.AbandonMinors) { s.AbandonMinors = true; changed.Add("abandon minors"); }
                 if (s.MinorAbandonThreshold != 30) { s.MinorAbandonThreshold = 30; changed.Add("abandon <30%"); }
                 if (!s.UseButterMajor) { s.UseButterMajor = true; changed.Add("butter majors"); }
                 if (s.UseButterMinor) { s.UseButterMinor = false; changed.Add("no minor butter"); }
-                bool fifty = false;
-                try { fifty = Main.Character.adventure.itopod.perkLevel[94] >= 610; } catch { }
-                if (s.FiftyItemMinors != fifty) { s.FiftyItemMinors = fifty; changed.Add(fifty ? "50-item minors" : "54-item minors"); }
+                // 50-ITEM MINORS IS ALWAYS ON, and the perk gate it used to follow had it backwards.
+                // [DECOMP] BeastQuestController.startQuest: targetDrops = Random.Range(50, 60) — i.e.
+                // 50..59, mean 54.5 — collapsing to a flat 50 once itopod perk 94 >= 610. The reward
+                // does not read targetDrops at all (giveRewardsAndClear: minorQuestReward() *
+                // questRewardFactor() * allActiveModifier()), and skipQuest() is just clearQuest():
+                // no cost, no cooldown, and a minor consumes no bank. So re-rolling a fresh minor
+                // until it asks for 50 is strictly dominant — same QP and AP for 8 % fewer kills —
+                // and QuestManager's test is marginal (`targetDrops - curDrops > 50`), so it re-rolls
+                // only while the work REMAINING beats a fresh 50-item quest.
+                //
+                // The old gate set it to (perk94 >= 610), which is exactly inverted: with the perk the
+                // game already gives 50 and the toggle is a no-op, while without it — the only case
+                // where the re-roll is worth anything — the advisor turned it off.
+                if (!s.FiftyItemMinors) { s.FiftyItemMinors = true; changed.Add("50-item minors"); }
                 if (changed.Count > 0)
                     Main.Log($"Advisor: quest strategy -> {string.Join(", ", changed.ToArray())}");
             }
@@ -848,6 +871,22 @@ namespace NGUAdvisor.Managers
             ? "ITOPOD"
             : ZoneHelpers.ZoneList.TryGetValue(zone, out string zn) ? zn : $"Zone {zone}";
 
+        // Whether drop chance still buys boosts in the farmed zone — the same read that decides
+        // whether the DC digger displaces the PP one (OptimizationAdvisor's venue law), so the log
+        // line that picks the zone also says why the digger set looks the way it does.
+        private static string DcHeadroomText(int zone)
+        {
+            try
+            {
+                var h = BoostFarmAdvisor.DcFor(zone);
+                if (!h.Known) return "n/a";
+                return h.Saturated
+                    ? $"capped ({h.HaveFactor * 100:#,0}% >= {h.NeedFactor * 100:#,0}%)"
+                    : $"{h.HaveFactor * 100:#,0}% of {h.NeedFactor * 100:#,0}% needed to cap rolls";
+            }
+            catch { return "n/a"; }
+        }
+
         private static void LogZoneDbg(string layer, Func<string> render)
         {
             try
@@ -1043,7 +1082,7 @@ namespace NGUAdvisor.Managers
                 Main.Log($"Advisor: farm zone -> {name} ({detail})");
             }
             LogZoneDbg(target == 1000 ? "itopod" : "boostfarm",
-                () => $"pick={name} rate={detail} wantMode={BoostFarmAdvisor.ModeName(farmMode)}"
+                () => $"pick={name} rate={detail} dc={DcHeadroomText(target)} wantMode={BoostFarmAdvisor.ModeName(farmMode)}"
                     + $" beat={(v.BestZone == -1000 ? "every farmable zone" : $"ITOPOD @{v.ItopodRate:0.###} boost/s")}"
                     + $" boostDemand={routedForBoosts} gearfarm={gearFarmWhy}");
         }

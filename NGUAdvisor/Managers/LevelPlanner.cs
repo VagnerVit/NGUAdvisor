@@ -193,8 +193,10 @@ namespace NGUAdvisor.Managers
         // Guide ch5 24h structure: Normal NGUs most of the run, EVIL NGUs the LAST N hours (N = T7 versions
         // defeated; 1h post-T7v1, 2h post-T7v2 …). Replaces the profile's hardcoded ~22h NGUDiff switch with
         // a dynamic one — but ONLY in the Ch.5 24h shape (T7-capable, Boss 125+) with a TIME-based rebirth
-        // target; elsewhere the profile's NGUDiff owns the track. UNTESTED until Boss 125+ (T7-version read
-        // via TitanVersion(6)-1 is a first cut).
+        // target; elsewhere the profile's NGUDiff owns the track. UNTESTED until Boss 125+. The T7-version
+        // count is read from the bestiary (ZoneHelpers.TitanVersionsBeaten) — the earlier
+        // `TitanVersion(6)-1` was the difficulty the player had SELECTED in the zone, not versions
+        // defeated, so it granted Evil NGU hours for touching a dropdown and none for actual kills.
         private static void TickNguTrack(Character c)
         {
             try
@@ -206,7 +208,7 @@ namespace NGUAdvisor.Managers
                 if (chapter != 5 || ZoneHelpers.CurrentHighestBoss(c) < 125 || target <= 0) return;
 
                 int t7 = 0;
-                try { t7 = Math.Max(0, ZoneHelpers.TitanVersion(6) - 1); } catch { }
+                try { t7 = ZoneHelpers.TitanVersionsBeaten(6); } catch { }
                 if (t7 < 1) return; // no T7 version defeated → no Evil NGU hours (guide ch5 rule: N = versions defeated)
                 double evilHours = t7;
                 double switchAt = target - evilHours * 3600.0;

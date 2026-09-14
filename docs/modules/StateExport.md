@@ -2,7 +2,25 @@
 
 Dumps the live game state to one readable text file —
 `%UserProfile%\AppData\LocalLow\NGUAdvisor\state-export.txt` — via the **EXPORT STATE** chip on the
-LOGS page.
+LOGS page, or by dropping a **`state-export.request`** file beside it.
+
+## The file request (2026-09-12)
+
+```bash
+touch ~/AppData/LocalLow/NGUAdvisor/state-export.request   # wait for it to vanish, then read the dump
+```
+
+`StateExport.Requested()` is polled from `Main.Update()`, inside the **same once-a-second budget as
+the unload request** (one `File.Exists` per second, not two per frame), and sets the same pending
+flag the chip does — so the export itself still runs through the one drain, on the Unity thread.
+The request file is deleted as the acknowledgement, exactly as `Loader.UnloadRequested` does it, so
+a waiting script can watch it vanish and then read `state-export.txt`.
+
+**Why it was added:** the dump was reachable only by a mouse click, so nothing outside the game could
+ask "what does the advisor actually see right now". Every check had to be inferred from log lines,
+which is how a wrong chapter went unnoticed long enough to disable the whole quirk plan
+(ProgressionAnalyzer.md). The window is Mono WinForms — one HWND, no child handles — so clicking the
+chip programmatically is not an option either (see the deploying-advisor skill).
 
 ## Why it exists: the names are not in the save
 
@@ -47,3 +65,18 @@ have the numbers in hand. `Character == null` is the one early return.
 Field names above were each verified against the decompiled `Assembly-CSharp.dll`; the first pass
 guessed `Beard.level`, `GoldDigger.level`, `Adventure.highestBoss` and `Magic.totalCapMagic()`, and
 all four were wrong.
+
+## Fields that exist because they were once invisible
+
+- **`titans beaten`** — T5..T12 with the highest VERSION beaten for the versioned ones ("T6 v1" means
+  v1 beaten, v2 not). These two reads gate the chapter and the guide's E:M ratio, and a
+  `titan{N}Version` misread once made both invisible.
+- **BEAST QUIRKS lists EVERY quirk, not just the owned ones** (index, level/max, cost, difficulty
+  requirement). `SpendPlanner`'s plans match the game's lists BY NAME and those names live only in
+  the Unity scene, so an owned-only dump could confirm what a step bought but never tell you what the
+  steps you have not reached are CALLED — which is exactly what checking a plan against the guide
+  needs. Four guide ch.4 quirks turned out to be missing from `QuirkPlan` and were only nameable once
+  this printed them (SpendPlanner.md).
+- **`EXP ... buying toward <phase>`** — which guide ratio the EXP walk is aiming at. It is derived
+  from the chapter and the T6 version, both a step removed from anything else in the dump, so without
+  it a wrong ratio shows up only as EXP going somewhere surprising.

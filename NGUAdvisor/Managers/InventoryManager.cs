@@ -780,6 +780,33 @@ namespace NGUAdvisor.Managers
 
         private static bool IsQuest(ih x) => x.id >= 278 && x.id <= 287;
 
+        // A LOCKED, un-maxxed quest item is the user asking to level it to 100 — the padlock is the
+        // whole intent, exactly as it is for the merge pass (:268, which only merges locked copies).
+        // Quest strategy has to ask, because an IDLE minor never drops a quest item at all:
+        // updateIdleQuest ticks idleProgress and advances curDrops directly
+        // ([DECOMP] BeastQuestController.cs:787-799), so nothing reaches the inventory to merge.
+        public static bool LevellingQuestItem()
+        {
+            try
+            {
+                var inv = Inventory.inventory;
+                for (int i = 0; i < inv.Count; i++)
+                {
+                    var it = inv[i];
+                    if (it == null || it.id < 278 || it.id > 287) continue;
+                    if (it.removable) continue;                        // unlocked: fuel, not a target
+                    if (Inventory.itemList.itemMaxxed[it.id]) continue;
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"LevellingQuestItem: {e.Message}");
+                return false;
+            }
+        }
+
         private static bool IsGuff(ih x) => macguffinList.ContainsKey(x.id);
 
         private static bool IsCooking(ih x) => x.id >= 367 && x.id <= 372;

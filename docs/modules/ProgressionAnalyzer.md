@@ -8,9 +8,26 @@ intentionally diverge — never substitute one for the other (full contrast in S
 ## Chapter logic
 
 Sadistic → 8. Evil: T8 beaten → 7, T7 beaten → 6, else 5. Normal: T6 beaten → 4, boss ≥ 100 → 3,
-≥ 58 → 2, else 1. Titan-beaten reads: versioned titans (idx 5–11) beaten iff
-`ZoneHelpers.TitanVersion(idx) >= 2` (TitanVersion is version+1); T5 via `boss5Kills >= 1`;
-T1–T4 inferred from boss thresholds.
+≥ 58 → 2, else 1. Titan-beaten reads: T5–T12 (idx 4–11) all via the all-time
+`boss{N}Kills >= 1` counter (`ZoneHelpers.TitanKills`); T1–T4 inferred from boss thresholds.
+
+### `titan{N}Version` is NOT progress (user-reported 2026-09-12)
+
+`TitanBeaten` used to read `ZoneHelpers.TitanVersion(idx) >= 2` for the versioned titans. That field
+is written by exactly one thing — `AdventureController.changeTitanDifficulty`, the V1–V4 buttons in
+the titan's own zone — so it is the difficulty the player has **selected**, free to change at any
+time and 0 until they touch it. Killing the Beast does not move it.
+
+The blast radius was much wider than one label, because `Chapter` gates plans across the advisor:
+
+- the chapter stuck at 3, so `ExpBalancer` handed out the post-T5 5:1 E:M ratio for the rest of the
+  game (`ExpRatioTables.For` only leaves that row at chapter ≥ 4);
+- **`SpendPlanner` never bought a single quirk** — every entry in `QuirkPlan` is `MinChapter` 4 or 5,
+  so the whole plan was skipped and QP banked forever.
+
+Game truth, from the decompile: `boss{N}Kills++` fires in the zone's drop handler for every one of
+`bigBoss{N}V1..V4`, and nothing resets it but a new game. Per-VERSION progress is recorded elsewhere
+again — see `ZoneHelpers.TitanVersionsBeaten`.
 
 ## Outputs and caching
 
