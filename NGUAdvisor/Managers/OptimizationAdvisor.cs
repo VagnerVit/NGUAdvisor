@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NGUAdvisor.AllocationProfiles.RebirthStuff;
@@ -452,6 +452,16 @@ namespace NGUAdvisor.Managers
                         list.Add(new Rec { System = "Blood", AutoKey = "blood", Text = text, Severity = bp2.Severity, Optimal = bp2.Optimal });
                     }
                 }
+            }
+            catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
+
+            // CHALLENGE — the next reward gate this codebase already reads (ChallengeAdvisor). Advice
+            // only: entering a challenge is the user's call, and the overlay handles the run once inside.
+            try
+            {
+                ChallengeAdvisor.Advice chal = ChallengeAdvisor.Analyze();
+                if (chal.Known)
+                    list.Add(new Rec { System = "Challenge", Text = chal.Text, Severity = chal.Severity });
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
 
@@ -928,14 +938,31 @@ namespace NGUAdvisor.Managers
                 bool ritualsLive = false;
                 try { ritualsLive = BloodPlanner.BloodMatters(); }
                 catch { }
+                // Demotion asks only whether blood MATTERS; promotion also asks whether any ritual is
+                // actually being fed. The digger multiplies ritual output, so with every ritual at zero
+                // magic there is nothing for it to multiply — a live auto-spell alone must not buy it a slot.
+                bool ritualsFunded = false;
+                try
+                {
+                    for (int i = 0; i < c.bloodMagic.ritual.Count && !ritualsFunded; i++)
+                        if (c.bloodMagic.ritual[i].magic > 0) ritualsFunded = true;
+                }
+                catch (Exception) { }   // no blood magic yet: leave it false, the digger stays at the tail
 
                 // LAW: Stats digger earns priority while stats gate progress; else it drops to the tail.
                 order.Remove(2);
                 if (statsWanted) order.Insert(Math.Min(1, order.Count), 2);
                 else order.Add(2);
 
-                // LAW: Blood digger needs a live ritual caster.
-                if (!ritualsLive) { order.Remove(10); order.Add(10); }
+                // LAW: Blood digger follows the ritual lane in BOTH directions. It used to only demote,
+                // so in farm mode — whose recommended set does not name it — it could never be funded
+                // even while the whole magic cap fed rituals; `totalBloodBonus()` multiplies the output
+                // of every ritual, i.e. exactly what that magic buys. Promoted behind the lead digger
+                // and the stats law (same shape as the law above), not ahead of them: blood scales a
+                // sink, the growth diggers scale the run.
+                order.Remove(10);
+                if (ritualsLive && ritualsFunded) order.Insert(Math.Min(2, order.Count), 10);
+                else order.Add(10);
 
                 // BOOST FARM (user rule): Farm Best Boost routed to a real zone is a drop farm too, and
                 // PP has nothing to earn outside the pod — so the DC digger takes the PP digger's slot
@@ -1040,7 +1067,10 @@ namespace NGUAdvisor.Managers
         private static string Mode(ProgressionAnalyzer.Progression prog)
         {
             if (prog.Activity != null && prog.Activity.StartsWith("Challenge")) return "challenge";
-            if (prog.NextGoal != null && prog.NextGoal.IndexOf("Titan", StringComparison.OrdinalIgnoreCase) >= 0) return "push";
+            // Ask the owning module (ProgressionAnalyzer.GoalIsKill), never text-match its label: the
+            // milestone shorthand says "Kill T6 v2", so the old IndexOf("Titan") matched nothing before
+            // chapter 8 and every titan run got the farm digger/beard sets.
+            if (prog.GoalIsKill) return "push";
             return "farm";
         }
 

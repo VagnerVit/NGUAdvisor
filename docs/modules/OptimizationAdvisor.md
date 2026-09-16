@@ -40,7 +40,13 @@ order:
 - **Laws** (applied bottom-up, later = stronger): Stats(2) has priority only while stats gate
   progress (boss push / floor-restricted `!ceiling0` / challenge); Blood(10) needs a live ritual
   caster (`BloodPlanner.BloodMatters()` — ask the owning planner, never string-match another
-  module's output; the old AutoTokens string-match was wrong three ways, see inline comment);
+  module's output; the old AutoTokens string-match was wrong three ways, see inline comment).
+  **The blood law moves in BOTH directions (2026-09-16).** It used to only demote, and the farm
+  recommended set does not name Blood(10), so with the whole magic cap feeding rituals the digger
+  that multiplies every ritual's output (`allDiggers.totalBloodBonus()` is a factor in
+  `bloodAdded()`) could never be funded. Promotion additionally requires a ritual to actually HOLD
+  magic — a live auto-spell over zero-magic rituals has nothing to multiply — and lands behind the
+  lead digger and the stats law: blood scales a sink, the growth diggers scale the run;
   DC(0)/PP(8) picked by VENUE (titan window / gear hunt / **an unsaturated boost farm** → DC in +
   PP benched; ITOPOD → PP in + DC benched — ITOPOD rolls are FLAT, no DC scaling); Adv(3) always leads; **an active gear hunt
   outranks even Adv — DC(0) first, applied last** (user-caught: at one digger slot the Adventure
@@ -79,7 +85,12 @@ Beards · Yggdrasil + Perks + Quirks (SpendPlanner; **"Bank X — next guide buy
 "plan complete"** when steps are chapter/difficulty-gated — user-reported both rows) · Beard perm
 (shavings `floor(sqrt(level)×timeFactor)`, timeFactor capped 8; sub-1h rebirth banks NOTHING) ·
 EXP (ExpBalancer ratios) · Gold (titan gold banking) · Blood (BloodPlanner) · ITOPOD beacon ·
-NGU x/hr row · Boss-ceiling row · LSC opportunity.
+NGU x/hr row · Boss-ceiling row · LSC opportunity · **Challenge** (ChallengeAdvisor — the next
+unclaimed reward gate; advice only, entering one stays the user's call).
+
+**`Mode()` asks `ProgressionAnalyzer.GoalIsKill`**, never the milestone text. The old
+`NextGoal.IndexOf("Titan")` matched no Normal/Evil label, so "push" was unreachable before
+chapter 8 and every titan run got the farm digger/beard sets (see ProgressionAnalyzer.md).
 
 **Wandoos-as-power contexts**: challenge block, NORB (Number mult dead), NOAUG, or gold-starved
 for augs — AT-3/AT-4 (Wandoos E/M) become the power source and the AT rec switches accordingly.

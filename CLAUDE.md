@@ -73,7 +73,7 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `ui-infra.md` | SettingsIndex, Activity/ActivityRibbon, Destinations, SystemCatalog, PriorityCatalog, **UiTheme/UiLayout/ScrollPanel/ScaledCheckBox (the DPI contract — read before placing any control)**, SystemControlBar, LogTail, PresetInstaller |
 | `small-managers.md` | BeardManager, CookingManager, ChallengeDetector |
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |
-| `TitanTables.md` | TitanTables + NumberFormatter |
+| `TitanTables.md` | TitanTables + NumberFormatter + **TitanDropTables (what each titan drops; the only reason to swap gear for an AK titan)** |
 | `BloodPlanner.md` | BloodPlanner + BloodRouter (**single-sink routing: the ladder, the per-sink verdicts, and why the cost-curve knee needs hysteresis AND a dwell**) |
 | `ZoneCadence.md` | ZoneCadence + BoostValueMath + BoostSinks (**farm-rate substrate: kill cadence, idle-vs-manual truth, boost pricing — read before touching either farm advisor**) |
 | `ItopodFarmAdvisor.md` | ItopodFarmAdvisor + ItopodRewards (**the pod's four currencies and where each one saturates — read before pricing ITOPOD against anything**) |

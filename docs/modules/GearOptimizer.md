@@ -145,9 +145,31 @@ reference has no equivalent feature.
   fight was a user-reported death loop (twice: empty loadout, then drop gear on a live T6v2). On that
   path it also passes `new int[0]` for `pinnedIds`, i.e. **the real-fight override drops pins too**:
   pinned loot/utility gear equipped into a live titan is the same death loop the override exists for.
-  AK-trivial spawns honor the configured loot objective *and* the global pins.
+  AK-trivial spawns honor the configured loot objective *and* the global pins — but they get it as
+  `GearChain.LootChain(obj)`, i.e. `Adventure(0) > <loot>(all)`: **main slots Adventure, accessories
+  loot**. Handing a loot objective the whole set spends the Power/Toughness the AK thresholds are
+  measured against, which is how an auto-kill quietly becomes a real fight. Falls back to the plain
+  objective if the chain does not resolve (unknown name, or the objective already IS Adventure).
 - `ResolveGoldGear()` — nothing configured → optimize for "Gold Drops" (data-driven default).
 - `OptimizeAndEquip(obj, forceTopRespawn)` — optimize + equip live.
+## `BuildPools` — one entry per id, and it must be the copy the EQUIPPER would pick
+
+Duplicates are routine in NGU: a second copy of an item drops long before the first is merged up, so
+the same id commonly exists at two levels at once. The pool therefore cannot just take the first copy
+it walks past — `LoadoutManager.ChangeGear` equips whatever `FindItemSlot` returns, and that is
+`MaxItem()` over every copy carrying the id (`Extensions.cs:128`): **locked outranks level** (`ih.locked`
+is `!equipment.removable`, and its `+101` beats any unlocked level), then the level, then the fewest
+still-needed boosts. `BuildPools` replicates that ordering on `Equipment`.
+
+It used to keep the first copy seen, walking equipped slots before the inventory — so the pools
+disagreed with the equipper and the optimizer ranked an id by a weaker copy's stats, passing over gear
+it would actually have equipped. User-reported 2026-09-16: two `Sir Looty McLootington III`, one maxed,
+and under a pure `Drop Chance(all)` chain the maxed one was never worn — the diagnostic showed
+`current == optimized (x1)` in NOW while MAXED wanted the item, which is the signature of the pool
+holding the weak copy.
+
+Daycare is deliberately NOT a source: those items are not available to equip.
+
 - `OffhandPercent` — live `weapon2Factor() * 100`, cached 30 s (scoring reads it thousands of
   times per pass). 0 while the second weapon slot is locked.
 

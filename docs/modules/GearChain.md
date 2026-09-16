@@ -64,10 +64,59 @@ step:
 |---|---|---|
 | `Adventure + Respawn` | `Adventure(3) > Respawn(1) > Adventure(all)` | Unconditionally reserves one respawn accessory. The TopRespawn pin only fires when the loadout has NO respawn at all, so on merit-respawn gear it never engages. |
 | `Adventure + Energy` | `Adventure(3) > Energy NGU(2) > Adventure(all)` | Keeps energy-support accessories instead of stacking pure Power. |
+| `Drop Chance + Adventure` | `Adventure(0)+PowerWeapon > Drop Chance(all)` | Farm set: every accessory on drop chance, Power/Toughness everywhere else. |
+| `Drop Chance + NGUs` | `NGUs(0)+PowerWeapon > Drop Chance(all)` | Same, with the NGU stats in the main slots instead. |
+| `ITOPOD Push` | `NGUs(0)+PowerWeapon > Respawn(1) > Move Cooldown(1) > NGUs(all)` | Floor push: raw-Power weapon for kill speed, one Respawn and one Move Cooldown accessory to cut the dead time between kills, NGUs everywhere else. Both timing stats are capped at ONE slot — past the first item they are the weakest thing a slot can hold. |
+
+**The two farm presets are named loot-first but LEAD with the partner, and that is not a typo.** No
+main-slot item in the game carries Drop Chance — under a pure `Drop Chance` objective the diagnostic
+prints `W:- H:- C:- L:- B:-` for exactly that reason. Leading with the loot stat therefore scores
+every helmet, chest and weapon dead equal and the main slots land wherever the coordinate ascent
+happened to start. The partner leads at budget **0** (owning the main slots, claiming no accessory,
+see `LootChain` below), and Drop Chance then takes all of them. To trade some drop chance back for
+the partner's stats, insert a middle step — `Adventure(0) > Drop Chance(3) > Adventure(all)` — rather
+than reordering the lead.
+
+## `LootChain(lootObjective)` — the kill-safe loot set
+
+Not a preset (it is built from a name the user chose, so it cannot be a fixed list): returns
+`Adventure(0) > <loot>(all)` — **main slots Adventure, every accessory the loot stat**.
+
+The reason it is not simply `Drop Chance(all)`: the autokill thresholds are live
+`totalAdvAttack`/`totalAdvDefense` reads (`ZoneHelpers.AutokillAvailable`), so a set that spends
+Power/Toughness on loot can turn an auto-kill into a real fight — the same trade
+`GoldTargetLosingAutokill()` exists to catch *after* a gold swap. Buying the loot stat out of the
+accessories only costs the AK margin least.
+
+**`MaxAccessorySlots = 0` on the lead step is how "main slots only" is spelled.** Priority 0 owns
+the main slots regardless of its accessory budget (`GearOptimizer.RunChain`), so a 0 there claims no
+accessory and leaves every one of them to the next step. `GearOptimizer.ResolveTitanGear` uses this
+for AK-trivial spawns; a real fight still forces plain `Adventure` and never reaches it.
+
+Returns `null` for an unknown objective, and also when the loot objective IS `Adventure` (the chain
+would degenerate to `Adventure(0) > Adventure(all)`) — refuse, don't guess, same as `Resolve`.
 
 "Reserve N slots for a secondary stat, then fill the rest with the lead" needs **no new grammar** —
 the same objective may appear more than once in a chain, and the tail step's `Unlimited` mops up
 whatever is left.
+
+## `PinTopPowerWeapon` — the weapon the lead objective would not have picked
+
+A farm set wants the hardest-hitting weapon whatever the lead scores: kills per second is what the
+loot stat multiplies, and an `NGUs` lead picks a weapon for its energy specs (measured: `Power` and
+`Adventure` both want `The Fists of Flubber`, `NGUs` wants `A Giant Bazooka`). The grammar cannot say
+"this step owns only the weapon" — priority 0 owns **every** main slot — so the flag rides in as a
+pin instead, the same shape `forceTopRespawn` already uses.
+
+- Set on a step (the lead, by convention); `GearOptimizer` reads it off **any** step in the chain.
+- Resolved ONCE per `Optimize` call, before the chain runs: the single highest-`Power` weapon in the
+  pools. It does not depend on the chain's progress, and `forceTopRespawn` re-runs the whole chain per
+  candidate — re-scanning the weapon pool inside that loop would be pure waste.
+- **The user's own pins are placed first and therefore win the main hand.** An explicit "always wear
+  this" outranks a preset's convenience pin.
+- `Describe` renders it as `Adventure(0)+PowerWeapon`, and that is load-bearing: the pin changes which
+  loadout the chain produces, so it has to change the chain's identity, or `AdvisorApply` would not see
+  a switch when a preset gains or loses it.
 
 ## One namespace, and nothing in it is ever renamed
 

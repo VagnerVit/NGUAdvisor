@@ -302,6 +302,29 @@ child and the overrun.
   where it paints. Measure through `EffectiveBounds`, like every other rule — an `AutoSize` label's
   `Width` understates the Mono render.
 
+## LogsPanel sources — every one of them is a FILE tail
+
+| Rail child | File | Chips |
+|---|---|---|
+| `Logs/Advisor` | `advisor.log` | ALL · ALLOC · GEAR · TITAN · SEGMENT · QUEST (match the `[TAG]`) |
+| `Logs/Loot` | `loot.log` | ALL · DROPS · EXP · AP · BOOSTS |
+| `Logs/Session` | `inject.log` | ALL |
+| `Logs/Diagnostic` | `debug.log` / `combat.log` / `pitspin.log` | DEBUG · COMBAT · PIT — **these chips select the FILE, not a filter** |
+
+Two defects this replaced, user-reported 2026-09-16 ("spousta logů se nevykresluje a nesbírá"):
+
+1. **ADVISOR and LOOT read in-memory rings** (`ChallengeOverlay.Feed`, `Main.LootFeed`), which every
+   reload emptied while the files kept growing — so the reader went blank after each hot-swap — and
+   which capped at 50 / 400 entries. `ChallengeOverlay.Record` now mirrors to its own `advisor.log`
+   writer; the ring stays as the live view, the file is the record.
+2. **Four of the seven writers had no route into the UI**: `debug.log` (every `[GearDbg]`,
+   `[ZoneDbg]`, `[TitanGoldDbg]`, `UI AUDIT` line), `combat.log`, `pitspin.log`, `cards.log`. The
+   first three are the DIAGNOSTIC source. `cards.log` is deliberately left out — nothing writes to it.
+
+`OPEN FILE` resolves the same way the reader does, so it always opens the file you are looking at.
+`TailLines` is 400 for every source; `LogTail.Read` bounds the window at EOF, which is what makes a
+2-second refresh over a session-long `debug.log` affordable.
+
 ## LogTail (`Managers/LogTail.cs`)
 
 Tails the on-disk logs for the LOGS section (Advisor / Loot / Session). In-memory mirrors exist for

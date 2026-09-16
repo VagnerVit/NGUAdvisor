@@ -26,8 +26,14 @@ other — and neither may replace the primary harvest exception.
 - **MacGuffin fruit 2 (index 13)**: eat-now-vs-wait math using the game's own yield chain —
   `tierFactor × 0.1 × poopModifier × equipYggYield × yggdrasilYieldBonus × harvestBonus`. Eats
   when the per-tier value of harvesting NOW (plus tier-1 harvests for the remaining tiers) beats
-  the per-tier value of waiting for max tier. `EquipYggdrasilYield` reads the CONFIGURED ygg
-  loadout's Yggdrasil specs (`spec*Cur / 1e7`), not equipped gear.
+  the per-tier value of waiting for max tier. `EquipYggdrasilYield` sums the Yggdrasil specs
+  (`spec*Cur / 1e7`) of the gear the harvest will ACTUALLY run in, resolved by `HarvestGearIds()`
+  the same way `TryYggdrasilSwap` resolves it: `ResolveModeGear(YggdrasilObjective, …)` when
+  `SwapYggdrasilLoadouts && NeedsSwap()`, otherwise `LoadoutManager.CurrentGearIds()`. It used to
+  read `Settings.YggdrasilLoadout` directly — with an empty static loadout (the normal setup once
+  an objective is configured) that valued every harvest at equipBonus 1.0 while the swap equipped
+  a live optimized set, so the eat-now side was systematically under-counted. The valuation call
+  passes `quiet: true` so the per-tick resolve does not log.
 - **QP fruit (index 14)**: eaten only when the swap threshold is satisfied, poop is off, and the
   ITOPOD harvest bonus is 1 (no first-harvest bonus to waste).
 - `NeedsSwap()` (gear swap worthwhile): a maxed fruit at or above `YggSwapThreshold`.

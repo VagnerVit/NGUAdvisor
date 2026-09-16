@@ -1,4 +1,4 @@
-namespace NGUAdvisor.Managers
+﻿namespace NGUAdvisor.Managers
 {
     // WHERE the caller means to go — never HOW the current UI gets there.
     //
@@ -76,5 +76,6 @@ namespace NGUAdvisor.Managers
         // The SESSION source specifically: Main.Log() writes inject.log, which LOGS shows as SESSION.
         // The ADVISOR source is the ChallengeOverlay decision feed and does not contain it.
         public const string LogsSession = "Logs/Session";
+        public const string LogsDiagnostic = "Logs/Diagnostic";
     }
 }

@@ -51,6 +51,8 @@ namespace NGUAdvisor
         private ListBox _black;
         private readonly List<int> _blackIds = new List<int>();
         private ListBox _manualReadout;
+        private Label _boostingNow;
+        private DateTime _boostingNowAt;
         private ComboBox _order;
         // The ids currently rendered in _prio, parallel to its Items, so a selection can be restored by
         // ITEM rather than by index after the list is rebuilt.
@@ -270,14 +272,30 @@ namespace NGUAdvisor
                         ? "Boosts go to the Infinity Cube only"
                         : "Boosts follow the priority list again");
                     RefreshManualReadout();
+                    RefreshBoostingNow(force: true);
                 }
                 catch (Exception ex) { LogDebug($"Boosts cube-only: {ex.Message}"); }
             };
             _boostPage.Controls.Add(_cubeOnly);
 
-            // Both views hang off the checkbox row rather than a tuned S(44) — the row's height comes from
+            // ONE LINE, BOTH MODES (user request): the item boosts are going into. The head of
+            // GetBoostSlots is the answer — BoostInventory walks that list top-down until the boosts run
+            // out — and ADVISOR ACTIVE has no readout of its own, so this is the only place that mode
+            // says what its ranked order actually came to.
+            _boostingNow = new Label
+            {
+                AutoSize = false,
+                Size = new Size(_pw - UiTheme.S(20), UiTheme.TextH),
+                Location = new Point(UiTheme.S(10), _cubeOnly.Bottom + UiTheme.S(8)),
+                Font = UiTheme.Bold,
+                ForeColor = UiTheme.Accent,
+                BackColor = UiTheme.Ground
+            };
+            _boostPage.Controls.Add(_boostingNow);
+
+            // Both views hang off the row above rather than a tuned S(44) — the row's height comes from
             // the measured line, so a hardcoded offset would overlap it at a different scale.
-            int viewsY = _cubeOnly.Bottom + UiTheme.S(8);
+            int viewsY = _boostingNow.Bottom + UiTheme.S(8);
 
             // ADVISOR view: computed order readout.
             _advisorView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
@@ -876,6 +894,7 @@ namespace NGUAdvisor
                 }
             }
             finally { _syncing = false; }
+            RefreshBoostingNow(force: true);
             RefreshChains();
             if (Settings.AutoBoostPriority) RefreshReadout();
         }
@@ -945,6 +964,86 @@ namespace NGUAdvisor
                 foreach (string line in lines) _manualReadout.Items.Add(line);
             }
             finally { _manualReadout.EndUpdate(); }
+        }
+
+        // The one line above both views: which item the boosts are actually landing on.
+        //
+        // THE HEAD OF THE QUEUE IS NOT THE ANSWER (user-reported: it named a helmet whose Special was
+        // already maxed while a lipstick two rows down was taking every boost). `applyAllBoosts` hands a
+        // slot the boosts you HOLD, and an item only absorbs the types it still needs — so the receiver
+        // is, per type present in the inventory, the FIRST queued item that still needs that type.
+        // With the transform set to Special (advisor or forced) the whole inventory is one type, and
+        // every item that needs only Power or Toughness is skipped.
+        //
+        // Resolving the queue is a FindItemSlot scan per id — the live pump calls this every frame the
+        // window is up, hence the one-second throttle.
+        public void RefreshBoostingNow(bool force = false)
+        {
+            if (_boostingNow == null || !Visible) return;
+            DateTime now = DateTime.UtcNow;
+            if (!force && (now - _boostingNowAt).TotalSeconds < 1) return;
+            _boostingNowAt = now;
+
+            string text;
+            try
+            {
+                if (Main.Character == null || Settings == null)
+                    text = "Boosting: (game not ready)";
+                else if (!Settings.ManageInventory)
+                    text = "Boosting: nothing — inventory automation is off";
+                else if (Settings.BoostCubeOnly)
+                    text = "Boosting: Infinity Cube (cube only)";
+                else
+                    text = "Boosting: " + Receivers();
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Boosting now: {ex.Message}");
+                text = "Boosting: (unavailable)";
+            }
+            UiLayout.FitInto(_boostingNow, text);
+        }
+
+        // THE PLAN, not the instant. Two things it must not do:
+        //  · name the head of the queue — an item whose needed type is already full is skipped, and the
+        //    boosts flow past it (user-reported: a maxed-Special helmet named while a lipstick took them).
+        //  · read the inventory for boosts it holds RIGHT NOW — they are applied within a pass, so that
+        //    answer flickers to "none" between drops (user-reported).
+        // What survives both: the type the drops are being turned into, and the first queued item that
+        // still needs it.
+        private static string Receivers()
+        {
+            ih[] queue = InventoryManager.GetBoostSlots(new ih[0]);
+            int type = TransformManager.BoostTransformUnlocked(Main.Character)
+                ? TransformManager.EffectiveBoostType(Main.Character)
+                : BoostSinks.TypeNone;
+
+            // No transform steering the drops: they arrive as all three types, so the queue order is the
+            // whole answer and every entry still needs something.
+            if (type == BoostSinks.TypeNone)
+                return queue.Length == 0
+                    ? "Infinity Cube — nothing on the list still needs boosts"
+                    : Describe(queue[0]);
+
+            ih target = FirstNeeding(queue, type);
+            string typeName = BoostSinks.TypeName(type);
+            return target == null
+                ? $"Infinity Cube — nothing on the list needs {typeName}"
+                : $"{Describe(target)} · {typeName}";
+        }
+
+        private static string Describe(ih s) => $"{ItemNameNice(s.id)}  (#{s.id})  lvl {s.level}/100";
+
+        private static ih FirstNeeding(ih[] queue, int type)
+        {
+            foreach (ih s in queue)
+            {
+                BoostsNeeded need = s.equipment.GetNeededBoosts();
+                float want = type == BoostSinks.TypePower ? need.power
+                    : type == BoostSinks.TypeToughness ? need.toughness : need.special;
+                if (want > 0) return s;
+            }
+            return null;
         }
 
         private static bool Flag(int[] arr, int i) => arr != null && i < arr.Length && arr[i] != 0;
@@ -1054,8 +1153,7 @@ namespace NGUAdvisor
             for (int m = 0; m < _boostXform.Length; m++)
                 StyleOnOff(_boostXform[m], m == mode);
 
-            bool unlocked = Main.Character.challenges.levelChallenge10k.curCompletions
-                >= Main.Character.allChallenges.level100Challenge.maxCompletions;
+            bool unlocked = TransformManager.BoostTransformUnlocked(Main.Character);
             if (!unlocked)
             {
                 UiLayout.FitOrGrow(_boostXformNote, "Locked until the 100-level challenge is fully completed.");

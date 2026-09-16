@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -81,14 +81,19 @@ namespace NGUAdvisor.Managers
         // pinnedIds is null unless a caller needs to override the global pins (e.g. suppress them for a
         // real titan fight) -- null falls through to the global setting inside Optimize/OptimizeIds.
         // MUST be called on the main thread (reads live inventory). Never throws; falls back on any error.
+        // quiet: the caller is only VALUING the set, not equipping it -- skip the "optimized for" log
+        // line so a per-tick valuation does not flood the log.
         public static int[] ResolveModeGear(string objectiveName, bool forceRespawn, int[] fallback,
-                                            IReadOnlyList<int> pinnedIds = null)
+                                            IReadOnlyList<int> pinnedIds = null, bool quiet = false)
         {
             if (!string.IsNullOrEmpty(objectiveName))
             {
                 var obj = FindObjective(objectiveName);
                 if (obj == null)
-                    Main.LogDebug($"Mode objective '{objectiveName}' not recognized; using static loadout.");
+                {
+                    if (!quiet)
+                        Main.LogDebug($"Mode objective '{objectiveName}' not recognized; using static loadout.");
+                }
                 else
                 {
                     try
@@ -97,11 +102,12 @@ namespace NGUAdvisor.Managers
                         var ids = OptimizeIds(chain, pinnedIds, forceRespawn);
                         if (ids.Length > 0)
                         {
-                            Main.Log($"Mode gear optimized for '{obj.Name}'{(forceRespawn ? " (+top respawn)" : "")}: {ids.Length} items.");
+                            if (!quiet)
+                                Main.Log($"Mode gear optimized for '{obj.Name}'{(forceRespawn ? " (+top respawn)" : "")}: {ids.Length} items.");
                             return ids;
                         }
                     }
-                    catch (Exception e) { Main.LogDebug($"Mode optimize '{objectiveName}' failed: {e.Message}; using static loadout."); }
+                    catch (Exception e) { if (!quiet) Main.LogDebug($"Mode optimize '{objectiveName}' failed: {e.Message}; using static loadout."); }
                 }
             }
             return fallback;
@@ -140,6 +146,23 @@ namespace NGUAdvisor.Managers
             }
             if (string.IsNullOrEmpty(obj) && (fallback == null || fallback.Length == 0))
                 obj = "Adventure";
+            // AK-trivial spawn: the loot objective belongs in the ACCESSORIES, not in the main slots.
+            // Handing it the whole set spends the very Power/Toughness the AK thresholds are measured
+            // against, and a titan that stops auto-killing is a real fight in loot gear.
+            var lootChain = GearChain.LootChain(obj);
+            if (lootChain != null)
+            {
+                try
+                {
+                    var ids = OptimizeIds(lootChain, null, Main.Settings.TitanObjectiveRespawn);
+                    if (ids.Length > 0)
+                    {
+                        Main.Log($"Titan gear optimized for '{GearChain.Describe(lootChain)}': {ids.Length} items.");
+                        return ids;
+                    }
+                }
+                catch (Exception e) { Main.LogDebug($"Titan loot chain failed: {e.Message}; using the plain objective."); }
+            }
             return ResolveModeGear(obj, Main.Settings.TitanObjectiveRespawn, fallback);
         }
 
@@ -398,6 +421,22 @@ namespace NGUAdvisor.Managers
             var r = new Result();
             if (steps.Count == 0) return r;
 
+            // The farm sets' weapon pin (GearPriority.PinTopPowerWeapon): the single highest-Power
+            // weapon in the pools, frozen into the main hand before the chain runs. Resolved ONCE here
+            // -- it does not depend on the chain's progress, and forceTopRespawn re-runs the whole chain
+            // per candidate, which would otherwise re-scan the weapon pool every time.
+            int powerWeaponPin = 0;
+            if (steps.Any(p => p.PinTopPowerWeapon))
+            {
+                double bestPower = 0;
+                foreach (var w in weapons)
+                    if (w.Value.Stats.TryGetValue(GearObjectives.Stat.Power, out double pw) && pw > bestPower)
+                    {
+                        bestPower = pw;
+                        powerWeaponPin = w.Key;
+                    }
+            }
+
             // Slots frozen by a pin for the WHOLE run. (Main slots are additionally frozen after
             // priority 0 -- that freeze is expressed by simply not running MainAscent again.)
             var pinnedMain = new HashSet<part>();
@@ -582,8 +621,10 @@ namespace NGUAdvisor.Managers
 
                 if (pinnedIds != null)
                     foreach (var id in pinnedIds) Place(id, true);
-                // The forceTopRespawn candidate rides in as one more pin; it is never "the user's pin",
-                // so it is not reported.
+                // Neither of these is "the user's pin", so neither is reported. The user's pins are
+                // placed FIRST and therefore win the main hand: an explicit pin outranks a preset's.
+                if (powerWeaponPin != 0) Place(powerWeaponPin, false);
+                // The forceTopRespawn candidate rides in as one more pin.
                 if (extraPin != 0) Place(extraPin, false);
             }
 
@@ -703,18 +744,75 @@ namespace NGUAdvisor.Managers
 
         // Build candidate pools by part from inventory + currently-equipped, deduped by item id.
         // maxed picks the item valuation -- see Optimize.
+        // MaxItem()'s ordering, on Equipment rather than ih: ih.locked is !equipment.removable
+        // (Extensions.cs:143), and its +101 makes a locked copy outrank any unlocked level.
+        private static int Rank(Equipment e) => e.removable ? e.level : e.level + 101;
+
+        private static bool Outranks(Equipment candidate, Equipment incumbent)
+        {
+            int a = Rank(candidate), b = Rank(incumbent);
+            if (a != b) return a > b;
+            return candidate.GetNeededBoosts().Total() < incumbent.GetNeededBoosts().Total();
+        }
+
+        // The copy of an id the EQUIPPER would reach for -- the same one BuildPools scores. Exposed
+        // for the diagnostic, which has to report an item the optimizer considered but did not equip
+        // (a pick sitting in the inventory says nothing until you can see the stats it was ranked on).
+        public static Equipment BestCopy(int id)
+        {
+            if (id <= 0) return null;
+            var inv = Main.Character.inventory;
+            Equipment best = null;
+            void Consider(Equipment e)
+            {
+                if (e == null || e.id != id) return;
+                if (best == null || Outranks(e, best)) best = e;
+            }
+            Consider(inv.weapon);
+            Consider(inv.weapon2);
+            Consider(inv.head); Consider(inv.chest); Consider(inv.legs); Consider(inv.boots);
+            if (inv.accs != null) foreach (var a in inv.accs) Consider(a);
+            if (inv.inventory != null) foreach (var e in inv.inventory) Consider(e);
+            return best;
+        }
+
         private static Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>> BuildPools(Dictionary<int, GearScorer.Item> idToItem, bool maxed)
         {
             var inv = Main.Character.inventory;
             var ic = Main.InventoryController;
             var pools = new Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>>();
 
+            // One pool entry per id, and it MUST be the copy the equip path would reach for.
+            // LoadoutManager.ChangeGear equips whatever FindItemSlot returns, and that is MaxItem()
+            // over every copy carrying the id (Extensions.cs:128): locked outranks level, then the
+            // level itself, then the fewest still-needed boosts. Keeping the FIRST copy seen instead
+            // made the pools disagree with the equipper -- duplicates are routine in NGU, where a
+            // second copy of an item drops long before the first is merged up -- so the optimizer
+            // ranked an id by a weaker copy's stats and passed over gear it would actually have
+            // equipped (user-reported 2026-09-16: two Sir Looty McLootington III, one maxed, and
+            // the maxed one never worn under a pure "Drop Chance" chain).
+            var best = new Dictionary<int, Equipment>();
+
             void Consider(Equipment e)
             {
-                if (e == null || e.id == 0 || idToItem.ContainsKey(e.id)) return;
+                if (e == null || e.id == 0) return;
                 var pt = e.type;
                 if (pt != part.Head && pt != part.Chest && pt != part.Legs &&
                     pt != part.Boots && pt != part.Weapon && pt != part.Accessory) return;
+                if (best.TryGetValue(e.id, out var incumbent) && !Outranks(e, incumbent)) return;
+                best[e.id] = e;
+            }
+
+            Consider(inv.weapon);
+            if (ic.weapon2Unlocked()) Consider(inv.weapon2);
+            Consider(inv.head); Consider(inv.chest); Consider(inv.legs); Consider(inv.boots);
+            if (inv.accs != null) foreach (var a in inv.accs) Consider(a);
+            if (inv.inventory != null) foreach (var e in inv.inventory) Consider(e);
+
+            foreach (var kv in best)
+            {
+                var e = kv.Value;
+                var pt = e.type;
                 var item = GameGearAdapter.BuildItem(e, pt == part.Weapon, maxed);
                 idToItem[e.id] = item;
                 if (!pools.TryGetValue(pt, out var list))
@@ -724,12 +822,6 @@ namespace NGUAdvisor.Managers
                 }
                 list.Add(new KeyValuePair<int, GearScorer.Item>(e.id, item));
             }
-
-            Consider(inv.weapon);
-            if (ic.weapon2Unlocked()) Consider(inv.weapon2);
-            Consider(inv.head); Consider(inv.chest); Consider(inv.legs); Consider(inv.boots);
-            if (inv.accs != null) foreach (var a in inv.accs) Consider(a);
-            if (inv.inventory != null) foreach (var e in inv.inventory) Consider(e);
             return pools;
         }
     }

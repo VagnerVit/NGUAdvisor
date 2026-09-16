@@ -41,6 +41,15 @@ not a framework:
   digger can't afford level 1: base drain ~1e24 vs gross ~5e21 — the old "recap only on complete
   set" froze ALL diggers at level 1 the whole run, user-caught). Recommendation order passed
   explicitly so the greedy budget levels high-priority diggers first.
+- **Titan targets**: `targets[i] = !ak || ZoneHelpers.TitanHasWantedDrops(i)`. Below AK, attend the
+  spawn to FIGHT it. At AK, the titan dies in whatever is worn — so attend only while its drop table
+  still owes gear, and that spawn is then worth a swap into loot accessories
+  (`GearOptimizer.ResolveTitanGear` → `GearChain.LootChain`). A titan with nothing left to give is
+  worth no swap at all. The earlier `if (!ak)` alone meant an AK titan never entered
+  `TitanSwapTargets`, so `RefreshTitanSnapshots` never listed it, `AnyTitansSpawningSoon()` stayed
+  false and no lock was taken — the kill landed in whatever gear the advisor happened to be wearing
+  and its drop chance was wasted (user-reported 2026-09-16). During a challenge the whole target
+  list is still cleared, AK titans included.
 - **Gear refresh** (`ApplyGearRefresh`, throttle 120 s): objective resolution order is
   challenge rotation > GEAR HUNT ("LOOT HUNTER") > `ChallengeOverlay.GearObjectiveOverride` >
   profile's `GearBreakpoints.ActiveChainSource ?? ActiveObjective`. **The challenge rotation only

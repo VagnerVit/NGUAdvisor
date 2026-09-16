@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,6 +11,13 @@ namespace NGUAdvisor.Managers
     {
         public GearObjectives.Objective Objective;
         public int MaxAccessorySlots = GearChain.Unlimited;
+
+        // Farm sets want the hardest-hitting weapon regardless of what the lead objective scores:
+        // kills per second is what the loot stat multiplies, and an NGU lead picks a weapon for its
+        // energy specs. The chain grammar cannot say "this step owns only the weapon" -- priority 0
+        // owns every main slot -- so this rides in as a pin instead, exactly like forceTopRespawn.
+        // Read off ANY step (GearOptimizer.WantsTopPowerWeapon); the lead is where it is written.
+        public bool PinTopPowerWeapon;
     }
 
     // The chain layer: ordered objectives, each with an accessory budget.
@@ -44,8 +51,13 @@ namespace NGUAdvisor.Managers
             => GearObjectives.Objectives.FirstOrDefault(o =>
                 string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase));
 
-        private static GearPriority Step(string objective, int slots)
-            => new GearPriority { Objective = FindObjective(objective), MaxAccessorySlots = slots };
+        private static GearPriority Step(string objective, int slots, bool pinTopPowerWeapon = false)
+            => new GearPriority
+            {
+                Objective = FindObjective(objective),
+                MaxAccessorySlots = slots,
+                PinTopPowerWeapon = pinTopPowerWeapon,
+            };
 
         // Named chains, selectable exactly like an objective. Both repeat their lead objective as the
         // final unlimited step: reserve a couple of slots for the secondary stat, then fill whatever
@@ -69,7 +81,63 @@ namespace NGUAdvisor.Managers
                 Step("Energy NGU", 2),
                 Step("Adventure", Unlimited),
             }),
+            // Farm sets: max drop chance on the accessories, real stats everywhere else.
+            //
+            // These are the ONLY shape that works for a loot stat. No main-slot item in the game
+            // carries Drop Chance -- the diagnostic prints "W:- H:- C:- L:- B:-" under a pure
+            // "Drop Chance" objective for exactly that reason -- so leading with it leaves the lead
+            // priority scoring every helmet, chest and weapon dead equal, and the main slots land
+            // wherever the ascent happened to start. The partner objective leads (owning the main
+            // slots at budget 0, claiming no accessory), Drop Chance then takes all of them.
+            new Preset("Drop Chance + Adventure", new List<GearPriority>
+            {
+                Step("Adventure", 0, pinTopPowerWeapon: true),
+                Step("Drop Chance", Unlimited),
+            }),
+            new Preset("Drop Chance + NGUs", new List<GearPriority>
+            {
+                Step("NGUs", 0, pinTopPowerWeapon: true),
+                Step("Drop Chance", Unlimited),
+            }),
+            // ITOPOD floor push (user request): the pod is a kill loop, so the weapon is pinned to raw
+            // Power — the floor you can hold is set by how fast the boss dies, not by what the helmet's
+            // specs feed. Respawn and Move Cooldown get ONE accessory each: they shorten the dead time
+            // between kills, and past the first item both are the weakest thing a slot can hold. The
+            // main slots and every remaining accessory go to NGUs, which is what the pod is being run
+            // for in the first place.
+            new Preset("ITOPOD Push", new List<GearPriority>
+            {
+                Step("NGUs", 0, pinTopPowerWeapon: true),
+                Step("Respawn", 1),
+                Step("Move Cooldown", 1),
+                Step("NGUs", Unlimited),
+            }),
         };
+
+        // Kill-safe loot gear: the MAIN slots go to Adventure, the ACCESSORIES to the loot stat.
+        //
+        // The autokill thresholds are live totalAdvAttack/totalAdvDefense reads (ZoneHelpers.
+        // AutokillAvailable), so a set that spends Power/Toughness on loot turns an auto-kill into a
+        // real fight — the exact trade GoldTargetLosingAutokill() exists to catch after a gold swap.
+        // Keeping the main slots on Adventure buys the loot stat out of the accessories only, where
+        // it costs the AK margin least.
+        //
+        // Budget 0 on the lead step is how "main slots only" is spelled: priority 0 owns the main
+        // slots regardless of its accessory budget (GearOptimizer.RunChain), so a 0 there claims no
+        // accessory and leaves every one of them to the next step.
+        //
+        // Returns null when either objective is unknown — refuse, don't guess, same as Resolve.
+        public static List<GearPriority> LootChain(string lootObjective)
+        {
+            var loot = FindObjective(lootObjective);
+            var adventure = FindObjective("Adventure");
+            if (loot == null || adventure == null || loot == adventure) return null;
+            return new List<GearPriority>
+            {
+                new GearPriority { Objective = adventure, MaxAccessorySlots = 0, PinTopPowerWeapon = true },
+                new GearPriority { Objective = loot, MaxAccessorySlots = Unlimited },
+            };
+        }
 
         public static Preset FindPreset(string name)
             => Presets.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -105,7 +173,9 @@ namespace NGUAdvisor.Managers
             {
                 if (step == null || step.Objective == null) continue;
                 var slots = step.MaxAccessorySlots >= Unlimited ? "all" : step.MaxAccessorySlots.ToString();
-                parts.Add($"{step.Objective.Name}({slots})");
+                // The weapon pin changes which loadout the chain produces, so it belongs in the chain's
+                // identity: AdvisorApply treats a changed Describe() as an objective switch.
+                parts.Add($"{step.Objective.Name}({slots}){(step.PinTopPowerWeapon ? "+PowerWeapon" : "")}");
             }
             return parts.Count == 0 ? "(no chain)" : string.Join(" > ", parts.ToArray());
         }

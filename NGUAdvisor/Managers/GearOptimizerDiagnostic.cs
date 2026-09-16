@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,6 +16,32 @@ namespace NGUAdvisor.Managers
     // sitting on the loadout.
     public static class GearOptimizerDiagnostic
     {
+        private const string RequestFileName = "gearopt.request";
+
+        public static string RequestPath =>
+            Path.Combine(Main.GetSettingsDir() ?? ".", RequestFileName);
+
+        // Same request/acknowledge shape as the unload and state-export files, and for the same reason:
+        // the run reads live Character/inventory and so is Unity-thread-only, while "why did the
+        // optimizer pick that?" is a question asked from OUTSIDE the game. F10 was the only trigger,
+        // which meant the answer needed the player at the keyboard. Drop the file, Main.Update()
+        // notices it on the Unity thread and deletes it as the acknowledgement, then writes the log.
+        public static bool Requested()
+        {
+            try
+            {
+                string path = RequestPath;
+                if (!File.Exists(path)) return false;
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"Gear diagnostic request read failed: {e.Message}");
+                return false;
+            }
+        }
+
         private static string Name(int id) => id == 0 ? "-" : $"[{id}]{Main.ItemName(id)}";
 
         public static void Run()
@@ -68,6 +94,16 @@ namespace NGUAdvisor.Managers
                 // Both valuations, side by side. The NOW block is the live optimizer's own behaviour; the
                 // MAXED block is the site oracle, so picks that differ between the blocks are boost debt,
                 // not an optimizer bug.
+                // Ids a pick named that are NOT worn. "Why that one and not this one" is unanswerable from
+                // the worn-item block alone -- the challenger's stats are exactly what is missing -- so every
+                // such id gets the same NOW/MAXED pair below, read off the copy BuildPools would score.
+                var challengers = new HashSet<int>();
+                var wornIds = new HashSet<int>();
+                void NoteWorn(Equipment e) { if (e != null && e.id != 0) wornIds.Add(e.id); }
+                NoteWorn(inv.weapon); NoteWorn(inv.weapon2);
+                NoteWorn(inv.head); NoteWorn(inv.chest); NoteWorn(inv.legs); NoteWorn(inv.boots);
+                if (inv.accs != null) foreach (var a in inv.accs) NoteWorn(a);
+
                 void Recommend(string title, List<GearScorer.Item> worn, bool asMaxed)
                 {
                     var equip = new List<GearScorer.Item>(worn) { cube, nude };
@@ -84,10 +120,29 @@ namespace NGUAdvisor.Managers
                         lines.Add("      W:" + Name(best.MainWeapon) + (best.OffWeapon != 0 ? " / " + Name(best.OffWeapon) : "")
                             + "  H:" + Name(best.Head) + "  C:" + Name(best.Chest) + "  L:" + Name(best.Legs) + "  B:" + Name(best.Boots));
                         lines.Add("      Acc: " + (best.Accessories.Count == 0 ? "(none)" : string.Join(", ", best.Accessories.Select(Name))));
+                        foreach (var id in best.AllIds())
+                            if (id > 0 && !wornIds.Contains(id)) challengers.Add(id);
                     }
                 }
                 Recommend("NOW (live optimizer: current boost fill)", now, false);
                 Recommend("MAXED (site oracle: boosted to cap)", maxed, true);
+
+                if (challengers.Count > 0)
+                {
+                    lines.Add("");
+                    lines.Add("=== ITEMS PICKED BUT NOT WORN (the copy the optimizer scored) ===");
+                    lines.Add("A pick that appears only under MAXED is boost debt: its cap beats what you wear, its");
+                    lines.Add("current fill does not. Compare the two rows to see how much boosting it still needs.");
+                    foreach (var id in challengers.OrderBy(x => x))
+                    {
+                        var e = GearOptimizer.BestCopy(id);
+                        if (e == null) { lines.Add($"  [{id}]{Main.ItemName(id)} — no copy found"); continue; }
+                        bool isWeapon = e.type == part.Weapon;
+                        lines.Add($"  [{e.id}] {Main.ItemName(e.id)} (lvl {e.level}{(e.removable ? "" : ", locked")})");
+                        lines.Add($"       NOW   {Fmt(GameGearAdapter.BuildItem(e, isWeapon, false))}");
+                        lines.Add($"       MAXED {Fmt(GameGearAdapter.BuildItem(e, isWeapon, true))}");
+                    }
+                }
 
                 lines.Add("");
                 lines.Add("NOTE: spec %s match the site; no gear SETS in NGU; cube + nude base included; hard caps");

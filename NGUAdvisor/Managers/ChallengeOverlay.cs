@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NGUAdvisor.AllocationProfiles.BreakpointTypes;
@@ -98,6 +98,9 @@ namespace NGUAdvisor.Managers
                     action = char.ToUpperInvariant(action[0]) + action.Substring(1);
                 Feed.Insert(0, $"[{category}] {DateTime.Now:HH:mm} {action} — {reason}");
                 if (Feed.Count > 50) Feed.RemoveAt(Feed.Count - 1);
+                // The ring is the live view; the file is the record. A reload empties the ring, and the
+                // 50-entry cap drops the rest of a long session, so LOGS reads advisor.log instead.
+                Main.LogAdvisor($"[{category}] {action} — {reason}");
                 Main.Log($"Overlay: {action} ({reason})");
             }
             catch { }

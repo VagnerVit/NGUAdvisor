@@ -296,6 +296,13 @@ namespace NGUAdvisor.Managers
         // The type drops are ACTUALLY being rerolled into: the user's forced choice when there is one,
         // the advisor's answer otherwise. Callers that ask "which boost id am I farming" want this,
         // not the raw setting.
+        // The game hides its four transform toggles until the 100-level challenge is fully completed
+        // (InventoryController.updateTransformToggles) — before that the setting does nothing and drops
+        // arrive as whatever type they rolled, so callers that reason about the type must ask this first.
+        public static bool BoostTransformUnlocked(Character c)
+            => c != null
+            && c.challenges.levelChallenge10k.curCompletions >= c.allChallenges.level100Challenge.maxCompletions;
+
         public static int EffectiveBoostType(Character c)
         {
             int mode = Main.Settings?.BoostTransformMode ?? 0;
@@ -346,10 +353,7 @@ namespace NGUAdvisor.Managers
                 if (e.removable || e.level >= 100) continue;   // not padlocked, or already finished
                 if (e.id < minId) minId = e.id;
             }
-            if (minId == int.MaxValue) return BoostSinks.TypeNone;
-            return minId <= 13 ? BoostSinks.TypePower
-                : minId <= 26 ? BoostSinks.TypeToughness
-                : BoostSinks.TypeSpecial;
+            return BoostSinks.TypeOfBoostId(minId == int.MaxValue ? 0 : minId);
         }
 
         private static void ApplyBoostTransform(Character c, SavedSettings st)
@@ -357,7 +361,7 @@ namespace NGUAdvisor.Managers
             if ((DateTime.UtcNow - _lastBoostTransform).TotalSeconds < 5) return;
             _lastBoostTransform = DateTime.UtcNow;
 
-            if (c.challenges.levelChallenge10k.curCompletions < c.allChallenges.level100Challenge.maxCompletions)
+            if (!BoostTransformUnlocked(c))
                 return;
 
             int want = st.BoostTransformMode == 0

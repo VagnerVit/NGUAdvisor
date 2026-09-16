@@ -182,6 +182,15 @@ namespace NGUAdvisor.Managers
                 var c = Main.Character;
                 if (c == null || c.NGU == null) { _cache = p; return p; }
 
+                // POOL BASIS — the WHOLE cap, deliberately. Every ×/hr below is "what this lane returns
+                // if NGUs own the cap", not a prediction of the running profile: rituals, CAPTM and
+                // CAPWAN take their share first, so the lanes usually receive less (often nothing).
+                // Sizing the pool from what the lanes hold RIGHT NOW would be worse, not better — a
+                // profile that starves them would price every lane at a share of zero and prune the
+                // plan away, which is exactly the deadlock BloodPlanner.BloodMatters was written to
+                // avoid. The divergence between this plan and the profile is REPORTED instead
+                // (NGUAdvisors.Diagnose → GrowthPanel, [GrowthDbg]); closing it needs a value-per-unit
+                // arbiter across sinks, which nothing in the advisor has yet.
                 double ePool = Math.Max(1, c.curEnergy);
                 double mPool = Math.Max(1, c.magic.curMagic);
                 Build(c, energyCandidates, false, ePool, p.Energy);
@@ -194,7 +203,10 @@ namespace NGUAdvisor.Managers
 
                 string Fmt(List<Entry> l) => l.Count == 0 ? "-"
                     : string.Join(", ", l.Take(3).Select(x => $"{x.Name} ×{Math.Min(x.Rating, 9.99):0.00}/hr").ToArray());
-                p.Summary = $"E: {Fmt(p.Energy)} · M: {Fmt(p.Magic)}";
+                // Name the basis in the summary: the rates are per-lane shares of the FULL cap, so a
+                // reader comparing them to a measured rate knows why the two differ when the profile
+                // spends the cap elsewhere.
+                p.Summary = $"E: {Fmt(p.Energy)} · M: {Fmt(p.Magic)} (at full-cap share)";
                 p.Known = p.Energy.Count > 0 || p.Magic.Count > 0;
             }
             catch (Exception e) { Main.LogDebug($"NGUAdvisors: {e.Message}"); }

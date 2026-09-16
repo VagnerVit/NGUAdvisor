@@ -191,6 +191,14 @@ namespace NGUAdvisor.Managers
             return cubeToughness > cubePower ? TypeToughness : TypePower;
         }
 
+        // Boost items are ids 1-39: 13 value tiers per type, Power then Toughness then Special
+        // (docs/ITEM-IDS.md). Anything else is not a boost.
+        public static int TypeOfBoostId(int id)
+        {
+            if (id < 1 || id > 39) return TypeNone;
+            return id <= 13 ? TypePower : id <= 26 ? TypeToughness : TypeSpecial;
+        }
+
         public static string TypeName(int type)
         {
             switch (type)

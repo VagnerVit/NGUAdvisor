@@ -729,7 +729,11 @@ namespace NGUAdvisor.Managers
                     if (riddleLocked) continue;
                     bool ak = false;
                     try { ak = ZoneHelpers.AutokillAvailable(i); } catch { }
-                    if (!ak) targets[i] = true;
+                    // Below AK: attend the spawn to FIGHT it. At AK: the titan dies in whatever is
+                    // worn, so attend only while its table still owes us gear — that spawn is then
+                    // worth a swap into loot accessories (ResolveTitanGear), and a titan with nothing
+                    // left to give is worth no swap at all.
+                    if (!ak || ZoneHelpers.TitanHasWantedDrops(i)) targets[i] = true;
                 }
                 // Not ready for the first-kill attempt: don't attend its spawns in kill gear at all.
                 // (The version parking below keeps the AK-able version spawning for gold/drops.)

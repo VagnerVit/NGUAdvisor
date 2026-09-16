@@ -23,6 +23,16 @@ game's exact math.
 
 ## Selection — iterative equal-share prune (`Pick`)
 
+**The pool is the WHOLE cap** (`curEnergy` / `curMagic`), so every ×/hr here means "if NGUs own the
+cap" — it is NOT a prediction of the running profile. Rituals (`BR`), `CAPTM` and `CAPWAN` take
+their share first (`ResourceBreakpoint.UpdateMaxAllocation` splits `capMax / prioCount` by JSON
+order), so the lanes usually receive less, often nothing. Sizing the pool from what the lanes hold
+right now would be WORSE: a profile that starves them prices every lane at a share of zero and
+prunes the plan away — the same deadlock shape `BloodPlanner.BloodMatters` was written to avoid.
+The gap between this plan and the profile is REPORTED instead (`Diagnose` → GrowthPanel,
+`[GrowthDbg]`) and `Summary` says "(at full-cap share)" so the number is never read as a forecast.
+Closing it for real needs a value-per-unit arbiter across sinks, which the advisor does not have.
+
 Split the pool equally over the kept set; drop lanes whose ratio at their ACTUAL share is under
 **1.05×/hr**; re-split (survivors' shares grow); repeat (≤ 12 iters, monotone → terminates).
 Prune-only BY DESIGN — re-admitting on the larger share would oscillate. Nothing hot → deepen the

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using NGUAdvisor.Managers;
 using Xunit;
 
@@ -120,5 +120,67 @@ namespace NGUAdvisor.Tests
             Assert.Null(GearChain.Resolve(""));
             Assert.Null(GearChain.Resolve(null));
         }
+
+        // The AK-titan loot set: main slots keep Adventure, every accessory goes to the loot stat.
+        [Fact]
+        public void LootChain_GivesTheLeadNoAccessoriesAndTheLootStatAllOfThem()
+        {
+            var chain = GearChain.LootChain("Drop Chance");
+            Assert.NotNull(chain);
+            Assert.Equal(2, chain.Count);
+            Assert.Equal("Adventure", chain[0].Objective.Name);
+            Assert.Equal(0, chain[0].MaxAccessorySlots);
+            Assert.Equal("Drop Chance", chain[1].Objective.Name);
+            Assert.Equal(GearChain.Unlimited, chain[1].MaxAccessorySlots);
+        }
+
+        [Fact]
+        public void LootChain_RefusesAnUnknownOrRedundantObjective()
+        {
+            Assert.Null(GearChain.LootChain("no such objective"));
+            Assert.Null(GearChain.LootChain("Adventure"));
+        }
+
+
+        [Fact]
+        public void FarmPresetsPinTheTopPowerWeaponOnTheirLead()
+        {
+            foreach (var name in new[] { "Drop Chance + Adventure", "Drop Chance + NGUs" })
+            {
+                var preset = GearChain.FindPreset(name);
+                Assert.NotNull(preset);
+                Assert.True(preset.Priorities[0].PinTopPowerWeapon, $"{name} lead must pin the power weapon");
+                Assert.Equal(0, preset.Priorities[0].MaxAccessorySlots);
+                Assert.Equal("Drop Chance", preset.Priorities[1].Objective.Name);
+                Assert.Equal(GearChain.Unlimited, preset.Priorities[1].MaxAccessorySlots);
+            }
+        }
+
+        [Fact]
+        public void LootChain_PinsTheTopPowerWeapon()
+        {
+            Assert.True(GearChain.LootChain("Drop Chance")[0].PinTopPowerWeapon);
+        }
+
+        [Fact]
+        public void ItopodPush_PinsThePowerWeaponAndReservesOneRespawnAndOneMoveCooldown()
+        {
+            var preset = GearChain.FindPreset("ITOPOD Push");
+            Assert.NotNull(preset);
+            Assert.Equal("NGUs(0)+PowerWeapon > Respawn(1) > Move Cooldown(1) > NGUs(all)",
+                         GearChain.Describe(preset.Priorities));
+        }
+
+        // The pin changes the resulting loadout, so it must change the chain's identity too --
+        // AdvisorApply treats a changed Describe() as an objective switch.
+        [Fact]
+        public void Describe_MarksThePowerWeaponPin()
+        {
+            Assert.Equal("Adventure(0)+PowerWeapon > Drop Chance(all)",
+                         GearChain.Describe(GearChain.LootChain("Drop Chance")));
+            Assert.Equal("Adventure(3) > Respawn(1) > Adventure(all)",
+                         GearChain.Describe(GearChain.FindPreset("Adventure + Respawn").Priorities));
+        }
+
     }
 }

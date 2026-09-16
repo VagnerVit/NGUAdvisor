@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -244,6 +244,28 @@ namespace NGUAdvisor.Managers
         }
 
         public static bool AutokillAvailable(int titanIndex) => AutokillAvailable(titanIndex, TitanVersion(titanIndex));
+
+        // Is there still GEAR worth farming off this titan? An auto-killed titan dies in whatever is
+        // worn, so the only reason to spend a gear swap on one is its drop table. Same three tests
+        // GearFarmAdvisor applies to a farm zone (GearFarmAdvisor.cs:392-401): equipment only (a
+        // titan's table also carries boosts — ids 1-39, see docs/ITEM-IDS.md), not already maxxed,
+        // not loot-filtered (a filtered item never drops, so it can never be the reason to swap).
+        public static bool TitanHasWantedDrops(int titanIndex)
+        {
+            try
+            {
+                var il = _character.inventory.itemList;
+                foreach (var id in TitanDropTables.For(titanIndex))
+                {
+                    if (id > Consts.MAX_GEAR_ID || (int)_character.itemInfo.type[id] > 5) continue;
+                    if (id >= il.itemMaxxed.Count || il.itemMaxxed[id]) continue;
+                    if (id < il.itemFiltered.Count && il.itemFiltered[id]) continue;
+                    return true;
+                }
+            }
+            catch (Exception e) { LogDebug($"Titan {titanIndex + 1} drop check: {e.Message}"); }
+            return false;
+        }
 
         public static int? GetHighestSpawningTitanZone()
         {

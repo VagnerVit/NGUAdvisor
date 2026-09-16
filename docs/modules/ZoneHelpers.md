@@ -70,6 +70,16 @@ titans didn't count as reachable until one boss kill past their unlock.
 (incl. item 135 maxed for T4, 3× boss5Kills for T5); T6–T12 call the game's own
 `autokillTitan{N}V{v}Achieved`; T13/T14 never AK (returns false).
 
+`TitanHasWantedDrops(titanIndex)`: does this titan still owe us gear? An auto-killed titan dies in
+whatever is worn, so its drop table is the ONLY reason to spend a swap on it. Reads
+`TitanDropTables.For(idx)` and applies the same three tests `GearFarmAdvisor` applies to a farm zone
+(`GearFarmAdvisor.cs:392-401`): equipment only (a titan's table also carries BOOSTS — T2 drops ids
+4-7/17-20/30-33 — and a boost is never a reason to swap), not `itemMaxxed`, not `itemFiltered` (a
+filtered item never drops). This is what lets `AdvisorApply` target AK titans at all: before it,
+`if (!ak) targets[i] = true` meant an AK titan never entered `TitanSwapTargets`, never entered the
+snapshot list, never took a lock — so it was killed in whatever the advisor happened to be wearing
+and its drop chance was wasted (user-reported 2026-09-16).
+
 `TitanEnemyName` returns the game's own enemy entry (user-reported mislabel fix: WALDERP has no
 versions — versioned titans' entries found by V-suffix, unversioned use the zone's last slot,
 the same slot the game's autokill path uses).

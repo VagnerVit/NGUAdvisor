@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -28,6 +28,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\ProfileValidator.cs" Link="Linked\ProfileValidator.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NumberFormatter.cs" Link="Linked\NumberFormatter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\TitanTables.cs" Link="Linked\TitanTables.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\TitanDropTables.cs" Link="Linked\TitanDropTables.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostSeed.cs" Link="Linked\BoostSeed.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BoostValueMath.cs" Link="Linked\BoostValueMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ItopodConstants.cs" Link="Linked\ItopodConstants.cs" />
@@ -42,6 +43,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\AtMath.cs" Link="Linked\AtMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestZoneItems.cs" Link="Linked\QuestZoneItems.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\ChallengeGates.cs" Link="Linked\ChallengeGates.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BloodRouter.cs" Link="Linked\BloodRouter.cs" />
   </ItemGroup>

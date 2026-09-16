@@ -24,6 +24,7 @@ namespace NGUAdvisor.Managers
             public string Difficulty;        // Normal / Evil / Sadistic
             public string Activity;          // what we're doing now
             public string NextGoal;          // milestone we're working toward
+            public bool GoalIsKill;          // the milestone is a titan/boss KILL push (ask this, never text-match NextGoal)
             public string RecommendedProfile;
             public string RecommendReason;
             public string OptimalFocus;      // GO-style "best gain" advice (filled in 3.2)
@@ -32,7 +33,7 @@ namespace NGUAdvisor.Managers
         private static readonly Progression Unknown = new Progression
         {
             Known = false, Chapter = 0, Label = "Stage -", Difficulty = "", Activity = "-",
-            NextGoal = "-", RecommendedProfile = "", RecommendReason = "", OptimalFocus = ""
+            NextGoal = "-", GoalIsKill = false, RecommendedProfile = "", RecommendReason = "", OptimalFocus = ""
         };
 
         private static Progression _cache = Unknown;
@@ -90,7 +91,8 @@ namespace NGUAdvisor.Managers
                 : mode != "Default" ? mode
                 : inBlock ? "Challenge block" : "Farming / idle";
 
-            string nextGoal = inBlock ? "Complete challenge block" : MilestoneGoal(chapter, boss);
+            bool goalIsKill = false;
+            string nextGoal = inBlock ? "Complete challenge block" : MilestoneGoal(chapter, boss, out goalIsKill);
             string focus = GetOptimalFocus(chapter);
 
             string rec, reason;
@@ -112,6 +114,7 @@ namespace NGUAdvisor.Managers
                 Difficulty = diffName,
                 Activity = activity,
                 NextGoal = nextGoal,
+                GoalIsKill = goalIsKill,
                 RecommendedProfile = rec,
                 RecommendReason = reason,
                 OptimalFocus = focus
@@ -141,8 +144,14 @@ namespace NGUAdvisor.Managers
                 double opt = GearOptimizer.Optimize(obj, false, new int[0]).Score;
                 if (cur > 0 && opt > cur)
                 {
+                    // Below the call-to-action bar the headroom is still REPORTED, not thrown away: a
+                    // full Optimize() ran to produce it, and a few percent of NGU speed compounds over a
+                    // 22 h marathon. The 8 % bar decides the wording ("re-optimize" vs "near-optimal"),
+                    // never whether the user gets to see the number.
                     double pct = (opt / cur - 1.0) * 100.0;
-                    _focus = pct >= 8 ? $"Re-optimize gear: +{pct:0}% {objName}" : $"Gear near-optimal ({objName})";
+                    _focus = pct >= 8
+                        ? $"Re-optimize gear: +{pct:0}% {objName}"
+                        : $"Gear near-optimal ({objName}, +{pct:0.#}% left)";
                 }
                 else _focus = $"Gear near-optimal ({objName})";
             }
@@ -172,8 +181,14 @@ namespace NGUAdvisor.Managers
             catch { return false; }
         }
 
-        private static string MilestoneGoal(int chapter, int boss)
+        // `isKill` says whether the milestone is a KILL push, so consumers never have to read the label.
+        // The labels are display shorthand and have been reworded before (RecommendProfile's note below
+        // records the last time a text match on them went wrong); OptimizationAdvisor.Mode read them for
+        // "Titan", which no Normal/Evil label contains, so push mode — and with it the Stats/Adv/Blood
+        // digger set and the Stats/Adv/Wandoos beard set — was unreachable outside chapter 8.
+        private static string MilestoneGoal(int chapter, int boss, out bool isKill)
         {
+            isKill = true;
             switch (chapter)
             {
                 // Compact hints — sized to fit the status strip's NEXT GOAL cell (the full guide detail
@@ -188,20 +203,23 @@ namespace NGUAdvisor.Managers
                     // read as the goal while still on v1 skips every step that actually comes next.
                     int t6v = ZoneHelpers.TitanVersionsBeaten(5);
                     if (t6v < 4) return $"Kill T6 v{t6v + 1}";
+                    isKill = false;
                     if (boss < 300) return "Reach B300";
                     return "Atk boost → Evil";
                 case 5:
                     if (!TitanBeaten(6)) return "B125 → kill T7";
-                    if (boss < 166) return "B166 → T8 puzzle";
+                    if (boss < 166) { isKill = false; return "B166 → T8 puzzle"; }
                     return "Kill T8";
                 case 6:
                     if (!TitanBeaten(7)) return "Kill T8";
+                    isKill = false;
                     return "R3 → farm T-sets";
                 case 7:
                     if (!TitanBeaten(8)) return "Kill T9";
+                    isKill = false;
                     return "24 AK → Rad set";
                 case 8: return "Sadistic titans";
-                default: return "-";
+                default: isKill = false; return "-";
             }
         }
 

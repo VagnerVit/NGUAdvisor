@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -39,7 +39,26 @@ namespace NGUAdvisor.Managers
 
         // A zone is "worth farming now" if its slowest uncapped item finishes inside this budget
         // (same hours-scale ruling as the quest capstone hold: forced farm time is cheap).
-        private const double TargetHours = 3.0;
+        private const double DefaultTargetHours = 3.0;
+
+        // ...but never past the rebirth: a farm that needs 3 h is not "worth farming now" with 40 min
+        // left in the run, and the verdict used to offer it anyway. Only a SCHEDULED rebirth shortens
+        // the budget — with no rebirth target the run has no deadline to miss, so the ruling stands as
+        // written. Lengthening it for a long cadence run would be a new policy, not a fix.
+        private static double TargetHoursNow()
+        {
+            try
+            {
+                double tgt = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1;
+                if (tgt > 0)
+                {
+                    double leftH = (tgt - Main.Character.rebirthTime.totalseconds) / 3600.0;
+                    if (leftH > 0 && leftH < DefaultTargetHours) return leftH;
+                }
+            }
+            catch { }
+            return DefaultTargetHours;
+        }
 
         private static readonly Dictionary<int, Roll[]> Table = new Dictionary<int, Roll[]>
         {
@@ -357,6 +376,7 @@ namespace NGUAdvisor.Managers
                 if (c == null) return v;
 
                 double lootFactor = c.lootFactor();
+                double budgetH = TargetHoursNow();   // one read: every verdict below must judge on the same budget
                 var il = c.inventory.itemList;
                 int[] modes = CombatHelpers.RegularAttackUnlocked() ? new[] { 0, 3 } : new[] { 0 };
 
@@ -409,13 +429,13 @@ namespace NGUAdvisor.Managers
                             Mode = bestMode,
                             HoursToCap = HoursToCap(zone, kv.Value, missing, lootFactor, bestEst)
                         };
-                        plan.Viable = plan.HoursToCap <= TargetHours;
+                        plan.Viable = plan.HoursToCap <= budgetH;
 
                         // Required lootFactor for the budget: rates are monotonic in DC, so binary
                         // search; if even a huge DC can't cap in budget (roll caps), report -1.
                         if (plan.Viable) plan.ReqLootFactor = 0;
                         else if (double.IsInfinity(HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst))
-                            || HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst) > TargetHours)
+                            || HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst) > budgetH)
                             plan.ReqLootFactor = -1;
                         else
                         {
@@ -423,7 +443,7 @@ namespace NGUAdvisor.Managers
                             for (int i = 0; i < 60; i++)
                             {
                                 double mid = Math.Sqrt(lo * hi);   // geometric: the range spans decades
-                                if (HoursToCap(zone, kv.Value, missing, mid, bestEst) <= TargetHours) hi = mid;
+                                if (HoursToCap(zone, kv.Value, missing, mid, bestEst) <= budgetH) hi = mid;
                                 else lo = mid;
                             }
                             plan.ReqLootFactor = hi;
@@ -443,7 +463,7 @@ namespace NGUAdvisor.Managers
                 }
                 else if (v.Nearest != null)
                 {
-                    v.Text = $"No gear zone caps within {TargetHours:0}h — closest is {v.Nearest.ZoneName} (needs ~{v.Nearest.ReqLootFactor * 100:#,0}% drop chance)";
+                    v.Text = $"No gear zone caps within {budgetH:0.#}h — closest is {v.Nearest.ZoneName} (needs ~{v.Nearest.ReqLootFactor * 100:#,0}% drop chance)";
                 }
                 else if (plans.Count > 0)
                 {
@@ -451,7 +471,7 @@ namespace NGUAdvisor.Managers
                     // the budget no matter the DC — honest answer: show the floor; partial levels
                     // accumulated by the boost-farm routing shrink it over time.
                     var fastest = plans.OrderBy(p => p.HoursToCap).First();
-                    v.Text = $"Gear uncapped in {plans.Count} zone(s), but roll caps hold them past {TargetHours:0}h — fastest is {fastest.ZoneName} (~{FmtHours(fastest.HoursToCap)})";
+                    v.Text = $"Gear uncapped in {plans.Count} zone(s), but roll caps hold them past {budgetH:0.#}h — fastest is {fastest.ZoneName} (~{FmtHours(fastest.HoursToCap)})";
                 }
                 else
                 {

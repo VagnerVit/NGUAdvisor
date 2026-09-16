@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -11,15 +11,42 @@ namespace NGUAdvisor
 {
     // LOGS section (L1, revised for the A1 rail sub-nav): the sources live as rail children —
     // the rail calls SelectSource. This panel is the reader: adaptive filter chips + the list.
-    //  - ADVISOR: the ChallengeOverlay feed (the old Advisors FEED sub-view, moved here whole).
-    //  - LOOT:    Main.LootFeed ring (mirrors loot.log writes; OPEN FILE for full history).
-    //  - SESSION: tail of inject.log, read on demand (shared read — the writer keeps it open).
+    //  - ADVISOR:    advisor.log  (ChallengeOverlay.Record's own writer)
+    //  - LOOT:       loot.log
+    //  - SESSION:    inject.log
+    //  - DIAGNOSTIC: debug.log / combat.log / pitspin.log / yggdrasil.log, chosen by the chips
+    //
+    // EVERY source is a file tail (shared read — the writers keep them open). The in-memory rings
+    // these replaced were emptied by every reload and capped at 50/400 entries, so the reader went
+    // blank after a hot-swap while the files kept growing; and four of the seven writers had no way
+    // into the UI at all, debug.log — where every [GearDbg]/[ZoneDbg] line lands — among them.
+    // cards.log is deliberately absent: nothing writes to it yet.
     public class LogsPanel : Panel
     {
         private static readonly string[] AdvisorCats = { "ALL", "ALLOC", "GEAR", "TITAN", "SEGMENT", "QUEST" };
         private static readonly string[] LootCats = { "ALL", "DROPS", "EXP · AP", "BOOSTS" };
         private static readonly string[] SessionCats = { "ALL" };
-        private static readonly string[][] SourceFilters = { AdvisorCats, LootCats, SessionCats };
+        // The remaining writers, reachable at last. They are not filters of one feed but separate files,
+        // so the chips here SELECT THE FILE -- the only axis that matters once a source is "raw log".
+        private static readonly string[] DiagCats = { "DEBUG", "COMBAT", "PIT", "YGG" };
+        private static readonly string[][] SourceFilters = { AdvisorCats, LootCats, SessionCats, DiagCats };
+
+        // Every source now reads its FILE, not an in-memory ring: a reload empties the rings while the
+        // files keep growing, which is why LOGS looked empty after every hot-swap. null = curated feed.
+        private static readonly string[] SourceFiles = { "advisor.log", "loot.log", "inject.log", null };
+
+        private const int TailLines = 400;
+
+        private static string DiagFile(string filter)
+        {
+            switch (filter)
+            {
+                case "COMBAT": return "combat.log";
+                case "PIT": return "pitspin.log";
+                case "YGG": return "yggdrasil.log";
+                default: return "debug.log";
+            }
+        }
 
         private readonly List<Button> _chips = new List<Button>();
         private ListBox _list;
@@ -51,7 +78,7 @@ namespace NGUAdvisor
             {
                 try
                 {
-                    string file = _active == 1 ? "loot.log" : _active == 2 ? "inject.log" : null;
+                    string file = _active == 3 ? DiagFile(_filter) : SourceFiles[_active];
                     System.Diagnostics.Process.Start(file == null ? GetLogDir() : Path.Combine(GetLogDir(), file));
                 }
                 catch (Exception ex) { LogDebug($"Logs open: {ex.Message}"); }
@@ -156,22 +183,23 @@ namespace NGUAdvisor
             switch (_active)
             {
                 case 0:
-                    var src = ChallengeOverlay.Feed;
-                    return _filter == "ALL"
-                        ? src.ToList()
-                        : src.Where(l => l.StartsWith($"[{_filter}]")).ToList();
+                    var adv = Tail("advisor.log");
+                    // The category tag sits after the timestamp the writer prepends, so match anywhere in
+                    // the line rather than at its start (the ring entries this replaced led with the tag).
+                    return _filter == "ALL" ? adv : adv.Where(l => l.Contains($"[{_filter}]")).ToList();
                 case 1:
-                    return _filter == "ALL"
-                        ? Main.LootFeed.ToList()
-                        : Main.LootFeed.Where(l => LootMatch(l, _filter)).ToList();
+                    var loot = Tail("loot.log");
+                    return _filter == "ALL" ? loot : loot.Where(l => LootMatch(l, _filter)).ToList();
+                case 3:
+                    return Tail(DiagFile(_filter));
                 default:
-                    return SessionTail();
+                    return Tail("inject.log");
             }
         }
 
-        // Last ~200 lines of inject.log, newest first. LogTail reads a bounded window at the end of the
-        // file instead of the whole thing — inject.log grows all session and this refreshes every 2s.
-        private static List<string> SessionTail() => LogTail.Read(Path.Combine(GetLogDir(), "inject.log"), 200);
+        // Newest first, bounded window at the end of the file — these grow all session and this
+        // refreshes every 2 s, so never read the whole thing.
+        private static List<string> Tail(string file) => LogTail.Read(Path.Combine(GetLogDir(), file), TailLines);
 
         private void Rebuild(bool force = false)
         {
@@ -188,7 +216,7 @@ namespace NGUAdvisor
                 {
                     _list.Items.Clear();
                     if (lines.Count == 0)
-                        _list.Items.Add(_active == 0 ? "(no advisor actions yet this session)" : "(nothing yet this session)");
+                        _list.Items.Add(_active == 0 ? "(no advisor actions logged yet)" : "(this log is empty)");
                     else
                         foreach (var l in lines) _list.Items.Add(l);
                 }

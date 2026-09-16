@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -155,7 +155,7 @@ namespace NGUAdvisor
                 { "Economy", new[] { "Overview", "Planners" } },
                 { "Systems", new[] { "Yggdrasil", "Quests", "Boosts", "Inventory", "Cooking", "Blood" } },
                 { "Loadouts", new[] { "Titan", "Gold", "Quest", "Yggdrasil", "Cooking", "Loot Hunter", "Shockwave" } },
-                { "Logs", new[] { "Advisor", "Loot", "Session" } },
+                { "Logs", new[] { "Advisor", "Loot", "Session", "Diagnostic" } },
                 { "Cards", new[] { "Cards", "Wishes" } },
             };
         private readonly System.Collections.Generic.Dictionary<string, string> _activeChild
@@ -778,6 +778,7 @@ namespace NGUAdvisor
                 _childNav["Logs/Advisor"] = () => _logsPanel.SelectSource(0);
                 _childNav["Logs/Loot"] = () => _logsPanel.SelectSource(1);
                 _childNav["Logs/Session"] = () => _logsPanel.SelectSource(2);
+                _childNav["Logs/Diagnostic"] = () => _logsPanel.SelectSource(3);
             }
 
             var loadouts = NewSection("Loadouts");
@@ -1841,6 +1842,7 @@ namespace NGUAdvisor
             _pitSliver?.TickSliver();
             _growthPanel?.TickGrowth();
             _bloodPanel?.RefreshStatus();    // no-ops unless the Blood page is visible
+            _boostsPanel?.RefreshBoostingNow();   // no-ops unless the Boosts page is visible; 1s throttle
         }
 
         // Switch the active allocation profile (used by the dashboard). Validates, persists, reloads.

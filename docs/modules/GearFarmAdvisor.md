@@ -44,8 +44,13 @@ calibrated on the boss, and boss-only rolls now price themselves correctly throu
 excluded or counted at full speed.
 
 Each `ZonePlan` carries the `Mode` it was costed at, and `AdvisorApply.ApplyZones` applies it to
-`Settings.CombatMode` before routing. `TargetHours = 3.0` — the "worth farming now" budget (same
-hours-scale ruling as the quest capstone hold).
+`Settings.CombatMode` before routing. `DefaultTargetHours = 3.0` — the "worth farming now" budget (same
+hours-scale ruling as the quest capstone hold) — but `TargetHoursNow()` clamps it to the time left
+before a **scheduled** rebirth (2026-09-16): a 3 h farm is not "worth farming now" with 40 min left
+in the run, and the verdict used to offer it anyway. With no rebirth target there is no deadline to
+miss, so the ruling stands unchanged; LENGTHENING the budget for a long cadence run would be a new
+policy, not a fix, and is deliberately not done here. Read once per `Analyze()` so every plan,
+the binary search and the verdict text all judge on the same budget.
 
 ## Analysis details
 

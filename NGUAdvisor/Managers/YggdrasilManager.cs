@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 using static NGUAdvisor.Main;
@@ -25,10 +26,23 @@ namespace NGUAdvisor.Managers
             return false;
         }
 
-        private static float EquipYggdrasilYield()
+        // The gear the harvest will ACTUALLY run in, resolved exactly the way LockManager resolves it:
+        // the optimizer's Yggdrasil set when the swap is going to fire, whatever is on your back when
+        // it isn't. Reading Settings.YggdrasilLoadout directly valued an empty list as "no Yggdrasil
+        // gear" while the swap equipped a live optimized set, so the eat-now-vs-wait math below
+        // under-counted every harvest.
+        private static int[] HarvestGearIds()
+        {
+            if (Settings.SwapYggdrasilLoadouts && NeedsSwap())
+                return GearOptimizer.ResolveModeGear(Settings.YggdrasilObjective, Settings.YggdrasilObjectiveRespawn,
+                                                     Settings.YggdrasilLoadout, quiet: true);
+            return LoadoutManager.CurrentGearIds();
+        }
+
+        private static float EquipYggdrasilYield(int[] gearIds)
         {
             float result = 1f;
-            foreach (var id in Settings.YggdrasilLoadout)
+            foreach (var id in gearIds)
             {
                 ih item = LoadoutManager.FindItemSlot(id);
                 if (item == null)
@@ -44,14 +58,13 @@ namespace NGUAdvisor.Managers
             return result;
         }
 
-        private static long MacguffinFruit2Bonus(int tier, bool firstHarvest = true)
+        private static long MacguffinFruit2Bonus(int tier, float equipBonus, bool firstHarvest = true)
         {
             var fruit = Fruits[13];
             int tierFactor = _fc.tierFactor(tier);
             bool usePoop = fruit.usePoop && (!_character.settings.poopOnlyMaxTier || tier == (int)fruit.maxTier);
             float poopModifier = usePoop ? _character.allArbitrary.poopModifier() : 1f;
             float harvestBonus = firstHarvest ? _character.adventureController.itopod.totalHarvestBonus(13) : 1f;
-            float equipBonus = EquipYggdrasilYield();
             var result = (long)Mathf.Ceil(tierFactor * 0.1f * poopModifier * equipBonus * _character.yggdrasilYieldBonus() * harvestBonus);
             if (result >= int.MaxValue)
                 result = int.MaxValue;
@@ -77,9 +90,10 @@ namespace NGUAdvisor.Managers
             if (fruit.usePoop && !_character.settings.poopOnlyMaxTier)
                 return false;
 
-            var maxBonus = (double)MacguffinFruit2Bonus((int)maxTier) / maxTier;
-            var bonus = (double)MacguffinFruit2Bonus(harvestTier);
-            bonus += (maxTier - harvestTier) * (double)MacguffinFruit2Bonus(1, false);
+            float equipBonus = EquipYggdrasilYield(HarvestGearIds());
+            var maxBonus = (double)MacguffinFruit2Bonus((int)maxTier, equipBonus) / maxTier;
+            var bonus = (double)MacguffinFruit2Bonus(harvestTier, equipBonus);
+            bonus += (maxTier - harvestTier) * (double)MacguffinFruit2Bonus(1, equipBonus, false);
             bonus /= maxTier;
             if (bonus <= maxBonus)
                 return false;
@@ -149,6 +163,7 @@ namespace NGUAdvisor.Managers
         {
             try
             {
+                LogHarvestHeader(tierOver1);
                 ReadTooltipLog(false);
                 var macguffinFruit = Fruits[10];
                 if (tierOver1)
@@ -233,6 +248,43 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // What the harvest is about to take, written BEFORE it runs: the game's own tooltip lines say
+        // what each fruit gave but never which tier it was at or what the loadout contributed, and
+        // after consumeAll the tiers are gone. Gear is named because the yield scales with it
+        // (EquipYggdrasilYield) -- a harvest read back later is only interpretable with it.
+        // The display names live on the controller, not on Fruit itself.
+        private static string FruitName(int index)
+        {
+            try
+            {
+                var names = _yc.fruitName;
+                return index >= 0 && index < names.Count ? names[index] : $"Fruit {index}";
+            }
+            catch { return $"Fruit {index}"; }
+        }
+
+        private static void LogHarvestHeader(bool tierOver1)
+        {
+            try
+            {
+                var ready = new List<string>();
+                for (var i = 0; i < Fruits.Count; i++)
+                {
+                    int tier = _fc.harvestTier(i);
+                    if (tier <= 0) continue;
+                    ready.Add($"{FruitName(i)} T{tier}/{Fruits[i].maxTier}{(_fc.fruitMaxxed(i) ? " MAX" : "")}");
+                }
+
+                var gearIds = HarvestGearIds();
+                Main.LogYggdrasil($"--- HARVEST{(tierOver1 ? " (all tiers)" : "")} · yield x{EquipYggdrasilYield(gearIds):0.###}"
+                                + $" · gear [{string.Join(", ", gearIds.Select(id => Main.ItemName(id)).ToArray())}]");
+                Main.LogYggdrasil(ready.Count == 0
+                    ? "  nothing harvestable"
+                    : $"  ready: {string.Join(" · ", ready.ToArray())}");
+            }
+            catch (Exception e) { Main.LogDebug($"Harvest header: {e.Message}"); }
+        }
+
         public static void ReadTooltipLog(bool doLog)
         {
             var bLog = Main.Character.tooltip.log;
@@ -247,7 +299,7 @@ namespace NGUAdvisor.Managers
                     var sb = new StringBuilder(log[i]);
                     sb.Replace("<b>", "");
                     sb.Replace("</b>", "");
-                    LogPitSpin(sb.ToString());
+                    LogYggdrasil(sb.ToString());
                 }
                 log[i] += "<b></b>";
             }

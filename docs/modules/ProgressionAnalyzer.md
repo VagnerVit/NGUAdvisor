@@ -11,6 +11,18 @@ Sadistic → 8. Evil: T8 beaten → 7, T7 beaten → 6, else 5. Normal: T6 beate
 ≥ 58 → 2, else 1. Titan-beaten reads: T5–T12 (idx 4–11) all via the all-time
 `boss{N}Kills >= 1` counter (`ZoneHelpers.TitanKills`); T1–T4 inferred from boss thresholds.
 
+### `GoalIsKill`, not a text match on `NextGoal` (2026-09-16)
+
+`MilestoneGoal` returns display SHORTHAND — "Kill T6 v2", "B125 → kill T7", "Reach B300". The labels
+have been reworded before, and `RecommendProfile`'s own note records the last time a text match on
+them went wrong. `OptimizationAdvisor.Mode()` still matched `NextGoal` for the word **"Titan"**,
+which no Normal or Evil label contains, so `Mode()` returned "farm" for every run in chapters 1–7:
+the push digger set (Stats/Adv/PP/**Blood**/Wandoos) and the push beard set (Stats/Adv/Wandoos) were
+unreachable outside chapter 8 — the wrong loadout on exactly the runs whose point is the kill.
+
+`Progression.GoalIsKill` is now the structured answer, set beside the label in the same switch.
+Consumers ASK; nobody parses the label. A challenge block is never a kill goal.
+
 ### `titan{N}Version` is NOT progress (user-reported 2026-09-12)
 
 `TitanBeaten` used to read `ZoneHelpers.TitanVersion(idx) >= 2` for the versioned titans. That field
