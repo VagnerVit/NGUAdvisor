@@ -4,6 +4,75 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.6] - 2026-09-16
+
+### Added
+
+- **The advisor now tells you which challenge to run.** Nothing ever did: it could enter the Laser
+  Sword Challenge and reshape your allocation once you were already inside one, but the rewards that
+  gate everything else went unmentioned. A single Troll Challenge completion triples NGU speed — the
+  advisor's own projections were already dividing by three and never said why — and the same ladder
+  unlocks the Numbers fruit at 5, the eighth blood ritual at 6 and the golden beard at 7. The new
+  CHALLENGE row names the next unclaimed one. Advice only: entering a challenge is a rebirth, so it
+  stays your call, and every reward in the table is one the advisor already reads somewhere.
+
+- **Farm sets keep the hardest-hitting weapon.** Kills per second is what a loot stat multiplies, but
+  an `NGUs` lead picks a weapon for its energy specs and hands you a slower one. The farm presets now
+  pin the highest-Power weapon regardless of what the lead objective wants — your own pins still win
+  the main hand — and the loadout name says `+PowerWeapon` so a set that gains or loses the pin
+  registers as a real switch. New `ITOPOD Push` preset: raw-Power weapon, one Respawn and one Move
+  Cooldown accessory to cut the dead time between kills, NGUs everywhere else.
+
+- **The LOGS page reaches every log file.** It used to read in-memory rings that emptied on every
+  reload — so the page went blank after a hot-swap while the files kept growing — and four of the
+  seven writers had no way into the UI at all, `debug.log` among them. Every source is now a file
+  tail, with a DIAGNOSTIC source whose chips pick between debug, combat, pit-spin and Yggdrasil.
+
+- **The gear diagnostic can be asked for from outside the game**, the same way as the state export:
+  drop a `gearopt.request` file in the settings folder and it is deleted as the acknowledgement. It
+  also now prints the stats of items the optimizer PICKED but you are not wearing — "why that item
+  and not this one" cannot be answered from the worn block alone.
+
+- **The boost panel says what is actually being boosted.** ADVISOR ACTIVE only ever showed the order
+  the advisor intends to write, not what survives the gates.
+
+### Fixed
+
+- **Titan runs were being configured as farm runs.** The push-vs-farm decision matched the word
+  "Titan" against the milestone label, and the labels read "Kill T6 v2" — so for the whole of Normal
+  and Evil the answer was always "farm". Every titan-kill run got the farming digger and beard sets
+  instead of the stats/adventure ones. The decision now asks the progression module directly.
+
+- **The blood digger could never be funded while farming.** Its rule only demoted it, and the farm
+  set does not name it, so with the entire magic cap feeding rituals the digger that multiplies every
+  ritual's output sat on the bench. It is now promoted while rituals are live AND actually hold magic
+  — a live spell over empty rituals has nothing to multiply.
+
+- **An auto-killable titan died in whatever you were wearing.** Only titans you could not yet
+  auto-kill were treated as targets, so no gear lock was taken for the others and the kill's drop
+  chance was wasted. An AK titan is now attended whenever its drop table still owes you gear, and
+  that spawn gets loot accessories over Adventure main slots — buying the loot stat where it costs
+  the auto-kill margin least.
+
+- **The gear optimizer scored the wrong copy of duplicated items.** A second copy of an item routinely
+  drops long before the first is merged up; scoring the weak one made the item you are wearing look
+  beatable and floated a phantom challenger in the diagnostic.
+
+- **Yggdrasil harvest value was read off the wrong gear.** It used the configured Yggdrasil loadout
+  instead of the gear the harvest will actually run in, which with an empty static loadout — the
+  normal setup — meant it valued a harvest in gear you do not wear.
+
+- **A gear farm is no longer offered past the end of the run.** The "worth farming now" budget was a
+  flat three hours even with forty minutes left before a scheduled rebirth.
+
+- **Small gear gains are no longer rounded away to "near-optimal".** A full optimizer pass ran to
+  produce the number; below the 8 % call-to-action bar it was discarded instead of shown, and a few
+  percent of NGU speed compounds over a 22-hour marathon.
+
+- **The NGU plan says what its rates assume.** They are per-lane shares of the whole cap — what the
+  lanes would return if NGUs owned it — while rituals and the capped lanes take their share first.
+  The summary now labels the basis, so a rate that disagrees with the measured one explains itself.
+
 ## [1.5] - 2026-09-14
 
 ### Added

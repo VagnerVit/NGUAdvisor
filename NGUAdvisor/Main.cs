@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,6 +29,8 @@ namespace NGUAdvisor
         public static StreamWriter LootWriter;
         public static StreamWriter CombatWriter;
         public static StreamWriter PitSpinWriter;
+        public static StreamWriter AdvisorWriter;
+        public static StreamWriter YggdrasilWriter;
         public static StreamWriter CardsWriter;
         public static StreamWriter DebugWriter;
         private static CustomAllocation _profile;
@@ -40,7 +42,7 @@ namespace NGUAdvisor
         public static SettingsForm settingsForm;
         // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
         // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.5";
+        public const string Version = "1.6";
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.
@@ -98,6 +100,8 @@ namespace NGUAdvisor
 
         private static volatile bool _stateExportPending;
         public static void RequestStateExport() => _stateExportPending = true;
+
+        private static volatile bool _gearDiagnosticPending;
 
         // HOTKEYS ARE UNITY INPUT, so Update() only ever sees them while the GAME window is the
         // foreground window. The advisor is its own top-level HWND (Mono WinForms), so with the advisor
@@ -185,6 +189,16 @@ namespace NGUAdvisor
 
         public static void LogPitSpin(string msg) => WriterLog(PitSpinWriter, msg);
 
+        // The advisor's decision feed, on disk. It used to live only in ChallengeOverlay.Feed, a
+        // static List that every reload emptied while the other logs kept growing -- so the LOGS
+        // reader showed nothing after a hot-swap and nothing at all from earlier sessions.
+        public static void LogAdvisor(string msg) => WriterLog(AdvisorWriter, msg);
+
+        // The harvest's own record. These lines used to go to pitspin.log, where the money pit's
+        // rewards drown them -- and a harvest is the one event worth reading back in full: what
+        // each fruit gave, at which tier, under which gear.
+        public static void LogYggdrasil(string msg) => WriterLog(YggdrasilWriter, msg);
+
         public static void LogCard(string msg) => WriterLog(CardsWriter, msg);
 
         public static void LogDebug(string msg) => WriterLog(DebugWriter, msg);
@@ -253,6 +267,8 @@ namespace NGUAdvisor
             Try(() => LootWriter.Close());
             Try(() => CombatWriter.Close());
             Try(() => PitSpinWriter.Close());
+            Try(() => AdvisorWriter.Close());
+            Try(() => YggdrasilWriter.Close());
             Try(() => CardsWriter.Close());
             Try(() => DebugWriter.Close());
             Try(() => OutputWriter.Close());
@@ -297,6 +313,8 @@ namespace NGUAdvisor
                 LootWriter = new StreamWriter(Path.Combine(logDir, "loot.log")) { AutoFlush = true };
                 CombatWriter = new StreamWriter(Path.Combine(logDir, "combat.log")) { AutoFlush = true };
                 PitSpinWriter = new StreamWriter(Path.Combine(logDir, "pitspin.log"), true) { AutoFlush = true };
+                AdvisorWriter = new StreamWriter(Path.Combine(logDir, "advisor.log"), true) { AutoFlush = true };
+                YggdrasilWriter = new StreamWriter(Path.Combine(logDir, "yggdrasil.log"), true) { AutoFlush = true };
                 CardsWriter = new StreamWriter(Path.Combine(logDir, "cards.log"), true) { AutoFlush = true };
                 DebugWriter = new StreamWriter(Path.Combine(logDir, "debug.log")) { AutoFlush = true };
                 // Health probe: if debug.log stays empty even of this line, the writer itself is broken
@@ -481,6 +499,11 @@ namespace NGUAdvisor
                     Log("State export requested from disk");
                     RequestStateExport();
                 }
+                if (Managers.GearOptimizerDiagnostic.Requested())
+                {
+                    Log("Gear diagnostic requested from disk");
+                    _gearDiagnosticPending = true;
+                }
             }
 
             // Drain deferred file-watcher work on the main thread (see the watcher handlers). Doing this
@@ -508,6 +531,12 @@ namespace NGUAdvisor
                 _stateExportPending = false;
                 try { Managers.StateExport.Write(); }
                 catch (Exception e) { LogDebug($"Deferred state export failed: {e.Message}"); }
+            }
+            if (_gearDiagnosticPending)
+            {
+                _gearDiagnosticPending = false;
+                try { Managers.GearOptimizerDiagnostic.Run(); }
+                catch (Exception e) { LogDebug($"Deferred gear diagnostic failed: {e.Message}"); }
             }
 
             _formUpdateCooldown -= Time.deltaTime;
