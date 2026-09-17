@@ -58,6 +58,10 @@ namespace NGUAdvisor.Managers
         // would understate what is off. A system whose permission is BROADER than its panel may pass a
         // truthful replacement; everyone else gets the canonical wording, and the contract holds.
         private readonly string _whenIdle;
+        // What the un-pressable decisions chip says. Default MANUAL ONLY = "this system has no advisor
+        // layer". A system whose decisions layer lives on ANOTHER control passes the name of that
+        // control instead, because MANUAL ONLY would then be false (Adventure: FARM MODE owns it).
+        private readonly string _decisionsChip;
 
         private readonly Panel _stripe;
         private readonly Button _autoBtn;
@@ -74,7 +78,7 @@ namespace NGUAdvisor.Managers
             Func<bool> getAutomation, Action<bool> setAutomation,
             Func<bool> getAdvisor, Action<bool> setAdvisor,
             string whenAdvisor, string whenManual, string whenOff, string whenNoDecisions = null,
-            string whenIdle = null)
+            string whenIdle = null, string decisionsChip = null)
         {
             _whenIdle = string.IsNullOrEmpty(whenIdle) ? AdvisorIdle : whenIdle;
             _getAutomation = getAutomation;
@@ -85,6 +89,7 @@ namespace NGUAdvisor.Managers
             _whenManual = whenManual;
             _whenOff = whenOff;
             _whenNoDecisions = whenNoDecisions;
+            _decisionsChip = string.IsNullOrEmpty(decisionsChip) ? ManualOnly : decisionsChip;
 
             Size = new Size(width, BarHeight);
             BackColor = UiTheme.Surface;
@@ -133,9 +138,9 @@ namespace NGUAdvisor.Managers
                 // chip: it states the fact and cannot be pressed.
                 _decChip = new Label
                 {
-                    Text = ManualOnly,
+                    Text = _decisionsChip,
                     AutoSize = false,
-                    Size = new Size(UiLayout.MeasureText(ManualOnly, UiTheme.Chip) + UiTheme.S(14), UiTheme.SHead(24)),
+                    Size = new Size(UiLayout.MeasureText(_decisionsChip, UiTheme.Chip) + UiTheme.S(14), UiTheme.SHead(24)),
                     Font = UiTheme.Chip,
                     ForeColor = Color.White,
                     BackColor = UiTheme.Faint,

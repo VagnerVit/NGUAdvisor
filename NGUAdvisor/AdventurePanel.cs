@@ -18,17 +18,20 @@ namespace NGUAdvisor
 
         // AUTOMATION = Settings.CombatEnabled — the ADVENTURE ROUTING gate (Main.cs:1218, AdvisorApply:513).
         // It does NOT gate all combat: titan (Main.cs:1183), quest (:1196) and gold-CBlock (:1202) routing
-        // all DoZone() and return BEFORE it. DECISIONS = Settings.AdvisorZones — who picks the FARM ZONE
-        // (SnipeZone), and only that: Gear Hunt (:1223) and Target ITOPOD (:1225) both outrank it.
+        // all DoZone() and return BEFORE it. The DECISIONS half is gone: who picks the farm zone is one
+        // of the five flags FARM MODE writes (FarmMode.cs), not a separate switch.
         private SystemControlBar _controlBar;
         private int _pageTop;
 
+        // FARM MODE — panel-level, above the segment bar, because it is the ONE exclusive question the
+        // three pages used to answer in pieces (FarmMode.cs carries the argument).
+        private readonly List<Button> _modeButtons = new List<Button>();
+        private readonly List<FarmModeKind> _modeOrder = new List<FarmModeKind>();
+        private Label _modeLine;
+
         // ZONES view
-        private Button _farmGear;
-        private Button _farmBoost;
         private ComboBox _zoneCombo;
         private Label _zoneLbl;
-        private Button _gearHunt;
         private Label _huntLbl;
         private ComboBox _huntZone;
         private Label _huntLine;
@@ -41,7 +44,6 @@ namespace NGUAdvisor
         private ComboBox _combatMode;
 
         // ITOPOD view
-        private Button _targetItopod;
         private ComboBox _itopodFloor;
         private NumericUpDown _itopodTargetFloor;
         private Button _itopodBeast;
@@ -87,27 +89,64 @@ namespace NGUAdvisor
             // height it needs in SettingsForm instead — the Combat section already scrolls.
 
             // PANEL-LEVEL, not inside ZONES. CombatEnabled gates the whole adventure routing tail —
-            // which feeds the ITOPOD page's Target ITOPOD as much as the ZONES page's farm zone — so it
-            // is not a zones-only switch. DECISIONS is the narrow one (who picks the farm zone), and the
-            // text says so. It also says what AUTOMATION does NOT stop: titan, quest and gold-snipe
+            // which feeds the ITOPOD page as much as the ZONES page's farm zone — so it is not a
+            // zones-only switch. It also says what AUTOMATION does NOT stop: titan, quest and gold-snipe
             // routing all DoZone() and return BEFORE the CombatEnabled check (Main.cs:1183/1196/1202 vs
             // :1218), so "combat off" has never meant "no combat".
+            //
+            // NO DECISIONS HALF here any more. AdvisorZones is one of the five flags FARM MODE writes
+            // (ZONE = manual, BOOSTS/GEAR = advisor), so a second control for that one bit would be a
+            // switch the selector overwrites on the next click. The chip says where the choice moved.
             // Width matches the pages' right edge (_w - 34 at x=0), so nothing sticks out past the widest
             // sibling — the thing that summoned the horizontal scrollbar.
             _controlBar = new SystemControlBar(
                 _w - UiTheme.S(44),
                 () => Settings.CombatEnabled, v => Settings.CombatEnabled = v,
-                () => Settings.AdvisorZones, v => Settings.AdvisorZones = v,
-                "Advisor picks the farm zone. Gear Hunt and ITOPOD outrank it.",
-                "Your zone is the farm zone. Gear Hunt and ITOPOD outrank it.",
+                null, null,
+                null, null,
                 "Adventure routing off — titan and quest zones still run.",
+                "Routing runs as FARM MODE says. Titan and quest zones run regardless.",
                 null,
-                "Advisor idle — adventure routing off (titans/quests run).");
+                "FARM MODE");
             _controlBar.Changed += SyncFromSettings;
             _controlBar.Location = new Point(UiTheme.S(10), UiTheme.S(10));
             Controls.Add(_controlBar);
 
-            _pageTop = UiTheme.S(10) + SystemControlBar.BarHeight + UiTheme.S(8);
+            int my = UiTheme.S(10) + SystemControlBar.BarHeight + UiTheme.S(8);
+            var modeCap = MkHead("FARM MODE");
+            Controls.Add(modeCap);
+            modeCap.Location = new Point(UiTheme.S(10), my);
+            my += UiTheme.HeadPitch;
+
+            // The exclusive set, in the cascade's own precedence order so the row reads the way routing
+            // resolves. WrapRow because the Combat section column is narrow in M1 and five buttons do
+            // not fit on one line there.
+            foreach (var kind in new[] { FarmModeKind.Zone, FarmModeKind.Boosts, FarmModeKind.Gear, FarmModeKind.Hunt, FarmModeKind.Itopod })
+            {
+                var b = MkBtn(FarmMode.Caption(kind));
+                var k = kind;
+                b.Click += (s, e) =>
+                {
+                    if (Settings == null) return;
+                    FarmMode.Set(k);
+                    SyncFromSettings();
+                    RefreshBoostAdvice();
+                };
+                Controls.Add(b);
+                _modeButtons.Add(b);
+                _modeOrder.Add(kind);
+            }
+            my = UiLayout.WrapRow(UiTheme.S(10), my, UiTheme.S(6), _w - UiTheme.S(34),
+                Math.Max(UiTheme.S(30), UiTheme.SCtl(24) + UiTheme.S(6)), _modeButtons.ToArray()) + UiTheme.S(4);
+
+            _modeLine = MkLbl("");
+            _modeLine.AutoSize = false;
+            _modeLine.Size = new Size(_w - UiTheme.S(44), UiTheme.TextH);
+            Controls.Add(_modeLine);
+            _modeLine.Location = new Point(UiTheme.S(10), my);
+            my += UiTheme.LinePitch * 2 + UiTheme.S(6);
+
+            _pageTop = my;
 
             int bx = UiTheme.S(10);
             foreach (var name in new[] { "ZONES", "ITOPOD", "BLACKLIST" })
@@ -228,27 +267,17 @@ namespace NGUAdvisor
             page.Controls.Add(_zoneCombo);
             y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(10), _zoneLbl, _zoneCombo) + UiTheme.S(6);
 
-            // Advisor strategies (visible in advisor mode): gear-capping farm outranks the boost
-            // farm; the boost farm only leaves the ITOPOD while something consumes boosts.
-            _farmGear = MkToggle("Farm Gear Zones", () => Settings.AdvisorFarmGear = !Settings.AdvisorFarmGear);
-            _farmBoost = MkToggle("Farm Best Boost", () => Settings.AdvisorFarmBoost = !Settings.AdvisorFarmBoost);
-            page.Controls.Add(_farmGear);
-            page.Controls.Add(_farmBoost);
-            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _farmGear, _farmBoost) + UiTheme.S(10);
+            // The "Farm Gear Zones" / "Farm Best Boost" toggles that stood here are GONE: they were two
+            // of the five flags that answered one exclusive question, and FARM MODE answers it now.
 
             // GEAR HUNT (user feature): camp a chosen stage for its drops in the Loot Hunter hybrid
-            // set (pool accessories + best P/T). Works in BOTH zone-source modes and outranks the
-            // automatic farms; the pool itself is curated in Loadouts › Loot Hunter.
+            // set (pool accessories + best P/T). The stage stays here; whether the hunt runs is the
+            // HUNT entry in FARM MODE. The pool itself is curated in Loadouts › Loot Hunter.
             var ghead = MkHead("GEAR HUNT");
             page.Controls.Add(ghead);
             ghead.Location = new Point(UiTheme.S(10), y);
             y += UiTheme.HeadPitch;
 
-            _gearHunt = MkToggle("Gear Hunt", () =>
-            {
-                Settings.GearHuntEnabled = !Settings.GearHuntEnabled;
-                AdvisorApply.GearRestored();   // re-arm the gear pass: swap on the next tick, not after the 120s throttle
-            });
             _huntLbl = MkLbl("Stage");
             _huntZone = new LineComboBox { Width = UiTheme.S(200), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_huntZone);
@@ -264,10 +293,9 @@ namespace NGUAdvisor
                 Settings.GearHuntZone = ((KeyValuePair<int, string>)_huntZone.SelectedItem).Key;
                 SyncFromSettings();
             };
-            page.Controls.Add(_gearHunt);
             page.Controls.Add(_huntLbl);
             page.Controls.Add(_huntZone);
-            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(10), _gearHunt, _huntLbl, _huntZone) + UiTheme.S(4);
+            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(10), _huntLbl, _huntZone) + UiTheme.S(4);
 
             _huntLine = MkLbl("");
             _huntLine.AutoSize = false;
@@ -359,11 +387,18 @@ namespace NGUAdvisor
             head.Location = new Point(UiTheme.S(10), y);
             y += UiTheme.HeadPitch;
 
-            _targetItopod = MkToggle("Target ITOPOD", () => Settings.AdventureTargetITOPOD = !Settings.AdventureTargetITOPOD);
+            // "Target ITOPOD" lived here and was the reason switching from the pod to a boost farm took
+            // a tab hop: the page that owned the flag winning the cascade was not the page that owned
+            // the flag you wanted. It is the ITOPOD entry in FARM MODE now; this page is HOW the pod is
+            // farmed, never WHETHER.
+            var itopodHint = MkLbl("Selected under FARM MODE above. These settings apply whenever routing lands in the pod.");
+            page.Controls.Add(itopodHint);
+            itopodHint.Location = new Point(UiTheme.S(10), y);
+            y += UiTheme.LinePitch + UiTheme.S(6);
+
             _itopodBeast = MkToggle("Beast Mode", () => Settings.ITOPODBeastMode = !Settings.ITOPODBeastMode);
-            foreach (Control c in new Control[] { _targetItopod, _itopodBeast })
-                page.Controls.Add(c);
-            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _targetItopod, _itopodBeast) + UiTheme.S(14);
+            page.Controls.Add(_itopodBeast);
+            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _itopodBeast) + UiTheme.S(14);
 
             // Floor mode replaces the old Auto-Push checkbox: pushing is what "Max" means, and a fixed
             // target pushes too — up to the target, not past it. ITOPODAutoPush stays the underlying
@@ -526,22 +561,32 @@ namespace NGUAdvisor
                 // other reachable writer of CombatEnabled) or a settings reload. Sync() never raises Changed.
                 _controlBar?.Sync();
 
-                bool advisor = Settings.AdvisorZones;
-                _zoneCombo.Visible = _zoneLbl.Visible = !advisor;
-                _farmGear.Visible = _farmBoost.Visible = advisor;
-                StyleOnOff(_farmGear, Settings.AdvisorFarmGear);
-                StyleOnOff(_farmBoost, Settings.AdvisorFarmBoost);
+                // The mode is DERIVED from the flags, never cached: a settings reload, the PP panel's
+                // pod shortcut or a profile switch can all move it, and a cached copy would then show
+                // a mode nobody was farming — the exact failure FARM MODE exists to end.
+                FarmModeKind mode = FarmMode.Current();
+                for (int i = 0; i < _modeButtons.Count; i++)
+                {
+                    bool on = _modeOrder[i] == mode;
+                    UiTheme.ApplyState(_modeButtons[i], on ? UiTheme.Accent : UiTheme.BtnFace, on ? Color.White : UiTheme.Ink);
+                }
+                UiLayout.FitOrGrow(_modeLine, FarmMode.Explain(mode), 2);
+
+                // Both parameter pickers stay VISIBLE in every mode and only lose focus when they are
+                // not the one in play. Hiding them reflowed the page on every mode click, and a control
+                // that vanishes reads as "this setting is gone", not "this setting is not in charge".
+                _zoneCombo.Enabled = mode == FarmModeKind.Zone;
+                _huntZone.Enabled = mode == FarmModeKind.Hunt;
                 for (int i = 0; i < _zoneCombo.Items.Count; i++)
                     if (((KeyValuePair<int, string>)_zoneCombo.Items[i]).Key == Settings.SnipeZone)
                     { _zoneCombo.SelectedIndex = i; break; }
 
-                StyleOnOff(_gearHunt, Settings.GearHuntEnabled);
                 for (int i = 0; i < _huntZone.Items.Count; i++)
                     if (((KeyValuePair<int, string>)_huntZone.Items[i]).Key == Settings.GearHuntZone)
                     { _huntZone.SelectedIndex = i; break; }
                 string hunt;
-                if (!Settings.GearHuntEnabled)
-                    hunt = "Off — pick a stage; curate the accessory pool in Loadouts › Loot Hunter";
+                if (mode != FarmModeKind.Hunt)
+                    hunt = "Not the farm mode — pick HUNT above; curate the accessory pool in Loadouts › Loot Hunter";
                 else if (Settings.GearHuntZone < 0)
                     hunt = "On — pick a stage to hunt";
                 else if (!GearHunter.ZoneReachable())
@@ -563,7 +608,6 @@ namespace NGUAdvisor
                 int cm = Settings.CombatMode;
                 if (cm >= 0 && cm < _combatMode.Items.Count) _combatMode.SelectedIndex = cm;
 
-                StyleOnOff(_targetItopod, Settings.AdventureTargetITOPOD);
                 int fm = Settings.ITOPODFloorMode;
                 if (fm >= 0 && fm < _itopodFloor.Items.Count) _itopodFloor.SelectedIndex = fm;
                 _itopodTargetFloor.Value = Math.Min(Math.Max(1, Settings.ITOPODTargetFloor), ItopodConstants.MaxFloor);

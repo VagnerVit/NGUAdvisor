@@ -179,8 +179,13 @@ namespace NGUAdvisor
             if (Settings == null) return;
             try
             {
-                bool on = !Settings.AdventureTargetITOPOD;
-                Settings.AdventureTargetITOPOD = on;
+                // Through FarmMode, not straight at the flag: this switch and the Combat tab's FARM MODE
+                // are two views of ONE exclusive choice, and a raw write here would leave a boost farm
+                // showing as selected while the pod actually owned routing. Off returns to the mode the
+                // user was in, not to a guess — clearing the flag alone used to hand routing back to
+                // whatever the other four flags happened to say.
+                bool on = FarmMode.Current() != FarmModeKind.Itopod;
+                FarmMode.Set(on ? FarmModeKind.Itopod : FarmMode.Previous);
                 // Only on the way ON, and ITOPODCombatMode is deliberately untouched: AdventurePanel
                 // owns that choice, and turning this off is meant to restore routing, not to rewrite
                 // the pod's optimisation target behind the user's back.
@@ -299,13 +304,13 @@ namespace NGUAdvisor
                 $"Queued: {planned.Name} · {gate} · {NumberFormatter.Abbrev(planned.Cost)} PP (have {NumberFormatter.Abbrev(banked)})");
         }
 
-        // The toggle reflects the LIVE setting rather than a cached copy, so flipping Target ITOPOD on
-        // the Adventure page moves this button too — they are one property with one owner.
+        // The toggle reflects the LIVE mode rather than a cached copy, so picking a different FARM MODE
+        // on the Adventure page moves this button too — they are one choice with one owner.
         private void RenderToggle()
         {
             if (Settings == null) return;
 
-            bool on = Settings.AdventureTargetITOPOD;
+            bool on = FarmMode.Current() == FarmModeKind.Itopod;
             UiTheme.ApplyState(_toggle, on ? UiTheme.Cap : UiTheme.BtnFace, on ? Color.White : UiTheme.Ink);
 
             // Four preconditions, all read from the routing code itself (Main.cs:1386-1404). A control

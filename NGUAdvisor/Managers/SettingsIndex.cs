@@ -244,9 +244,9 @@ namespace NGUAdvisor.Managers
             // fights as well as WHERE it goes, and a beast-mode search that returned a row reading only
             // "routing" would be answering a different question than the one asked.
             e.Add(Sys(SystemIds.Adventure, "Adventure", Destinations.Adventure,
-                "Adventure routing and combat style: the farm zone, ITOPOD, gear hunt, and how it fights. Titan and quest zones run regardless.",
-                "CombatEnabled AdvisorZones SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush ITOPODFloorMode ITOPODTargetFloor AllowZoneFallback SnipeBossOnly BeastMode",
-                layers + " adventure combat combat enabled advisor routes zones manual zone farm zone target itopod itopod floor fixed floor target floor push max floor gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
+                "One exclusive FARM MODE — zone, boosts, gear, hunt or ITOPOD — plus combat style. Titan and quest zones run regardless.",
+                "CombatEnabled AdvisorZones AdvisorFarmBoost AdvisorFarmGear SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush ITOPODFloorMode ITOPODTargetFloor AllowZoneFallback SnipeBossOnly BeastMode",
+                layers + " adventure combat combat enabled farm mode what am i farming advisor routes zones manual zone farm zone farm boosts boost farm best boost farm gear gear zones target itopod itopod floor fixed floor target floor push max floor gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
 
             // No synthetic panel-wide decisions boolean, and — corrected in slice 7.5C — not seven
             // decision sources either. A mode's source is `!IsNullOrEmpty(GetObj())`, and LOOT HUNTER and

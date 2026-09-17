@@ -1553,7 +1553,7 @@ namespace NGUAdvisor
                 BossesOnly.Checked = newSettings.SnipeBossOnly;
                 AllowFallthrough.Checked = newSettings.AllowZoneFallback;
 
-                TargetITOPOD.Checked = newSettings.AdventureTargetITOPOD;
+                TargetITOPOD.Checked = newSettings.AdventureTargetITOPOD;   // the flag, not FarmMode: this runs against the INCOMING settings
                 // This RETIRED grid's combo carries only 2 modes (Idle, Snipe) while AdventurePanel's
                 // offers 4 — so an unguarded assignment threw ArgumentOutOfRange for Defensive/Offensive
                 // and aborted the WHOLE deferred UpdateFromSettings, silently stopping every panel after
@@ -2416,10 +2416,14 @@ namespace NGUAdvisor
             catch (Exception reportEx) { try { LogDebug($"Manual Yggdrasil harvest completion report failed:\n{reportEx}"); } catch { } }
         }
 
+        // Through FarmMode, like every other writer of this flag: it is one entry of an exclusive
+        // choice, and a raw write here left the Combat tab showing a farm that no longer routed.
+        // Unchecking hands routing back to the mode that was selected before, not to whatever the
+        // other four flags happened to still say.
         private void TargetITOPOD_CheckedChanged(object sender, EventArgs e)
         {
             if (_initializing) return;
-            Settings.AdventureTargetITOPOD = TargetITOPOD.Checked;
+            Managers.FarmMode.Set(TargetITOPOD.Checked ? FarmModeKind.Itopod : Managers.FarmMode.Previous);
         }
 
         private void KillTitan_CheckedChanged(object sender, EventArgs e)

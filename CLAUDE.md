@@ -70,6 +70,7 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `AllocationProfiles.md` | all of `AllocationProfiles/` (breakpoint engine, token engine, rebirth types) |
 | `Main.md` | `Main.cs` + `Loader.cs` |
 | `ui-panels.md` | root `*Panel.cs`, `SettingsForm`, `ProfileEditorForm` |
+| `FarmMode.md` | FarmMode + the FARM MODE row in `AdventurePanel` (**the one exclusive "what am I farming?" choice — every writer of those five flags goes through `FarmMode.Set`**) |
 | `ui-infra.md` | SettingsIndex, Activity/ActivityRibbon, Destinations, SystemCatalog, PriorityCatalog, **UiTheme/UiLayout/ScrollPanel/ScaledCheckBox (the DPI contract — read before placing any control)**, SystemControlBar, LogTail, PresetInstaller |
 | `small-managers.md` | BeardManager, CookingManager, ChallengeDetector |
 | `ProfileModel.md` | ProfileModel + ProfileValidator + GrowthTracker |

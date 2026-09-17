@@ -143,16 +143,12 @@ namespace NGUAdvisor
                 // (1) AUTOMATION (CombatEnabled) gates adventure ROUTING, not combat: Main.cs returns at
                 //     :1218 only after titan and quest routing have already run. "OFF" must not read as
                 //     "the tool stops fighting".
-                // (2) MANUAL is the NORMAL routing source, not a guarantee: Gear Hunt and Target ITOPOD
-                //     outrank the zone choice (Main.cs:1223-1225). They sit BEHIND the gate, though — so
-                //     they are disclosed while it is open and correctly go unmentioned once it is shut,
-                //     because then they do not run either.
-                { SettingsIndex.SystemIds.Adventure, () => RowState.TwoLayer(
-                    Settings.CombatEnabled, Settings.AdvisorZones,
-                    "Advisor picks the farm zone; Gear Hunt and ITOPOD outrank it.",
-                    "Your zone is the farm zone; Gear Hunt and ITOPOD outrank it.",
-                    "Adventure routing off — titan and quest zones still run.",
-                    "Advisor idle — adventure routing off (titans/quests still run).") },
+                // (2) The second layer is NOT an ADVISOR/MANUAL bit any more. Advisor-vs-manual was only
+                //     ever one row of a five-way exclusive choice — the other four (boost farm, gear
+                //     farm, gear hunt, ITOPOD) outranked it — so the chip carries the FARM MODE itself.
+                //     A MANUAL chip on a character parked in the pod was the lie this replaces.
+                { SettingsIndex.SystemIds.Adventure, () => RowState.FarmMode(
+                    Settings.CombatEnabled, Managers.FarmMode.Current()) },
 
                 // LOADOUTS — NOT a two-layer system, and not seven decision sources either.
                 //
@@ -434,6 +430,30 @@ namespace NGUAdvisor
                     // Boosts' wider permission are disclosures, so they stay Faint.
                     Status = auto ? (advisor ? whenAdvisor : whenManual) : (idle ? whenIdle : whenOff),
                     StatusColor = idle ? UiTheme.Ink : UiTheme.Faint,
+                };
+            }
+
+            // Adventure's second layer: an exclusive FARM MODE, not a boolean. The chip is the mode, so
+            // the row can never claim a source that the routing cascade overrode (Managers/FarmMode.cs).
+            // There is no state D: every mode is a real choice, and the only idle state is the gate shut.
+            public static RowState FarmMode(bool auto, FarmModeKind mode)
+            {
+                return new RowState
+                {
+                    LeftCaption = SystemControlBar.AutomationCap,
+                    LeftChip = auto ? SystemControlBar.On : SystemControlBar.Off,
+                    LeftColor = auto ? UiTheme.Cap : UiTheme.Danger,
+
+                    RightCaption = "FARM MODE",
+                    RightChip = Managers.FarmMode.Caption(mode),
+                    // The two advisor-driven modes wear the ADVISOR accent; the three you pick yourself
+                    // wear the MANUAL amber, so the row still answers "who decides?" at a glance.
+                    RightColor = (mode == FarmModeKind.Boosts || mode == FarmModeKind.Gear) ? UiTheme.Accent : UiTheme.Energy,
+
+                    Status = auto
+                        ? Managers.FarmMode.Explain(mode)
+                        : "Adventure routing off — titan and quest zones still run.",
+                    StatusColor = UiTheme.Faint,
                 };
             }
 

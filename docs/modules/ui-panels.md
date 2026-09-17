@@ -62,7 +62,7 @@ non-scrolling panel has no scrollbar to reach the overflow with.
 | `GrowthPanel` | `GrowthTracker` samples, `NGUAdvisors` predicted rates + `Diagnose` (the NGU tile's sub-line names the CAUSE when measurement diverges from prediction — highlighted, full text in the tooltip, logged once per change as `[GrowthDbg]`) |
 | `ChallengesPanel` | `ChallengeOverlay.Feed` / `Block()` / `AllocationStatus` |
 | `ProfilePanel` | profile list, switch/apply (via request), `PresetInstaller` output |
-| `AdventurePanel`, `TitansPanel` | zone routing, `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner) |
+| `AdventurePanel`, `TitansPanel` | zone routing via **`FarmMode`** (the panel-level FARM MODE row owns the exclusive farm choice — see FarmMode.md; the control bar has no DECISIONS half), `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner) |
 | `SpendPanel` | `SpendOverview` — one row per currency, each naming the module that owns the ordering (it owns none itself) |
 | `GoldPanel`, `PitPanel` | gold snipe state, `MoneyPitManager.AdvisorPlan`/`PredictNext` |
 | `YggPanel`, `QuestsPanel`, `BloodPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |
