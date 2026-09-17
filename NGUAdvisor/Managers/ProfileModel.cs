@@ -63,6 +63,9 @@ namespace NGUAdvisor.Managers
             public string Objective = "";
             // Gear only: when optimizing, always pin the single best Respawn item into the loadout.
             public bool ForceRespawn = false;
+            // Gear only: when optimizing, pin the highest-Power weapon into the main hand — the same pin
+            // the farm-set presets carry (GearChain.PinTopPowerWeapon), spelled at breakpoint level.
+            public bool PinTopPowerWeapon = false;
             public string Challenge = "";
             // Gear only: an ordered objective chain. When non-empty it supersedes Objective.
             public readonly List<GearPriorityEntry> Priorities = new List<GearPriorityEntry>();
@@ -227,6 +230,7 @@ namespace NGUAdvisor.Managers
                         if (kv.Key == "Time" || kv.Key == payloadKey) continue;
                         if (kv.Key == "Objective") { b.Objective = kv.Value.Value; continue; }
                         if (kv.Key == "TopRespawn") { b.ForceRespawn = kv.Value.AsBool; continue; }
+                        if (kv.Key == "TopPowerWeapon") { b.PinTopPowerWeapon = kv.Value.AsBool; continue; }
                         if (kv.Key == "Challenge") { b.Challenge = kv.Value.Value ?? ""; continue; }
                         if (kv.Key == "Priorities")
                         {
@@ -472,6 +476,7 @@ namespace NGUAdvisor.Managers
                 o[payloadKey] = items;
                 if (!string.IsNullOrEmpty(b.Objective)) o["Objective"] = b.Objective;
                 if (b.ForceRespawn) o["TopRespawn"] = b.ForceRespawn;
+                if (b.PinTopPowerWeapon) o["TopPowerWeapon"] = b.PinTopPowerWeapon;
                 if (!string.IsNullOrEmpty(b.Challenge)) o["Challenge"] = b.Challenge;
                 if (b.Priorities.Count > 0)
                 {

@@ -133,6 +133,74 @@ drop chance cube-rooted.
 
 ---
 
+## The post-rebirth setup: where the TM hour and the AT hour actually pay
+
+Rule of thumb 2 above says *what* the first two hours are. This section says *where the leverage sits
+inside them* — worked 2026-09-17 against a live Ch.4 run (energy cap 1.84e9, power 6.12e5). Both
+answers are counter-intuitive, and in both cases the allocation list is the smaller lever.
+
+### TM hour: the payoff is `realBaseGold`, not the energy split
+
+`TimeMachineController.setbaseGold(x)` assigns `machine.realBaseGold = x` only when `x` exceeds it, so
+the machine rides on **the single highest gold drop of the current rebirth** (see GoldDropAdvisor.md for
+the drop math). A rebirth zeroes it. Consequence:
+
+- Machine Speed / Gold Multiplier levels bought in hour 0 are correct — they run for the whole 24 h —
+  but they multiply whatever `realBaseGold` happens to be at the time, and it is **not** locked in at
+  purchase. Early levels and a big bank are independent wins; neither waits for the other.
+- The bank a zone snipe can reach is an order of magnitude below the best AK titan. Live numbers from
+  that run: zone 17 snipe → 19.2 B, T5 v1 → 45.6 B, **T6 v1 → 228 B**. So the whole TM hour rides on
+  *how fast the best gold titan spawns and gets banked*, not on how energy is split.
+- **Do not reshape the TM hour's token list to chase this.** `Main.Update` already re-arms the run's
+  gold snipe the moment `realBaseGold == 0` (the "rebirth (TM empty)" trigger) and `ApplyTitanGold`
+  ranks titans by gold, not by height. The advisor path is the fast one; the profile cannot beat it.
+
+### AT hour: count the lanes, and keep Block out
+
+From the decomp (`AdvancedTrainingController`, same source AtCalculator.md cites):
+`progressPerTick = (E/50)·√EPow·atSpeedBonus / (baseTime·(L+1))`, `r = 50·M/baseTime` is constant in
+`L`, so `L(t) = √((L₀+1)² + 2rt) − 1` and the stat multiplier is `1 + 0.1·L^0.4`.
+
+Non-cap tokens each take `idle / prioCount` (AllocationProfiles.md §UpdateMaxAllocation), so **every
+extra token in the AT hour is a straight division of the AT rate**. At the reference stats above, one
+hour of hour-1 allocation:
+
+| hour-1 energy list | share per AT slot | AT level at 60 min | P/T multiplier |
+|---|---|---|---|
+| `AT-0, AT-1, AT-2, TM` | ¼ | ~16 100 | 5.81× |
+| `AT-0, AT-1, TM` | ⅓ | ~18 600 | 6.10× |
+| `AT-0, AT-1` | ½ | ~22 700 | 6.53× |
+
+- **`AT-2` (Block) does not belong in the AT hour.** It buys damage reduction only, and `LevelPlanner`
+  caps it at 99 % reduction (a few hundred levels) the moment `AutoProfile` is on — so under the auto
+  profile it is already out, and a hand-written list that keeps it is paying a quarter of the hour for
+  a target the advisor itself would have met immediately.
+- **`TM` in the AT hour is a real trade, not a mistake**: −6.5 % on the AT multiplier against another
+  hour of Machine Speed growth, which is permanent gold for the remaining 23 h while AT dies at
+  rebirth. It wins once the run's gold bank is large (post-titan), and loses while the bank is still a
+  zone snipe.
+- **`atSpeedBonus` enters `r` linearly, so the multiplier scales as `bonus^0.2`** — doubling AT-speed
+  gear is +15 %, about the same as removing two lanes. The `"Objective": "Advanced Training"` gear
+  breakpoint is worth as much as the token list.
+- **For EXP purchases, cap has twice the leverage of power on AT**: `mult ∝ ECap^0.2 · EPow^0.1`
+  (speed is linear in cap but only √ in power). This is the mechanism behind the guide's
+  "AT speed is linearly proportional to ECap, but only utilizes the square root of EPow".
+
+### Do not extend the AT hour on a 24 h run
+
+A second AT hour at ½ share takes the multiplier 6.53× → 7.36× (+12.7 %) — and rebirth deletes all of
+it, while the NGU-marathon hour it displaced was permanent. Extend only when a titan kill is the point
+of the run; that judgement is `AtHourPlanner`'s (which needs `AutoProfile`), and its criterion is
+exactly "does the projection cross the next titan stage".
+
+### Blitz-boost: why `CAPAT-X` is not a shortcut
+
+`CAPAT-X` caps a slot at blitz-boost (one level per tick). At the reference stats the BB ceiling is
+`M/baseTime − 1 ≈ 2 900` levels, reached in under a minute — after that the slot is off the cap and the
+token has nothing left to ask for. BB is a start-of-hour effect, not an hour-long strategy.
+
+---
+
 ## Gear Optimizer objectives (per goal)
 
 The guide's GO advice: **early game optimize "Power"; mid/late run multiple loadouts, each focused on ONE

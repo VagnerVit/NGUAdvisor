@@ -53,6 +53,26 @@ content** (the one-scroll-owner-per-screen rule, same as `_xformPage` and `Adven
 height must be re-derived whenever its content grows; a fixed height would silently clip, since a
 non-scrolling panel has no scrollbar to reach the overflow with.
 
+**"Grows to its content" has a second half that is easy to miss, and `BoostsPanel` missed it**
+(user-reported 2026-09-17: the Boost page could not be scrolled). Its two inner pages already grew —
+`PositionBlacklist` sizes `_boostPage` to whichever card is showing, and the transform block sizes
+`_xformPage` to its rows — but the control the scroll owner actually MEASURES is the outer panel, and
+`SettingsForm.Place` had set that height ONCE, from the `ContentHeight` the panel had at build time.
+Every later growth (flipping DECISIONS to MANUAL, which is the taller card; a transform chain gaining
+rows) therefore ran past the placed bottom and was clipped with no scrollbar to reach it — the NEVER
+BOOST section was simply unreachable. `BoostsPanel.SyncHeight()` hands the growth up, and both
+growth sites call it. **A panel that sizes its children but never re-sizes itself is the shape of this
+bug**; if you add a page to a scrolling host, either it grows all the way up or it does not grow.
+
+Note the auditor does NOT catch this: `UI AUDIT [Boosts]` read `clean` both before and after, because
+the audit runs while the panel is being built, when the content still fits. Growth-after-build is
+outside what it measures.
+
+**The shell window minimizes** (`MinimizeBox = true`, `SettingsForm.Designer.cs`) — it is
+`FixedSingle` with no maximize box, which is unchanged. `Main.RunHotkey(ShowWindow)` restores
+`WindowState` before `BringToFront()`: a minimized form is still `Visible`, so without that F1 reads
+as a dead key to anyone who just minimized the advisor.
+
 ## Panels and their owning managers
 
 | Panel | Reads / drives |
@@ -97,6 +117,46 @@ goes through those two named constants** — objectives start at `ChainIndex + 1
 - An objective (or a chain step objective) this build no longer offers is **kept verbatim** and added
   to the combo, so opening and saving a profile cannot quietly rewrite a value the editor did not
   understand.
+
+### The two optimize-mode pins
+
+`_objPanel` opens with two stacked checkboxes, then the live-optimize note — **three lines, and
+`ObjInfoH = UiTheme.SLines(3, 10)` is derived from all of them**; each line is placed one
+`UiTheme.LinePitch` below the last and none of them is scaled separately (the DPI contract in
+ui-infra.md). Adding a fourth line means raising `SLines`, never nudging a `Location`.
+
+- **Always keep the single best Respawn item** → `ListBreakpoint.ForceRespawn` → profile `TopRespawn`.
+- **Always equip the highest-Power weapon** → `ListBreakpoint.PinTopPowerWeapon` → profile
+  `TopPowerWeapon` → `GearPriority.PinTopPowerWeapon` on the resolved chain's LEAD step.
+
+The second one is the pin `GearChain`'s farm-set presets already carried per step (GearChain.md
+§PinTopPowerWeapon); the checkbox only lifts it to breakpoint level so a plain `Objective` can have it
+too. `GearBreakpoints.PerformSwap` **rebuilds** the chain with a fresh lead `GearPriority` rather than
+setting the flag on the one it resolved — `chain` is either the profile's own list or a `static
+readonly` preset, and mutating either would leak the pin into every other breakpoint that resolves the
+same name. Because `GearChain.Describe` renders the pin, gaining or losing it changes the chain's
+identity, which is what makes `AdvisorApply`'s refresh treat it as an objective switch instead of
+hiding it under the 5 % bar.
+
+### `Slots`: 0 is unlimited, −1 is none, and the editor must not "tidy" either
+
+The profile grammar is `0`/absent = all remaining accessory slots, a NEGATIVE = claims none
+(`GearBreakpoints.ParseSpec`, AllocationProfiles.md). **`-1` is therefore the only way to spell "this
+step owns the main slots and no accessory"** — the shape every farm preset in `GearChain.Presets`
+leads with, and the shape a chain needs whenever its accessory step is a stat no main-slot item
+carries. Three places had quietly made it unspellable or wrong (all fixed 2026-09-17, user hit the
+first one: "-1 nastavit nejde"):
+
+- `NumericUpDown.Minimum` was `0`, so the editor could not enter it at all.
+- Loading did `_slots.Value = Math.Max(0, entry.Slots)`, which is an **inversion**, not a
+  normalization: it turned "claims none" into "claims all remaining". Opening a hand-written profile
+  and saving it handed the lead step every accessory — exactly the round-trip `ProfileModel`'s `!= 0`
+  serialization guard exists to prevent, defeated one layer up.
+- The live `Chain:` summary mapped `Slots > 0 ? Slots : Unlimited`, so it *described* a negative step
+  as unlimited while the runtime would give it none. The preview contradicted the run.
+
+All three now use `ParseSpec`'s mapping verbatim. The hint label says
+`0 = all remaining · -1 = none (main slots only)`.
 
 ### PRIORITY CHAIN block
 

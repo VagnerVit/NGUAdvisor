@@ -15,7 +15,7 @@ namespace NGUAdvisor.Managers
         // Farm sets want the hardest-hitting weapon regardless of what the lead objective scores:
         // kills per second is what the loot stat multiplies, and an NGU lead picks a weapon for its
         // energy specs. The chain grammar cannot say "this step owns only the weapon" -- priority 0
-        // owns every main slot -- so this rides in as a pin instead, exactly like forceTopRespawn.
+        // owns every main slot it wants -- so this rides in as a pin instead, exactly like forceTopRespawn.
         // Read off ANY step (GearOptimizer.WantsTopPowerWeapon); the lead is where it is written.
         public bool PinTopPowerWeapon;
     }
@@ -122,9 +122,9 @@ namespace NGUAdvisor.Managers
         // Keeping the main slots on Adventure buys the loot stat out of the accessories only, where
         // it costs the AK margin least.
         //
-        // Budget 0 on the lead step is how "main slots only" is spelled: priority 0 owns the main
-        // slots regardless of its accessory budget (GearOptimizer.RunChain), so a 0 there claims no
-        // accessory and leaves every one of them to the next step.
+        // Budget 0 on the lead step is how "main slots only" is spelled: the first priority that WANTS
+        // the main slots takes them regardless of its accessory budget (GearOptimizer.RunChain), so a 0
+        // there claims no accessory and leaves every one of them to the next step.
         //
         // Returns null when either objective is unknown — refuse, don't guess, same as Resolve.
         public static List<GearPriority> LootChain(string lootObjective)

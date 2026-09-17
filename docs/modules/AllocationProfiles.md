@@ -182,6 +182,10 @@ purpose — those are exactly the Wandoos-is-the-power-source cases.
     `Slots` back whenever it is `!= 0`, so an omitted `Slots` round-trips as omitted **and a negative
     one survives**: `> 0` used to drop a `-1`, and the next load then read the absent key as
     unlimited — an editor round-trip inverting "claims nothing" into "claims everything".
+  - `TopRespawn` and `TopPowerWeapon` are breakpoint-level pins, valid next to an `Objective` or a
+    `Priorities` chain alike. `TopPowerWeapon` is folded onto the resolved chain's lead step as
+    `GearPriority.PinTopPowerWeapon` (GearChain.md) — the chain is REBUILT, never mutated, because it
+    may be a shared preset.
   - `Slots == 0`/absent in a `Priorities` step means "all remaining accessory slots"; the profile
     convention is mapped onto `GearChain.Unlimited` in `ParseSpec` and **nowhere else**. A NEGATIVE
     `Slots` claims 0 slots — agreeing with the optimizer's own clamp and the validator warning; mapping it

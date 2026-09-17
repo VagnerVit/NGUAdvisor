@@ -627,6 +627,10 @@ namespace NGUAdvisor
                 case Hotkey.ShowWindow:
                     if (!settingsForm.Visible)
                         settingsForm.Show();
+                    // A minimized window is still Visible, and BringToFront does not restore it — F1
+                    // would then appear dead to a user who had just minimized the advisor.
+                    if (settingsForm.WindowState == FormWindowState.Minimized)
+                        settingsForm.WindowState = FormWindowState.Normal;
                     settingsForm.BringToFront();
                     break;
 

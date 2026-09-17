@@ -108,6 +108,49 @@ Why each matters:
 - **A duplicate weapon pin must not land in both hands.** `ScoreOf` would then add it at full value
   AND at the offhand factor, inflating every score in the run.
 
+## The main slots go to the first priority that WANTS them (2026-09-17)
+
+The rule used to be "priority 0 owns the main slots, unconditionally". That is wrong for any step
+whose objective carries no main-slot stat — Respawn, Drop Chance; the diagnostic prints
+`W:- H:- C:- L:- B:-` for exactly these. `PickSlot` keeps a candidate only on a **strict** improvement
+and `MainAscent` starts from an empty `Result`, so such a step scores every helmet identically to no
+helmet, keeps none, and *owning* the main slots means leaving them empty.
+
+**That failed silently.** `LoadoutManager.ChangeGear` swaps only the ids it is handed and leaves every
+other slot alone, so slots the optimizer omits keep whatever was worn. User-reported 2026-09-17 under
+a `Respawn(2) > NGUs(all)` chain: helmet, chest and boots had to be swapped by hand, and the only
+visible symptom was `10 items` dropping to `6` in the equip log.
+
+`RunChain` now hands the main slots to the first step that actually picks something there:
+
+```
+if (!mainSlotsOwned) { RunOptimize(...); mainSlotsOwned = AnyFreeMainSlotFilled(); }
+else                 AccessoryOptimize(...);
+```
+
+- **"Wants them" is read off the ascent's own result, not pre-computed.** A step that left every FREE
+  main slot at 0 chose nothing there, so the right passes on. No stat-to-part table to keep in sync.
+- **Pinned slots are excluded from that test.** A pin is the user's choice, not the step's — and
+  `PinTopPowerWeapon` fills the main hand *before* the chain runs, so counting it would make every
+  pinned-weapon chain read as "the lead step chose this".
+- **No shipped preset changes.** They all lead with a main-slot objective (`Adventure`, `NGUs`), which
+  claims the slots on its own merit exactly as before. This only redirects the case that was broken.
+
+It also makes the chain mean what it reads like: `Respawn(2) > NGUs(all)` is "two respawn accessories,
+everything else NGUs", which is how the user wrote it and now how it runs — live, the chest moved from
+Slimy Chest to `[178] The Stealthiest Armour`. Writing `NGUs(-1) > Respawn(2) > NGUs(all)` to force it
+is no longer necessary (it still works, and remains the right shape when the *accessory* step should
+also be denied a main-slot claim it could win).
+
+### The Power floor, for a chain that wants them nowhere
+
+If no step claims the main slots — a chain of nothing but loot/support objectives —
+`FillEmptyMainSlotsByPower()` fills what is still 0 with the highest raw Power item in each pool, the
+same measure `PinTopPowerWeapon` uses, so "which item when nothing has an opinion" has one answer in
+this file. Empty is never right: main-slot items carry Power/Toughness and no item in NGU has a
+negative stat. It cannot fire once any step has claimed the slots, and what it fills scores 0 on every
+objective in the chain, so set valuations are untouched.
+
 ## TopRespawn pin (`forceTopRespawn`)
 
 Pass 1 runs the chain on pure merit (user pins still apply). Only if the merit loadout carries NO

@@ -334,7 +334,8 @@ inventory for it — so your gear keeps improving as your drops do:
     {
         "Time": 0,
         "Objective": "Adventure",
-        "TopRespawn": true
+        "TopRespawn": true,
+        "TopPowerWeapon": false
     }
 ]
 ```
@@ -342,6 +343,11 @@ inventory for it — so your gear keeps improving as your drops do:
 `Objective` accepts either a single objective name or the name of a built-in **priority chain**
 (`"Adventure + Respawn"`, `"Adventure + Energy"`). `TopRespawn` additionally keeps the single best
 Respawn item in the loadout when the optimised set would otherwise have no respawn at all.
+
+`TopPowerWeapon` pins the highest-**Power** weapon into the main hand whatever the objective would
+have picked. It is the same pin the farm-set presets (`"Drop Chance + Adventure"`) carry built in, and
+it exists because kills per second is what a loot stat multiplies: an `NGUs` objective picks a weapon
+for its energy specs, not for damage. Your own gear pins still win the main hand.
 
 ### Priority chains (`Priorities`)
 

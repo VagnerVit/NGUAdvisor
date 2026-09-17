@@ -446,6 +446,20 @@ namespace NGUAdvisor
             _blackView.Top = above + UiTheme.S(6);
             int pageBottom = _blackView.Bottom + UiTheme.S(4);
             if (_boostPage.Height != pageBottom) _boostPage.Height = pageBottom;
+            SyncHeight();
+        }
+
+        // Both pages GROW to their content instead of scrolling (ui-infra.md: ONE scroll owner per
+        // screen), but the control the scroll owner MEASURES is this panel, and its height was placed
+        // ONCE from the ContentHeight the panel happened to have at build time. So every later growth --
+        // flipping DECISIONS to MANUAL, which is the taller card, or a transform chain gaining rows --
+        // ran past the placed bottom and was simply clipped, with no scrollbar to reach it
+        // (user-reported: "nejde scrollovat v Boost okně"). Handing the growth up is the whole fix:
+        // ScrollPanel watches its children's SizeChanged and re-ranges off this.
+        private void SyncHeight()
+        {
+            int h = ContentHeight;
+            if (Height != h) Height = h;
         }
 
         private static readonly string[][] OrderPerms =
@@ -1140,6 +1154,7 @@ namespace NGUAdvisor
                 // GROW, don't scroll: this page has no scrollbar of its own any more, so it takes its
                 // content's height and lets the one scroll owner above it do the scrolling.
                 _xformPage.Height = _xformContent.Height;
+                SyncHeight();
             }
             catch (Exception ex) { LogDebug($"Chain status: {ex.Message}"); }
         }

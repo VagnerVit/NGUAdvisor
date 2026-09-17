@@ -15,6 +15,10 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
         public int[] Ids;
         public string Objective;
         public bool ForceRespawn;
+        // Pins the highest-Power weapon into the main hand (GearPriority.PinTopPowerWeapon), which the
+        // farm-set presets already carry per step. At breakpoint level it applies to whatever chain this
+        // breakpoint resolves to, so a plain "Objective" can have it too.
+        public bool PinTopPowerWeapon;
         // An explicit priority chain ("Priorities"). When non-empty it supersedes Objective.
         public List<GearPriority> Priorities;
     }
@@ -37,6 +41,9 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
             var resp = bp["TopRespawn"];
             if (resp != null)
                 spec.ForceRespawn = resp.AsBool;
+            var powerWeapon = bp["TopPowerWeapon"];
+            if (powerWeapon != null)
+                spec.PinTopPowerWeapon = powerWeapon.AsBool;
             var id = bp["ID"];
             if (id != null && id.IsArray)
                 spec.Ids = id.AsArray.Children.Select(x => x.AsInt).ToArray();
@@ -156,6 +163,19 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 }
                 chainSource = objectiveName;
             }
+
+            // The breakpoint-level power-weapon pin rides in on the chain's lead step: the optimizer reads
+            // it off ANY step, and GearChain.Describe renders it, so the chain's identity changes with it —
+            // which is what makes AdvisorApply's refresh treat gaining/losing the pin as a switch.
+            // Rebuild rather than assign: `chain` is either the profile's own list or a STATIC preset from
+            // GearChain.Presets, and mutating either would leak the pin into every other breakpoint.
+            if (bp.priorities.PinTopPowerWeapon && chain != null && chain.Count > 0 && !chain.Any(p => p.PinTopPowerWeapon))
+                chain = chain.Select((p, i) => i != 0 ? p : new GearPriority
+                {
+                    Objective = p.Objective,
+                    MaxAccessorySlots = p.MaxAccessorySlots,
+                    PinTopPowerWeapon = true,
+                }).ToList();
 
             int[] ids;
             if (chain != null)

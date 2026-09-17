@@ -105,10 +105,15 @@ whatever is left.
 A farm set wants the hardest-hitting weapon whatever the lead scores: kills per second is what the
 loot stat multiplies, and an `NGUs` lead picks a weapon for its energy specs (measured: `Power` and
 `Adventure` both want `The Fists of Flubber`, `NGUs` wants `A Giant Bazooka`). The grammar cannot say
-"this step owns only the weapon" — priority 0 owns **every** main slot — so the flag rides in as a
+"this step owns only the weapon" — the step that claims the main slots claims **every** one of them
+(GearOptimizer.md: the first priority that wants them) — so the flag rides in as a
 pin instead, the same shape `forceTopRespawn` already uses.
 
 - Set on a step (the lead, by convention); `GearOptimizer` reads it off **any** step in the chain.
+- Also reachable **per gear breakpoint**, as profile `"TopPowerWeapon": true` / the editor's "Always
+  equip the highest-Power weapon" checkbox. `GearBreakpoints.PerformSwap` rebuilds the resolved chain
+  with a fresh lead step carrying the flag — never by assigning into the chain it resolved, which may
+  be one of the `static readonly` presets below.
 - Resolved ONCE per `Optimize` call, before the chain runs: the single highest-`Power` weapon in the
   pools. It does not depend on the chain's progress, and `forceTopRespawn` re-runs the whole chain per
   candidate — re-scanning the weapon pool inside that loop would be pure waste.

@@ -24,7 +24,7 @@ namespace NGUAdvisor
         private static readonly int ChipH = UiTheme.NumH + UiTheme.S(6);
         private static readonly int HeaderH = ChipH + UiTheme.S(8);
         private static readonly int SourceH = UiTheme.S(40);
-        private static readonly int ObjInfoH = UiTheme.SLines(2, 10);
+        private static readonly int ObjInfoH = UiTheme.SLines(3, 10);
         private static readonly int BarH = UiTheme.SCtl(24) + UiTheme.S(8);
         private static readonly int ColHeadH = UiTheme.SHead(20) + UiTheme.S(4);
         private static readonly int IconW = IconWidth();
@@ -258,7 +258,7 @@ namespace NGUAdvisor
             private readonly Label _countLbl, _backupLbl, _orderHdr, _objInfo, _chainHead, _chainNote, _chainSummary;
             private readonly Button _addStep;
             private readonly ComboBox _source;
-            private readonly CheckBox _respawn;
+            private readonly CheckBox _respawn, _powerWeapon;
             private readonly Button _addItem;
             private readonly Button _paste, _copy, _undoBtn;
             private Button _del;
@@ -344,10 +344,13 @@ namespace NGUAdvisor
                 _objPanel = new Panel { Dock = DockStyle.Top, Height = ObjInfoH, BackColor = UiTheme.Surface };
                 _respawn = new ScaledCheckBox { Text = "Always keep the single best Respawn item", Location = new Point(UiTheme.S(2), UiTheme.S(3)), AutoSize = true, ForeColor = UiTheme.Ink };
                 _respawn.CheckedChanged += RespawnChanged;
-                // Second of two stacked lines — one LinePitch below the first, and ObjInfoH is derived from
-                // both, never scaled next to them.
-                _objInfo = new Label { Location = new Point(UiTheme.S(2), UiTheme.S(3) + UiTheme.LinePitch), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Text = "Gear is auto-optimized live for this objective while the breakpoint is active." };
+                _powerWeapon = new ScaledCheckBox { Text = "Always equip the highest-Power weapon", Location = new Point(UiTheme.S(2), UiTheme.S(3) + UiTheme.LinePitch), AutoSize = true, ForeColor = UiTheme.Ink };
+                _powerWeapon.CheckedChanged += PowerWeaponChanged;
+                // Third of three stacked lines — each one LinePitch below the last, and ObjInfoH is derived
+                // from all of them, never scaled next to them.
+                _objInfo = new Label { Location = new Point(UiTheme.S(2), UiTheme.S(3) + 2 * UiTheme.LinePitch), AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Text = "Gear is auto-optimized live for this objective while the breakpoint is active." };
                 _objPanel.Controls.Add(_respawn);
+                _objPanel.Controls.Add(_powerWeapon);
                 _objPanel.Controls.Add(_objInfo);
 
                 // ---- priority chain ----
@@ -359,7 +362,7 @@ namespace NGUAdvisor
                 _addStep = new Button { Text = "+ Add step", Width = UiLayout.BtnWidth("+ Add step"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };
                 UiTheme.StyleGhost(_addStep);
                 _addStep.Click += (s, e) => AddStep();
-                _chainNote = new Label { Text = "0 = all remaining", AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
+                _chainNote = new Label { Text = "0 = all remaining · -1 = none (main slots only)", AutoSize = true, ForeColor = UiTheme.Faint, Font = UiTheme.Ui };
                 // Measured left-to-right, each child centred on the band — overlap impossible by construction.
                 int hx = UiTheme.S(2);
                 _chainHead.Location = new Point(hx, (ChainHeadH - UiTheme.HeadH) / 2);
@@ -449,6 +452,7 @@ namespace NGUAdvisor
                 _source.SelectedIndex = ObjectiveIndex();
                 _source.SelectedIndexChanged += SourceChanged;
                 _respawn.Checked = _bp.ForceRespawn;
+                _powerWeapon.Checked = _bp.PinTopPowerWeapon;
 
                 _loading = false;
                 Restripe();
@@ -624,7 +628,10 @@ namespace NGUAdvisor
                         chain.Add(new GearPriority
                         {
                             Objective = GearChain.FindObjective(cr.Entry.Objective),
-                            MaxAccessorySlots = cr.Entry.Slots > 0 ? cr.Entry.Slots : GearChain.Unlimited,
+                            // The SAME mapping ParseSpec applies (GearBreakpoints.cs:64) — 0/absent is
+                            // unlimited, a negative claims none. `> 0 ? … : Unlimited` read a negative as
+                            // unlimited, so the summary line promised the opposite of what would run.
+                            MaxAccessorySlots = cr.Entry.Slots == 0 ? GearChain.Unlimited : Math.Max(0, cr.Entry.Slots),
                         });
 
                 UiLayout.FitOrGrow(_chainSummary, "Chain: " + GearChain.Describe(chain));
@@ -697,6 +704,13 @@ namespace NGUAdvisor
             {
                 if (_loading) return;
                 _bp.ForceRespawn = _respawn.Checked;
+                OnChanged();
+            }
+
+            private void PowerWeaponChanged(object sender, EventArgs e)
+            {
+                if (_loading) return;
+                _bp.PinTopPowerWeapon = _powerWeapon.Checked;
                 OnChanged();
             }
 
@@ -986,7 +1000,11 @@ namespace NGUAdvisor
                 // another. The user's number survives and can be edited down; nothing rewrites it.
                 _slots = new NumericUpDown
                 {
-                    Minimum = 0,
+                    // -1 is a REAL value, not an error: it is the only way to spell "this step claims no
+                    // accessory, it owns the main slots only" (GearBreakpoints.cs:64 maps 0 to unlimited,
+                    // so 0 cannot mean none). Every shipped farm preset is that shape, and without -1 here
+                    // the editor could not express a chain the profile grammar has always accepted.
+                    Minimum = -1,
                     Maximum = Math.Max(MaxChainSlots, Math.Max(0, entry.Slots)),
                     Width = UiTheme.S(56),
                     Font = UiTheme.Ui,
@@ -1003,9 +1021,11 @@ namespace NGUAdvisor
                 // saving it cannot quietly rewrite a step the editor did not understand.
                 if (idx < 0 && !string.IsNullOrEmpty(entry.Objective)) { _obj.Items.Add(entry.Objective); idx = _obj.Items.Count - 1; }
                 _obj.SelectedIndex = idx < 0 ? 0 : idx;
-                // A negative Slots is the profile's "claims none" and is shown as the 0 it already means
-                // downstream (GearBreakpoints.cs:64) — the only normalization here, and a visible one.
-                _slots.Value = Math.Max(0, entry.Slots);
+                // Shown VERBATIM. Normalizing a negative to 0 here was an inversion, not a tidy-up: 0 is
+                // "all remaining" and a negative is "none" (GearBreakpoints.cs:64), so opening a profile
+                // whose lead step claimed NO accessory and saving it handed that step EVERY accessory —
+                // the exact round-trip ProfileModel's `!= 0` serialization guard exists to prevent.
+                _slots.Value = Math.Max(_slots.Minimum, Math.Min(_slots.Maximum, entry.Slots));
                 _loading = false;
 
                 _up = Icon("↑"); _down = Icon("↓"); _rem = Icon("✕", true);

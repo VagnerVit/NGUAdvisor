@@ -443,6 +443,35 @@ namespace NGUAdvisor.Managers
             bool mainWeaponPinned = false, offWeaponPinned = false;
             int pinnedAccCount = 0;
 
+            // Highest raw Power in a pool, the tie-break an empty main slot falls back on (below). Same
+            // measure the PinTopPowerWeapon pin uses, so "which item when the objective does not care"
+            // has ONE answer in this file. Starts below zero so a pool of Power-less items still yields
+            // one -- wearing something with no Power still beats wearing nothing.
+            int HighestPower(IEnumerable<KeyValuePair<int, GearScorer.Item>> pool)
+            {
+                int pick = 0; double bestPower = -1;
+                foreach (var c in pool)
+                {
+                    c.Value.Stats.TryGetValue(GearObjectives.Stat.Power, out double pw);
+                    if (pw > bestPower) { bestPower = pw; pick = c.Key; }
+                }
+                return pick;
+            }
+
+            // Last-resort fill for main slots no priority in the chain had an opinion about (RunChain).
+            // Only ever touches a slot still at 0, and never a pinned one.
+            void FillEmptyMainSlotsByPower()
+            {
+                if (!mainWeaponPinned && r.MainWeapon == 0)
+                    r.MainWeapon = HighestPower(weapons.Where(w => w.Key != r.OffWeapon));
+                if (twoWeapons && !offWeaponPinned && r.OffWeapon == 0)
+                    r.OffWeapon = HighestPower(weapons.Where(w => w.Key != r.MainWeapon));
+                if (!pinnedMain.Contains(part.Head) && r.Head == 0) r.Head = HighestPower(heads);
+                if (!pinnedMain.Contains(part.Chest) && r.Chest == 0) r.Chest = HighestPower(chests);
+                if (!pinnedMain.Contains(part.Legs) && r.Legs == 0) r.Legs = HighestPower(legs);
+                if (!pinnedMain.Contains(part.Boots) && r.Boots == 0) r.Boots = HighestPower(boots);
+            }
+
             // Re-pick the single best item for one slot, given everything else fixed.
             bool PickSlot(ScoreContext c0, IEnumerable<KeyValuePair<int, GearScorer.Item>> pool, Func<int> get, Action<int> set)
             {
@@ -637,6 +666,31 @@ namespace NGUAdvisor.Managers
 
                 var frozenAccCount = pinnedAccCount;
                 ScoreContext lead = null;
+                // THE MAIN SLOTS GO TO THE FIRST PRIORITY THAT HAS AN OPINION ABOUT THEM -- not to
+                // priority 0 unconditionally. A step whose objective carries no main-slot stat (Respawn,
+                // Drop Chance; the diagnostic prints "W:- H:- C:- L:- B:-" for exactly these) scores every
+                // helmet identically to no helmet, so owning the main slots means leaving them EMPTY and
+                // the equipper then silently keeps whatever was worn -- LoadoutManager.ChangeGear only
+                // swaps the ids it is handed. That is how `Respawn(2) > NGUs(all)` came to freeze a
+                // helmet, chest and boots that had to be swapped by hand (user-reported 2026-09-17).
+                //
+                // "Has an opinion" is read off the ascent's own result rather than pre-computed: a step
+                // that left every FREE main slot at 0 picked nothing, so it wants nothing, and the right
+                // to the main slots passes on. Pinned slots are excluded from that test — a pin is the
+                // user's choice, not this step's — which matters because PinTopPowerWeapon fills the main
+                // hand before the chain runs and would otherwise read as the lead step having chosen it.
+                //
+                // Every shipped preset leads with a main-slot objective, so none of them change: the
+                // first step still takes the main slots on its own merit. This only redirects the case
+                // that was previously broken.
+                bool mainSlotsOwned = false;
+                bool AnyFreeMainSlotFilled() =>
+                       (!mainWeaponPinned && r.MainWeapon != 0)
+                    || (twoWeapons && !offWeaponPinned && r.OffWeapon != 0)
+                    || (!pinnedMain.Contains(part.Head) && r.Head != 0)
+                    || (!pinnedMain.Contains(part.Chest) && r.Chest != 0)
+                    || (!pinnedMain.Contains(part.Legs) && r.Legs != 0)
+                    || (!pinnedMain.Contains(part.Boots) && r.Boots != 0);
 
                 for (var k = 0; k < steps.Count; k++)
                 {
@@ -659,13 +713,26 @@ namespace NGUAdvisor.Managers
                                         Math.Max(0, accSlots - frozenAccCount));
                     var cap = frozenAccCount + take;
 
-                    // Priority 0 owns the main slots and runs the full alternation; every later priority
-                    // is accessory-only, which is exactly "freeze the main slots after priority 0".
-                    if (k == 0) RunOptimize(ctx, cap, frozenAccCount);
+                    // The main-slot owner runs the full alternation; every priority after it is
+                    // accessory-only, which is exactly "freeze the main slots once they are claimed".
+                    if (!mainSlotsOwned)
+                    {
+                        RunOptimize(ctx, cap, frozenAccCount);
+                        mainSlotsOwned = AnyFreeMainSlotFilled();
+                    }
                     else AccessoryOptimize(ctx, cap, frozenAccCount);
 
                     frozenAccCount = r.Accessories.Count;
                 }
+
+                // No step wanted the main slots at all (a chain of nothing but loot/support objectives).
+                // Empty is still never right — main-slot items carry Power/Toughness and no item in this
+                // game has a negative stat — so the slots fall back to raw Power, the same measure the
+                // PinTopPowerWeapon pin uses. This is a floor under a chain that says nothing about them,
+                // NOT a substitute for a step that does: the branch cannot fire once any step has claimed
+                // them, and what it fills scores 0 on every objective in the chain, so set valuations are
+                // untouched.
+                if (!mainSlotsOwned) FillEmptyMainSlotsByPower();
 
                 // A chain has no single score, so Result.Score is priority 0's -- the same quantity
                 // CurrentScore(chain) reports, so AdvisorApply's re-equip bar compares like with like.
