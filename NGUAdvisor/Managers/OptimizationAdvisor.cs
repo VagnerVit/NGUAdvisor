@@ -239,7 +239,7 @@ namespace NGUAdvisor.Managers
             {
                 var active = ToIntList(c.beards.activeBeards);
                 int slots = Math.Max(1, c.allBeards.capBeards());
-                var recommended = RecommendedBeards(mode).Where(b => b != 6 || GoldenUnlocked()).Take(slots).ToList();
+                var recommended = RecommendedBeards().Where(b => b != 6 || GoldenUnlocked()).Take(slots).ToList();
                 if (mode == "challenge")
                     list.Add(new Rec { System = "Beards", AutoKey = "beards", Text = "Set by the challenge block", Optimal = true });
                 else
@@ -1054,11 +1054,34 @@ namespace NGUAdvisor.Managers
                 // challenges too (they cost nothing) rather than leaving the set to the profile's one-shot.
                 if (mode == "challenge" && !Main.Settings.AutoProfile) return null;
                 int slots = Math.Max(1, c.allBeards.capBeards());
-                // Beards cost nothing — fill EVERY slot (user rule): mode heads lead, rest follow.
-                var order = new List<int>(RecommendedBeards(mode));
-                for (int i = 0; i <= Consts.MAX_BEARD_ID; i++)
-                    if (!order.Contains(i)) order.Add(i);
-                return order.Where(b => b != Consts.MAX_BEARD_ID || GoldenUnlocked()).Take(slots).ToArray();
+                var set = RecommendedBeards()
+                    .Where(b => b != Consts.MAX_BEARD_ID || GoldenUnlocked())
+                    .Take(slots)
+                    .ToList();
+
+                // Leftover slots are filled ONLY into a resource pool the set does not use yet.
+                // AllBeardsController.beardCountDivider() divides every beard's growth by the number of
+                // ACTIVE beards sharing its pool (max(count, 1)), and level solves dL/dt = R/((L+1)*N),
+                // so a second beard in an occupied pool costs the ones already there sqrt(N/(N+1)) of
+                // their level. Only 0 -> 1 in an EMPTY pool is free; the old "beards cost nothing, fill
+                // every slot" rule ignored the divider and paid for filler with the head's growth.
+                var usedPools = new List<bool>();
+                foreach (var b in set)
+                {
+                    var p = UsesEnergy(c, b);
+                    if (p == null) { usedPools = null; break; }   // unreadable: never fill blind
+                    if (!usedPools.Contains(p.Value)) usedPools.Add(p.Value);
+                }
+                for (int i = 0; usedPools != null && usedPools.Count < 2 && i <= Consts.MAX_BEARD_ID && set.Count < slots; i++)
+                {
+                    if (set.Contains(i)) continue;
+                    if (i == Consts.MAX_BEARD_ID && !GoldenUnlocked()) continue;
+                    var p = UsesEnergy(c, i);
+                    if (p == null || usedPools.Contains(p.Value)) continue;
+                    set.Add(i);
+                    usedPools.Add(p.Value);
+                }
+                return set.ToArray();
             }
             catch { return null; }
         }
@@ -1078,9 +1101,16 @@ namespace NGUAdvisor.Managers
         private static int[] RecommendedDiggers(string mode) =>
             mode == "push" ? new[] { 2, 3, 8, 10, 1 } : new[] { 3, 8, 0, 9, 2 };
 
-        // 0 Stats, 5 Adv, 4 Wandoos (push) ; 5 Adv, 1 Drops, 3 NGU (farm).
-        private static int[] RecommendedBeards(string mode) =>
-            mode == "push" ? new[] { 0, 5, 4 } : new[] { 5, 1, 3 };
+        // 1 Drops, 5 Adv, 3 NGU, 0 Stats — one set for every mode (user rule). Wandoos (4) is out: its
+        // bonus feeds wandoos98Controller only, which nothing in the current chapters pushes.
+        private static int[] RecommendedBeards() => new[] { 1, 5, 3, 0 };
+
+        // The game's usesEnergy[] — which resource pool a beard grows from. null = unreadable.
+        private static bool? UsesEnergy(Character c, int id)
+        {
+            try { return c.allBeards.usesEnergy[id]; }
+            catch { return null; }
+        }
 
         private static bool IsDiggerUnlocked(int i)
         {

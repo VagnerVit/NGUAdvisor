@@ -74,7 +74,10 @@ order:
   one-shot at rebirth hit 0 gold and never retried — user-caught in a BASIC challenge on the
   Evil climb); with a manual profile, challenge mode returns null (profile owns the set).
 - `NGU MARATHON` segment gets a growth-multiplier-first order {4,5,11,6,7,8,1,0}.
-- Beards cost nothing → always fill every slot; Golden (6) needs Troll ≥ 7.
+- Beards: one set for every mode — `{1 Drops, 5 Adv, 3 NGU, 0 Stats}`. Leftover slots are filled
+  ONLY into a resource pool the set does not use yet: `beardCountDivider()` divides growth by the
+  count of active beards sharing a pool (`usesEnergy[]`), so only 0 → 1 in an EMPTY pool is free.
+  The old "beards cost nothing, fill every slot" rule ignored the divider. Golden (6) needs Troll ≥ 7.
 
 ## Recs produced (one try/catch each)
 
