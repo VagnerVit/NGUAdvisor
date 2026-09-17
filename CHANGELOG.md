@@ -4,6 +4,27 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-09-17
+
+### Fixed
+
+- **A chain step whose objective wants nothing from the main slots now hands them over.** It owned
+  the helmet, chest, legs and boots and left them empty, and the equipper only swaps what it is
+  handed — so the gear from the previous step silently stayed on. The slots now go to the priority
+  that actually names a stat for them, and the chain runs the way it reads: two respawn accessories,
+  everything else NGUs. The gear editor also stopped normalising away two shapes it could not
+  express — a step that claims no accessory now survives a save/load round trip.
+
+- **Two farm targets could be live at once.** The five farm flags are an exclusive choice that
+  nothing enforced, so two writers could leave the advisor farming gold and gear at the same time
+  and neither row knew about the other. Every write now goes through one owner.
+
+- **Beard slots are no longer filled just because they are empty.** The rule was "beards cost
+  nothing, fill every slot", but the game divides each beard's growth by the number of active beards
+  sharing its resource pool — so a filler beard was paid for out of the growth of the ones already
+  there. Leftover slots are now filled only into a pool the set does not use yet, which is the one
+  case that is genuinely free.
+
 ## [1.6] - 2026-09-16
 
 ### Added
