@@ -123,6 +123,7 @@ namespace NGUAdvisor
         [SerializeField] private int _titanCombatMode;
         [SerializeField] private bool _titanBeastMode;
         [SerializeField] private bool _disableOverlay;
+        [SerializeField] private bool _disableUpdateCheck;
         [SerializeField] private bool _moneyPitRunMode;
         [SerializeField] private int _yggSwapThreshold;
         [SerializeField] private int[] _blacklistedBosses;
@@ -386,6 +387,7 @@ namespace NGUAdvisor
         {
             _globalEnabled = other?.GlobalEnabled ?? false;
             _disableOverlay = other?.DisableOverlay ?? false;
+            _disableUpdateCheck = other?.DisableUpdateCheck ?? false;
             _moneyPitRunMode = other?.MoneyPitRunMode ?? false;
             _autoFight = other?.AutoFight ?? false;
             _autoBuyAdventure = other?.AutoBuyAdventure ?? false;
@@ -1743,6 +1745,19 @@ namespace NGUAdvisor
             {
                 if (value == _disableOverlay) return;
                 _disableOverlay = value;
+                SaveSettings();
+            }
+        }
+
+        // Phrased as an opt-OUT so a settings.json written before this existed reads as "checking
+        // on" rather than silently disabling the feature for every current user.
+        public bool DisableUpdateCheck
+        {
+            get => _disableUpdateCheck;
+            set
+            {
+                if (value == _disableUpdateCheck) return;
+                _disableUpdateCheck = value;
                 SaveSettings();
             }
         }

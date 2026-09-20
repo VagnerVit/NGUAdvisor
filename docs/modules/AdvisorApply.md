@@ -120,7 +120,9 @@ not a framework:
   levelled). The 50-item rule used to follow `perk 94 >= 610`, which was inverted — that perk is
   exactly the case where the rule does nothing, because the game already hands out a flat 50
   (QuestManager.md has the decomp).
-- **EXP buys**: one `ExpBalancer.BuyTick(0.10)` walk step per minute.
+- **EXP buys**: one `ExpBalancer.BuyTick(0.60)` walk step per minute — 60 % of the bank each
+  time, the rest left as a hand-spending reserve. The waterfill can't overshoot the ratio at any budget, and banked EXP earns nothing, so the
+  old 10 % budget only meant EXP idled ~10 minutes on average before being spent.
 - **Blood**: cast timing + single-sink routing from BloodPlanner (60 s throttle); pooling turns
   ALL auto-spells off so the pill can charge.
 

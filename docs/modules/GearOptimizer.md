@@ -213,6 +213,29 @@ holding the weak copy.
 
 Daycare is deliberately NOT a source: those items are not available to equip.
 
+### The pools are CACHED on an inventory fingerprint (2026-09-20)
+
+Building the pools is the most repeated work in the advisor — a full inventory walk plus one
+`GearScorer.Item` and its stat dictionary per id — and it used to run once per `Optimize` call.
+`InventoryAdvisor.Compute` issues **54 of those back to back** (27 objectives × with/without the
+respawn pin) over an inventory that cannot change between them, and `GetOptimalFocus` pays for two
+more every 10 s.
+
+`CachedPools(maxed)` keeps one `PoolSet` per valuation (live / at-cap) keyed on
+`InventoryFingerprint()` — a hash of every field the build and `Outranks` actually read: `id`,
+`level`, `removable`, the cur/cap attack and defense pairs, the three spec cur/cap pairs (the caps
+matter because `maxed` scores `CalcCap(spec{N}Cap, level)`), plus `weapon2Unlocked`. Spec **types**
+are omitted: they cannot change without the id changing.
+
+**Fingerprint, not TTL, and this is the point.** A drop, a boost, a merge or an equip lands whenever
+it lands: a TTL would either serve stale pools across one of those or expire while nothing moved.
+The fingerprint walk is the same traversal without the allocations, which is where the saving is.
+
+The cached pools and items are **shared, not copied** — every consumer treats them as immutable
+(nothing writes to a pool list or an `Item.Stats` after `BuildPools` returns). If you ever add a
+caller that mutates either, it must copy first, or it will corrupt every later `Optimize` in the
+same fingerprint window.
+
 - `OffhandPercent` — live `weapon2Factor() * 100`, cached 30 s (scoring reads it thousands of
   times per pass). 0 while the second weapon slot is locked.
 

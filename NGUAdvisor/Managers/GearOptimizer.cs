@@ -383,8 +383,9 @@ namespace NGUAdvisor.Managers
             // Callers that need NO pins (e.g. a live titan fight) must pass an empty list, not null.
             pinnedIds = pinnedIds ?? ActivePins();
 
-            var idToItem = new Dictionary<int, GearScorer.Item>();
-            var pools = BuildPools(idToItem, maxed);
+            var cached = CachedPools(maxed);
+            var idToItem = cached.IdToItem;
+            var pools = cached.Pools;
             var ic = Main.InventoryController;
             var cube = GameGearAdapter.BuildCubeItem();
             var baseItem = GameGearAdapter.BuildBaseItem();
@@ -841,6 +842,81 @@ namespace NGUAdvisor.Managers
             if (inv.accs != null) foreach (var a in inv.accs) Consider(a);
             if (inv.inventory != null) foreach (var e in inv.inventory) Consider(e);
             return best;
+        }
+
+        private sealed class PoolSet
+        {
+            public long Fingerprint = long.MinValue;
+            public Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>> Pools;
+            public Dictionary<int, GearScorer.Item> IdToItem;
+        }
+
+        // Two slots: the live valuation and the at-cap one (`maxed`), which score the same inventory
+        // differently and are asked for by different callers.
+        private static readonly PoolSet[] _poolSets = { new PoolSet(), new PoolSet() };
+
+        // BUILDING THE POOLS IS THE MOST REPEATED WORK IN THE ADVISOR. It walks the whole inventory and
+        // allocates a GearScorer.Item (with its stat dictionary) per id, and it used to run once per
+        // Optimize call: InventoryAdvisor.Compute alone issues 54 of those back to back, over an
+        // inventory that cannot change between them, and the HUD paths re-run it seconds later.
+        //
+        // The key is a FINGERPRINT of every field BuildPools and Outranks actually read, not a TTL. A
+        // drop, a boost, a merge or an equip lands whenever it lands: a TTL would either serve stale
+        // pools across one of those or expire uselessly while nothing moved. The fingerprint walk costs
+        // the same traversal without the allocations, which is where the saving is.
+        //
+        // The returned pools and items are treated as IMMUTABLE by every caller (nothing writes to a
+        // pool list or an Item's Stats after BuildPools returns), so they are shared, not copied.
+        private static PoolSet CachedPools(bool maxed)
+        {
+            var set = _poolSets[maxed ? 1 : 0];
+            long fingerprint = InventoryFingerprint();
+            if (set.Pools != null && set.Fingerprint == fingerprint)
+                return set;
+
+            var idToItem = new Dictionary<int, GearScorer.Item>();
+            set.Pools = BuildPools(idToItem, maxed);
+            set.IdToItem = idToItem;
+            set.Fingerprint = fingerprint;
+            return set;
+        }
+
+        // Covers what the pool build depends on: which copy wins (`level`, `removable` — Rank; the
+        // needed-boost tie-break is a function of the cur/cap pairs below) and how it scores (the raw
+        // stats, at both current and cap fill). Spec TYPES are omitted deliberately — they cannot change
+        // without the id changing.
+        private static long InventoryFingerprint()
+        {
+            var inv = Main.Character.inventory;
+            long h = 17;
+
+            void Mix(Equipment e)
+            {
+                if (e == null) { h = h * 31 + 1; return; }
+                h = h * 31 + e.id;
+                h = h * 31 + e.level;
+                h = h * 31 + (e.removable ? 1 : 0);
+                h = h * 31 + e.curAttack.GetHashCode();
+                h = h * 31 + e.curDefense.GetHashCode();
+                h = h * 31 + e.capAttack.GetHashCode();
+                h = h * 31 + e.capDefense.GetHashCode();
+                h = h * 31 + e.spec1Cur.GetHashCode();
+                h = h * 31 + e.spec2Cur.GetHashCode();
+                h = h * 31 + e.spec3Cur.GetHashCode();
+                h = h * 31 + e.spec1Cap.GetHashCode();
+                h = h * 31 + e.spec2Cap.GetHashCode();
+                h = h * 31 + e.spec3Cap.GetHashCode();
+            }
+
+            Mix(inv.weapon);
+            Mix(inv.weapon2);
+            Mix(inv.head); Mix(inv.chest); Mix(inv.legs); Mix(inv.boots);
+            if (inv.accs != null) foreach (var a in inv.accs) Mix(a);
+            if (inv.inventory != null) foreach (var e in inv.inventory) Mix(e);
+
+            // weapon2Unlocked gates whether the offhand is a pool candidate at all.
+            try { h = h * 31 + (Main.InventoryController.weapon2Unlocked() ? 1 : 0); } catch { }
+            return h;
         }
 
         private static Dictionary<part, List<KeyValuePair<int, GearScorer.Item>>> BuildPools(Dictionary<int, GearScorer.Item> idToItem, bool maxed)

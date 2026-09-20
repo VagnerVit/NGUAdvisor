@@ -43,10 +43,30 @@ advisor disagree, the fix is to share the manager's struct (as `MoneyPitManager.
   update only on page open / REFRESH STATE (documented expected behavior in README).
 - Overview scrolls VERTICALLY only — no horizontal scrolling anywhere.
 
+## `UpdateStatus` — ONE gate for the whole refresh pump (2026-09-20)
+
+`Main.Update()` calls `SettingsForm.UpdateStatus()` every frame, and it fans out to a dozen `Tick*`
+methods that each carry their own throttle (250 ms at the finest, seconds for most). Each of those
+took a `DateTime.UtcNow` just to discover it had nothing to do — a dozen per frame, sixty frames a
+second. A single 200 ms gate now sits at the top, on an **unchecked `Environment.TickCount`
+subtraction** so it survives the counter wrapping (hence `_lastPump` seeded one interval back rather
+than at a sentinel: a sentinel far from the clock reads as "just ran"). 200 ms is below the finest
+downstream throttle, so **nothing refreshes any slower than it did before** — keep it that way if
+you add a `Tick` that wants a finer cadence.
+
+`StatusPanel` repaints only when a cell actually changed: `Set` and `PaintAuto` raise `_dirty` and
+the one `Refresh()` consumes it. The cells hold a stage, a profile name and a rebirth clock, so the
+old unconditional `Refresh()` was painting identical pixels four times a second for minutes at a
+time. Any new writer of a chip must raise `_dirty` too, or its change will not appear until the
+next one that does.
+
 ## Layout
 
 `SettingsForm` owns the shell: primary rail → category strip → page host, plus the pinned
-`StatusPanel` (the eight status cells) and the activity ribbon. Retired pages are kept out of the
+`StatusPanel` (the eight status cells) and the activity ribbon. The rail's bottom label
+(`_railFoot`, repainted by `TickRail`) is the hotkey + version line, and a waiting release is
+announced there — someone already reads that line to answer "what am I running", so the update
+needs no popup of its own (UpdateChecker.md). Retired pages are kept out of the
 control collection deliberately (the tab strip is hidden but the collection stays clean).
 `BasicSettingsPanel` does not scroll itself — it is nested in a scrolling host and **grows to its
 content** (the one-scroll-owner-per-screen rule, same as `_xformPage` and `AdventurePanel`). So its

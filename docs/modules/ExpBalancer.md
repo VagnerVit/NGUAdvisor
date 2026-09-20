@@ -55,7 +55,7 @@ EXP purchase planner: walks purchased E/M power/cap/bars toward the guide's rati
 Each stat has a level `k = ExpSpent / TargetShare`; equal levels = perfect ratio. The old code
 anchored targets to the single HIGHEST level — a stat left ahead by an earlier ratio phase (the
 early 1:37.5k:1 pours EXP into CAP) demanded an astronomical catch-up lump you can't un-spend.
-`BuyTick(fraction)` instead **waterfills** a small budget across the lagging stats — raise the
+`BuyTick(fraction)` instead **waterfills** the budget across the lagging stats — raise the
 lowest levels to a common water line, never referencing the leader. Converges smoothly; once all
 levels are within band (`BalanceTolerance = 0.75` of the max) it degrades to proportional
 maintenance. `Analyze()` reports balance % (min/max level), which stats the next chunk feeds, and
@@ -65,7 +65,7 @@ the phase the targets came from.
 
 Two guards used to make a small EXP bank permanently unspendable, and they compounded:
 
-1. A flat `budget < 100 → skip`. At 959 banked EXP the 10% tick budget is 95, so it bought
+1. A flat `budget < 100 → skip`. At 959 banked EXP the then-10 % tick budget was 95, so it bought
    nothing — every minute, forever, while EXP trickled in at +144/hr. Nothing was spent, so the
    bank never grew past the floor either. The floor is now the **cheapest unit actually on offer**
    (`UnitCost`, mirroring `BuyStat`'s rounding: power/bars per-unit, cap 1 EXP / 3 for magic),
@@ -84,4 +84,6 @@ Two guards used to make a small EXP bank permanently unspendable, and they compo
   250s, `hardCap()` clamp. `WriteCustomPlan` mirrors the reachable deficits into the game's
   custom-purchase boxes so the game's own "Buy ALL Custom" button reflects the walk.
 
-Consumers: OptimizationAdvisor EXP row; AdvisorApply `exp` auto-toggle calls `BuyTick`.
+Consumers: OptimizationAdvisor EXP row; AdvisorApply `exp` auto-toggle calls `BuyTick(0.60)` once a
+minute — a big slice, since the waterfill never overshoots the ratio at any budget and banked EXP
+earns nothing; the remaining 40 % is a reserve for manual buys.

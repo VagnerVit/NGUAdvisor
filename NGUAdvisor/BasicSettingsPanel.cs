@@ -196,6 +196,7 @@ namespace NGUAdvisor
             int y4 = Build(x3, UiTheme.S(44), "MISC", new[]
             {
                 Mk("DisableOverlay", "Disable Overlay", () => Settings.DisableOverlay, v => Settings.DisableOverlay = v),
+                Mk("DisableUpdateCheck", "No Update Check", () => Settings.DisableUpdateCheck, v => Settings.DisableUpdateCheck = v),
                 // Wide Layout toggle retired: the M1 Control Room window has ONE designed size.
             });
             y4 = MkDouble(x3, y4 + UiTheme.S(2), "DiggerCap", "MISC", "Digger cap %", () => Settings.DiggerCap, v => Settings.DiggerCap = Math.Max(0, Math.Min(100, v)));

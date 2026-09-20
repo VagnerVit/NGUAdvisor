@@ -66,6 +66,18 @@ Copy the built `NGUAdvisor.r<timestamp>.dll` over `injector/NGUAdvisor.dll` in y
 folder, keeping the existing `smi.exe` and `SharpMonoInjector.dll`. Then run `Run NGU Advisor.bat`
 with NGU Idle open — it injects `NGUAdvisor.dll` directly (`NGUAdvisor.Loader.Init`).
 
+### Auto-update
+
+The launcher also writes its own folder into `%LocalLow%\NGUAdvisor\install.txt` and runs
+`injector\update.ps1 -Apply`, which installs a release found by an earlier background check. The
+mechanism is documented in `docs/modules/UpdateChecker.md`; it always exits 0, so it can never stop
+the game from getting its advisor.
+
+Two consequences for deploying by hand: a runnable folder that predates this needs
+`injector\update.ps1` and the regenerated `Run NGU Advisor.bat` copied in once (take both from
+`./package-release.sh --no-zip`), and **an update never replaces `Run NGU Advisor.bat`** — `cmd.exe`
+reads a batch file as it executes it, so a launcher change means re-downloading the zip.
+
 ### `package-release.sh` (maintainer machine)
 
 ```

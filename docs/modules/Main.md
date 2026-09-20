@@ -19,6 +19,10 @@ killed a live game on 2026-08-13:
 is no variant of it that works — see the `deploying-advisor` skill. The same reasoning applies to any
 future external entry point: an outside caller may leave a request, never touch Unity state.
 
+The same once-a-second budget also carries `StateExport.Requested()`,
+`GearOptimizerDiagnostic.Requested()` and `UpdateChecker.Tick()` — all of them one cheap file probe,
+all of them the file-handshake shape rather than a call into the advisor (UpdateChecker.md).
+
 ## Cached statics — the documented invariant
 
 `Main.Character` and `Main.InventoryController` are `static readonly`, resolved once. NGU keeps ONE
@@ -34,10 +38,13 @@ lookups.**
 1. AppData dir `%userprofile%/AppData/LocalLow/NGUAdvisor` (+ `logs`, `profiles`).
 2. **One-time migration from `LocalLow\NGUInjector`** — merged PER ENTRY, not gated on the new
    folder being absent (the launcher may already have created it holding `injector-path.txt`).
-3. Log writers, all `AutoFlush`. `pitspin.log` and `cards.log` open in APPEND mode (not
-   overwritten across sessions); the rest truncate. A `debug.log writer alive (vX build Y)` probe
-   line is written immediately — if debug.log is empty even of that, the writer itself is broken and
-   every "Advisor … failed" message has been invisible.
+3. Log writers, all `AutoFlush`. `pitspin.log`, `advisor.log`, `yggdrasil.log` and `cards.log` open
+   in APPEND mode (not overwritten across sessions) through `AppendWriter`, which **rotates at 5 MB**
+   — one generation (`<name>.log.1`), replaced each time. Those four are the only things in the
+   advisor that grow without a ceiling; reading them was already bounded (`LogTail` seeks a window
+   from EOF), the file itself was not. The rest truncate. A `debug.log writer alive (vX build Y)`
+   probe line is written immediately — if debug.log is empty even of that, the writer itself is
+   broken and every "Advisor … failed" message has been invisible.
 4. `PresetInstaller.InstallMissing` before profiles are listed; legacy `allocation.json` →
    `profiles/default.json`.
 5. Settings load (falling back to defaults via `MassUpdate`), SettingsForm, allocation load,
@@ -80,7 +87,10 @@ progression-related must use `ZoneHelpers.CurrentHighestBoss` instead.
 - Log channels: `Log`/`LogLoot`/`LogCombat`/`LogPitSpin`/`LogCard`/`LogDebug`, each stamped with
   date + rebirth seconds. `LootFeed` is an in-memory newest-first ring (400) mirroring loot.log.
 - `Version` (hand-bumped SemVer) + `BuildTag` (parsed from the assembly name
-  `NGUAdvisor.r<yyMMddHHmmss>` → `yyMMdd-HHmm`).
+  `NGUAdvisor.r<yyMMddHHmmss>` → `yyMMdd-HHmm`). **`Version` is the ONLY trustworthy version in the
+  build** — the `AssemblyInfo.cs` attributes drifted to 1.2.2 and the assembly name is a build stamp,
+  not a version — so `Loader`'s `injected.txt` marker carries it as `version=` for the updater to
+  read when no advisor is running (UpdateChecker.md).
 - **Hotkeys** — F1 window, F2 pause, F3 quicksave, F5 dump gear, F7 quickload, F8 quick swap,
   F9 profile editor, F10 gear diagnostic; F11 is a reserved test stub. Plus the in-game overlay
   (`OnGUI`, `RefreshOverlayText`).

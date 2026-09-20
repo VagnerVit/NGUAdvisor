@@ -105,6 +105,10 @@ namespace NGUAdvisor
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(path, string.Join(Environment.NewLine, new[]
                 {
+                    // The advisor is the only trustworthy source of its own SemVer — the assembly
+                    // attributes drifted and the assembly name carries a build stamp, not a version —
+                    // so the updater reads this line when no advisor is running to ask.
+                    "version=" + Main.Version,
                     "build=" + Main.BuildTag,
                     "pid=" + System.Diagnostics.Process.GetCurrentProcess().Id,
                     "injectedUtc=" + DateTime.UtcNow.ToString("o"),

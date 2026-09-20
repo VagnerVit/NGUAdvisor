@@ -135,6 +135,12 @@ namespace NGUAdvisor
         private Panel _rail;
         private Panel _canvasHost;
         private Button _railMaster;
+        private Label _railFoot;
+
+        private const int PumpMs = 200;
+        // Seeded one interval back, not at a sentinel: the gate is an unchecked tick SUBTRACTION (so it
+        // survives TickCount wrapping), and a sentinel far from the clock reads as "just ran".
+        private int _lastPump = unchecked(Environment.TickCount - PumpMs);
         private readonly System.Collections.Generic.Dictionary<string, ScrollPanel> _sections
             = new System.Collections.Generic.Dictionary<string, ScrollPanel>();
         private class RailChild { public string Name; public Panel Row; public Panel Dot; public Label Lbl; }
@@ -1035,17 +1041,17 @@ namespace NGUAdvisor
             }
             ReflowRail();
 
-            var foot = new Label
+            _railFoot = new Label
             {
                 Dock = DockStyle.Bottom,
                 Height = UiTheme.S(60),
                 Font = UiTheme.Chip,
                 ForeColor = UiTheme.Faint,
                 BackColor = UiTheme.Ground,
-                Text = $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}",
+                Text = RailFootText(),
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter
             };
-            _rail.Controls.Add(foot);
+            _rail.Controls.Add(_railFoot);
             TickRail();
         }
 
@@ -1067,6 +1073,13 @@ namespace NGUAdvisor
         };
 
         // Master button reflects the global kill-switch (F1 flips it too — same setting).
+        // The version line is where someone already looks to answer "what am I running", so a waiting
+        // release is announced there rather than in a popup the advisor has no business showing.
+        private static string RailFootText() =>
+            Managers.UpdateChecker.Available
+                ? $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}\nv{Managers.UpdateChecker.LatestVersion} READY — RELAUNCH"
+                : $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}";
+
         private void TickRail()
         {
             try
@@ -1075,6 +1088,16 @@ namespace NGUAdvisor
                 bool on = Settings?.GlobalEnabled ?? false;
                 _railMaster.Text = on ? "ADVISOR ACTIVE" : "ADVISOR PAUSED";
                 UiTheme.ApplyState(_railMaster, on ? UiTheme.Cap : UiTheme.Danger, System.Drawing.Color.White);
+
+                if (_railFoot != null)
+                {
+                    var foot = RailFootText();
+                    if (_railFoot.Text != foot)
+                    {
+                        _railFoot.Text = foot;
+                        _railFoot.ForeColor = Managers.UpdateChecker.Available ? UiTheme.Cap : UiTheme.Faint;
+                    }
+                }
             }
             catch { }
         }
@@ -1825,6 +1848,14 @@ namespace NGUAdvisor
         {
             if (!Visible || WindowState == FormWindowState.Minimized)
                 return;
+
+            // ONE gate for the whole pump. Every Tick below carries its own throttle (250 ms at the
+            // finest, seconds for most), and each of them took a DateTime.UtcNow just to discover it
+            // had nothing to do — a dozen of those per frame, sixty frames a second. 200 ms sits under
+            // the finest of those throttles, so nothing refreshes any slower than it did before.
+            if (unchecked(Environment.TickCount - _lastPump) < PumpMs)
+                return;
+            _lastPump = Environment.TickCount;
 
             // Ages out temporary outcomes with no user interaction (nothing here schedules — this tick
             // already exists). Cheap by construction: Sync returns after two comparisons when the painted

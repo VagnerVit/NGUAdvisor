@@ -155,6 +155,30 @@ namespace NGUAdvisor
 
         public static SavedSettings Settings;
 
+        // The four APPEND logs (pitspin, advisor, yggdrasil, cards) deliberately outlive a session — that
+        // is the whole point of them, and LogTail reads a bounded window from the end so reading them
+        // stays cheap however long they get. Nothing ever bounded the FILE, though, and these are the
+        // only things in the advisor that grow without a ceiling. One generation is kept: the reason to
+        // open an old one is "what happened in the last few sessions", never "what happened in March".
+        private const long LogRotateBytes = 5 * 1024 * 1024;
+
+        private static StreamWriter AppendWriter(string logDir, string name)
+        {
+            var path = Path.Combine(logDir, name);
+            try
+            {
+                var info = new FileInfo(path);
+                if (info.Exists && info.Length >= LogRotateBytes)
+                {
+                    var previous = path + ".1";
+                    if (File.Exists(previous)) File.Delete(previous);
+                    File.Move(path, previous);
+                }
+            }
+            catch { /* best-effort: a log we cannot rotate is still a log we must be able to write */ }
+            return new StreamWriter(path, true) { AutoFlush = true };
+        }
+
         private static void WriterLog(StreamWriter writer, string msg)
         {
             var formattedDate = $"{DateTime.Now.ToShortDateString()}-{DateTime.Now.ToShortTimeString()} ({Math.Floor(Character.rebirthTime.totalseconds)}s)";
@@ -312,10 +336,10 @@ namespace NGUAdvisor
                 OutputWriter = new StreamWriter(Path.Combine(logDir, "inject.log")) { AutoFlush = true };
                 LootWriter = new StreamWriter(Path.Combine(logDir, "loot.log")) { AutoFlush = true };
                 CombatWriter = new StreamWriter(Path.Combine(logDir, "combat.log")) { AutoFlush = true };
-                PitSpinWriter = new StreamWriter(Path.Combine(logDir, "pitspin.log"), true) { AutoFlush = true };
-                AdvisorWriter = new StreamWriter(Path.Combine(logDir, "advisor.log"), true) { AutoFlush = true };
-                YggdrasilWriter = new StreamWriter(Path.Combine(logDir, "yggdrasil.log"), true) { AutoFlush = true };
-                CardsWriter = new StreamWriter(Path.Combine(logDir, "cards.log"), true) { AutoFlush = true };
+                PitSpinWriter = AppendWriter(logDir, "pitspin.log");
+                AdvisorWriter = AppendWriter(logDir, "advisor.log");
+                YggdrasilWriter = AppendWriter(logDir, "yggdrasil.log");
+                CardsWriter = AppendWriter(logDir, "cards.log");
                 DebugWriter = new StreamWriter(Path.Combine(logDir, "debug.log")) { AutoFlush = true };
                 // Health probe: if debug.log stays empty even of this line, the writer itself is broken
                 // and every "Advisor ... failed" message has been invisible.
@@ -504,6 +528,9 @@ namespace NGUAdvisor
                     Log("Gear diagnostic requested from disk");
                     _gearDiagnosticPending = true;
                 }
+                // Release check, in this same budget for the same reason: it is one File.GetLastWriteTime
+                // on a file an external script writes. The six-hour network spawn is throttled inside.
+                Managers.UpdateChecker.Tick();
             }
 
             // Drain deferred file-watcher work on the main thread (see the watcher handlers). Doing this

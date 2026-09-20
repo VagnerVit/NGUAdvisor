@@ -55,6 +55,9 @@ namespace NGUAdvisor
         // Wrap-safe throttle. (Environment.TickCount goes NEGATIVE after ~24.9 days uptime, which made the
         // old `TickCount - last < 250` check true forever => the strip never updated. Root cause of the saga.)
         private DateTime _lastContent = DateTime.MinValue;
+
+        // Set by every writer that actually changed a pixel; consumed by the one Refresh below.
+        private bool _dirty = true;
         // Last width at which UiLayout.Audit ACTUALLY ran. Recorded only after a successful audit, so a
         // pre-handle DoLayout at the (fixed) form width can never suppress the real, handle-backed audit.
         private int _auditedW = -1;
@@ -128,10 +131,10 @@ namespace NGUAdvisor
         private void PaintAuto(bool on)
         {
             var col = on ? UiTheme.Cap : UiTheme.Danger;
-            if (_autoLight.BackColor != col) _autoLight.BackColor = col;
+            if (_autoLight.BackColor != col) { _autoLight.BackColor = col; _dirty = true; }
             string t = on ? "ON" : "OFF";
-            if (_autoState.Text != t) _autoState.Text = t;
-            if (_autoState.ForeColor != col) _autoState.ForeColor = col;
+            if (_autoState.Text != t) { _autoState.Text = t; _dirty = true; }
+            if (_autoState.ForeColor != col) { _autoState.ForeColor = col; _dirty = true; }
         }
 
         private static Label MakeCaption(string text) => new Label
@@ -245,7 +248,15 @@ namespace NGUAdvisor
                 Set("RESOURCES", Resources(c), UiTheme.Ink);
                 Set("NEXT GOAL", prog.Known ? Capitalize(prog.NextGoal) : "-", UiTheme.Ink);
 
-                Refresh(); // force a synchronous repaint (label Text changes don't always repaint on their own)
+                // Synchronous repaint, because label Text changes don't always repaint on their own —
+                // but ONLY when something above actually changed. The cells hold a stage, a profile
+                // name and a rebirth clock: four unconditional full-panel repaints a second were
+                // painting the same pixels for minutes at a time.
+                if (_dirty)
+                {
+                    _dirty = false;
+                    Refresh();
+                }
             }
             catch (Exception e) { LogDebug($"StatusPanel update failed: {e.Message}"); }
         }
@@ -260,8 +271,9 @@ namespace NGUAdvisor
                 ch.Full = value;
                 _tips.SetToolTip(ch.Val, value);
                 ApplyFit(ch);
+                _dirty = true;
             }
-            if (ch.Val.ForeColor != color) ch.Val.ForeColor = color;
+            if (ch.Val.ForeColor != color) { ch.Val.ForeColor = color; _dirty = true; }
         }
 
         private static string RebirthElapsed(Character c)

@@ -102,12 +102,20 @@ rm -rf "$STAGE"
 if [ "$DO_ZIP" = 1 ]; then rm -f "$ZIP"; fi
 mkdir -p "$STAGE/injector"
 
-# single direct-inject launcher (CRLF line endings for cmd.exe)
-printf '@setlocal enableextensions\r\npushd "%%~dp0"\r\n\r\n.\\injector\\smi.exe inject -p NGUIdle -a .\\injector\\NGUAdvisor.dll -n NGUAdvisor -c Loader -m Init\r\n\r\npopd\r\n' \
+# Single direct-inject launcher (CRLF line endings for cmd.exe). Two things happen before the
+# inject, both of which only the launcher can do:
+#   install.txt  the advisor is loaded from BYTES, so Assembly.Location is empty and it cannot
+#                learn where this folder is. Managers/UpdateChecker.cs reads this to find update.ps1.
+#   update.ps1   applies a release downloaded by an earlier check, so it lands on the DLL that is
+#                about to be injected. It always exits 0 — an update problem never blocks the game.
+printf '@setlocal enableextensions\r\npushd "%%~dp0"\r\n\r\nset "ADVISORDATA=%%userprofile%%\\AppData\\LocalLow\\NGUAdvisor"\r\nif not exist "%%ADVISORDATA%%" mkdir "%%ADVISORDATA%%"\r\n>"%%ADVISORDATA%%\\install.txt" echo %%~dp0\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\injector\\update.ps1" -Apply\r\n\r\n.\\injector\\smi.exe inject -p NGUIdle -a .\\injector\\NGUAdvisor.dll -n NGUAdvisor -c Loader -m Init\r\n\r\npopd\r\n' \
   > "$STAGE/Run NGU Advisor.bat"
 
 cp "$DLL" "$STAGE/injector/NGUAdvisor.dll"
 cp "$TOOLS/SharpMonoInjector.dll" "$TOOLS/smi.exe" "$STAGE/injector/"
+# The updater ships next to the DLL it replaces, so it needs no configuration: $PSScriptRoot IS
+# the injector folder. Versioned here rather than downloaded, so a release can always be fixed.
+cp "$ROOT/build/update.ps1" "$STAGE/injector/update.ps1"
 cp -r "$PROFILES" "$STAGE/sampleprofiles"
 
 # --- guard: never ship the bootstrap, game assemblies, or backups ------------

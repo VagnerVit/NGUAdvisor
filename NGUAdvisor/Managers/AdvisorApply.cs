@@ -1091,16 +1091,20 @@ namespace NGUAdvisor.Managers
                     + $" boostDemand={routedForBoosts} gearfarm={gearFarmWhy}");
         }
 
-        // EXP balancing (guide ratios): one walk step per minute, waterfilling up to 10% of banked EXP
-        // across the lagging stats — raises the lowest levels first, converging on the ratio in gentle
-        // chunks, then maintains it with proportional buys.
+        // EXP balancing (guide ratios): one walk step per minute, waterfilling most of the bank across
+        // the lagging stats — raises the lowest levels first, then maintains the ratio with
+        // proportional buys. The budget is large because waiting has no upside (a purchase is an
+        // instant, permanent stat) and the waterfill never overshoots the ratio however large the
+        // budget is: it only ever pours up to a common water line. The old 10% budget left EXP idling
+        // ~10 minutes on average (steady-state bank = 10x the minute income) for no gain; the
+        // remaining 40% is a deliberate reserve for buying something by hand.
         private static DateTime _lastExpBuy = DateTime.MinValue;
 
         private static void ApplyExpBuys()
         {
             if ((DateTime.UtcNow - _lastExpBuy).TotalSeconds < 60) return;
             _lastExpBuy = DateTime.UtcNow;
-            var what = ExpBalancer.BuyTick(0.10);
+            var what = ExpBalancer.BuyTick(0.60);
             if (what != null)
                 Main.Log($"Advisor: bought {what}");
         }

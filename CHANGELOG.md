@@ -4,6 +4,26 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **The advisor now notices its own releases.** It asks GitHub for the latest version every few
+  hours and, when there is a newer one, says so on the version line in the rail. The launcher
+  installs it just before it injects, so the update is live the next time you start the game. The
+  check runs entirely outside the game process — the game's Mono runtime never touches the network —
+  and any failure leaves the installed build exactly where it was. MISC › **No Update Check** turns
+  it off.
+
+### Changed
+
+- **The advisor does less work for the same answers.** The gear optimizer used to rebuild its
+  candidate pools from the whole inventory on every single run — the keep/trash sweep alone did that
+  54 times in a row over an inventory that had not moved. The pools are now kept until the inventory
+  actually changes. The settings window repaints its status cells only when one of them says
+  something new, and its refresh pump wakes five times a second instead of sixty; nothing on screen
+  updates any slower than before.
+- The four logs that carry over between sessions (pit spins, advisor, Yggdrasil, cards) now roll
+  over at 5 MB and keep one previous generation, instead of growing forever.
+
 ## [1.6.5] - 2026-09-17
 
 ### Fixed
