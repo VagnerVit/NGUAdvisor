@@ -239,6 +239,53 @@ same fingerprint window.
 - `OffhandPercent` — live `weapon2Factor() * 100`, cached 30 s (scoring reads it thousands of
   times per pass). 0 while the second weapon slot is locked.
 
+## Drop Chance gives back the slots it no longer needs (2026-09-20)
+
+`Optimize(chain, …)` is a thin wrapper: `TrimSaturatedDropChance` first, `OptimizeCore` (the search
+proper) underneath. The trim exists because a zone's boost rolls are `Mathf.Min(chance × dcFactor,
+cap)` — past the saturation factor, more drop chance buys **nothing there**, and every accessory the
+chain still spends on it is one the next priority (NGUs, on the farm sets) would have used.
+
+`BoostFarmAdvisor.GearLootFor(zone)` owns the number. Game truth (decompiled `Character.lootFactor`):
+every drop-chance source multiplies, and gear is ONE factor — `(1 + bonuses[Looting] +
+bonuses[Looting2] + cubeLootBonus())`. `GearScorer` reproduces that term exactly (single base-100
+stat, `ScoreVals` divides by 100), so **the Drop Chance objective's score IS the game's gear factor**.
+That equivalence is what lets the advisor ask "would four slots still cap it?" without re-deriving
+drop chance. Rooted zones compare against `lootFactor^(1/3)`, so their `NeedFactor` is cubed back
+into the raw domain first — comparing a rooted need against an unrooted supply would ask for a gear
+factor hundreds of times too small.
+
+The search is sequential, so the only honest way to price a budget is to run it: the trim runs the
+chain, and if the result caps the zone it walks the Drop Chance budget down one slot at a time until
+the set stops capping, keeping the last one that did. With `CachedPools` in place those extra passes
+cost the search and nothing else.
+
+### Rules that keep it honest
+
+- **It only ever takes slots away.** Giving Drop Chance *more* than the chain asked for would
+  overrule the profile that wrote it.
+- **Drop Chance only.** The other loot stats have no saturation table, and inventing one would be the
+  made-up constant this codebase keeps refusing.
+- **It returns `null` only when it ran nothing.** Every path that already optimized returns that
+  result, so a chain carrying Drop Chance is never optimized twice for the same answer.
+- The budget it counts is the accessories the run actually **placed**, which is what turns
+  `Unlimited` into a real number.
+
+### Where it actually fires (measured 2026-09-20, non-gear factor 70.2)
+
+| Zone | Gear factor needed to cap | Trim fires? |
+|---|---|---|
+| 0–13 | 0.03×–0.19× | always — capped with no DC accessory at all |
+| 15 | 1.02× | always |
+| 17 | 2.85× | yes, at the worn 3.1× |
+| 18 Boring-Ass Earth | **23.74×** | no — the best pure-DC loadout reaches ~7.2× |
+| 20+ (rooted) | need³ | no, by orders of magnitude |
+
+So on the low zones the farm chains hand every accessory to NGUs, and in Boring-Ass Earth drop
+chance is never wasted — it is still earning linearly and keeps every slot the chain gives it. **The
+DC digger cannot close that gap either**: it is one more factor in the same product, and the levels
+left in it are worth a few percent, not the 7.65× the zone is short.
+
 ## Known gaps vs. reference
 
 No hard caps, no negative-exponent objectives, no per-item disable flag, no alternatives detection —

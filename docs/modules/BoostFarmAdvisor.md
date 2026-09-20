@@ -122,3 +122,17 @@ is the high one worth counting toward a max.
 Advisor priorities list (`Verdict.Text`). `BestZone == -1000` means ITOPOD. `DropHere` feeds the
 AdventurePanel ZONES and ITOPOD pages — deliberately NOT the Boosts panel's transform strip: the
 answer changes with the zone, and the transform type is only what the drop is rerolled into.
+
+## `GearLootFor(zone)` — the gear half of the saturation question
+
+`DcFor` answers "does drop chance still pay here" from the LIVE total. `GearLootFor` answers the
+question the gear optimizer needs: **how much of that saturation point must the accessories carry.**
+
+`Character.lootFactor` (decompiled) multiplies every source, and gear is one factor —
+`(1 + bonuses[Looting] + bonuses[Looting2] + cubeLootBonus())`. The "Drop Chance" objective's score
+is that same term (single base-100 stat, `ScoreVals` divides by 100), so
+`nonGear = lootFactor / gearScore` and `Target = neededLootFactor / nonGear`. Rooted zones cube
+their `NeedFactor` back into the raw domain first.
+
+Consumer: `GearOptimizer.TrimSaturatedDropChance` (GearOptimizer.md has the measured per-zone table
+and the rules the trim follows).

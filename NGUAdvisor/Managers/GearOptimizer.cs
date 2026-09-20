@@ -187,6 +187,34 @@ namespace NGUAdvisor.Managers
                 LoadoutManager.ChangeGear(ids);
         }
 
+        // Score a loadout the optimizer PROPOSED under some OTHER objective than the one it was built
+        // for — "this chain leads on NGUs, how much Drop Chance does the set it picked actually carry?".
+        // Scored through the same pools the search used, so it is the same quantity as Result.Score, not
+        // a second opinion computed a different way.
+        public static double ScoreOf(Result r, GearObjectives.Objective obj, bool maxed = false)
+        {
+            try
+            {
+                if (r == null || obj == null) return 0;
+                var idToItem = CachedPools(maxed).IdToItem;
+                var list = new List<GearScorer.Item>(16);
+                // The weapons lead: GetRawVals discounts the SECOND weapon it sees by the offhand
+                // factor, so main hand before off hand is not cosmetic ordering.
+                void Add(int id)
+                {
+                    if (id != 0 && idToItem.TryGetValue(id, out var it)) list.Add(it);
+                }
+                Add(r.MainWeapon);
+                Add(r.OffWeapon);
+                Add(r.Head); Add(r.Chest); Add(r.Legs); Add(r.Boots);
+                foreach (int a in r.Accessories) Add(a);
+                list.Add(GameGearAdapter.BuildCubeItem());
+                list.Add(GameGearAdapter.BuildBaseItem());
+                return GearScorer.ScoreRaw(list, obj.Stats, obj.Exponents, Offhand);
+            }
+            catch (Exception e) { Main.LogDebug($"ScoreOf failed: {e.Message}"); return 0; }
+        }
+
         // Score the CURRENTLY-equipped loadout for an objective (same scoring the optimizer uses), so callers
         // can compare "how good is my gear now" vs Optimize().Score. Read-only; main thread. 0 on failure.
         //
@@ -378,6 +406,117 @@ namespace NGUAdvisor.Managers
         // inside a single priority -- is what produces mixed accessory sets.
         public static Result Optimize(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
                                       bool forceTopRespawn = false, bool maxed = false)
+        {
+            // null means the trim did not apply and ran NOTHING — only then is a plain run needed. A
+            // trim that did run returns its own result, so a chain carrying Drop Chance is never
+            // optimized twice for the same answer.
+            return TrimSaturatedDropChance(chain, pinnedIds, forceTopRespawn, maxed)
+                ?? OptimizeCore(chain, pinnedIds, forceTopRespawn, maxed);
+        }
+
+        // HAND BACK THE ACCESSORY SLOTS DROP CHANCE NO LONGER NEEDS.
+        //
+        // A zone's boost rolls are `Mathf.Min(chance * dcFactor, cap)`, so past the saturation factor
+        // more drop chance buys NOTHING there — `BoostFarmAdvisor.GearLootFor` owns that number and
+        // converts it into the gear factor the loadout has to carry. Every slot a chain spends on Drop
+        // Chance ABOVE it is a slot the next priority (NGUs, on the farm sets) would have used.
+        //
+        // The search runs sequentially, so the only honest way to ask "would four slots still cap it?"
+        // is to run the chain and score the answer. That is why this lives above OptimizeCore and calls
+        // it in a loop: with the inventory pools cached (CachedPools), the extra passes cost the search
+        // and nothing else.
+        //
+        // IT ONLY EVER TAKES SLOTS AWAY. Handing Drop Chance MORE than the chain asked for would
+        // overrule the profile that wrote it, and a profile under the saturation point has usually
+        // chosen to sit there.
+        //
+        // Returns null ONLY when it has run nothing at all, so the caller knows it still owes a plain
+        // run; every path that has already optimized returns that result rather than making the caller
+        // redo it.
+        private static Result TrimSaturatedDropChance(
+            IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds, bool forceTopRespawn, bool maxed)
+        {
+            try
+            {
+                if (chain == null || chain.Count < 2) return null;
+
+                int step = -1;
+                for (int i = 0; i < chain.Count; i++)
+                    if (chain[i]?.Objective != null &&
+                        string.Equals(chain[i].Objective.Name, GearObjectives.Stat.DropChance, StringComparison.OrdinalIgnoreCase))
+                    {
+                        step = i;
+                        break;
+                    }
+                // Only Drop Chance: the other loot stats have no saturation table, and guessing one
+                // would be the made-up constant this codebase keeps refusing to invent.
+                if (step < 0) return null;
+
+                var need = BoostFarmAdvisor.GearLootFor(FarmZone());
+                if (!need.Known || need.Target <= 0) return null;
+
+                var dropChance = chain[step].Objective;
+                var atFullBudget = OptimizeCore(chain, pinnedIds, forceTopRespawn, maxed);
+                if (ScoreOf(atFullBudget, dropChance, maxed) < need.Target)
+                    return atFullBudget;   // below saturation: every slot it holds is still earning
+
+                // Walk the budget down while the set still caps the zone. Counting the accessories the
+                // run actually placed (not the declared budget) is what makes `Unlimited` a real number.
+                Result best = null;
+                IReadOnlyList<GearPriority> bestChain = null;
+                for (int slots = atFullBudget.Accessories.Count - 1; slots >= 0; slots--)
+                {
+                    var candidate = WithBudget(chain, step, slots);
+                    var run = OptimizeCore(candidate, pinnedIds, forceTopRespawn, maxed);
+                    if (ScoreOf(run, dropChance, maxed) < need.Target)
+                        break;
+                    best = run;
+                    bestChain = candidate;
+                }
+
+                if (best == null) return atFullBudget;
+                LogTrim(chain, bestChain, step, need);
+                return best;
+            }
+            catch (Exception e) { Main.LogDebug($"TrimSaturatedDropChance failed: {e.Message}"); return null; }
+        }
+
+        // The zone whose rolls the drop chance is being spent on. Same read the digger venue law and the
+        // state export use, so all three agree on WHERE the farming happens.
+        private static int FarmZone() => Main.Settings != null ? Main.Settings.SnipeZone : 1000;
+
+        private static IReadOnlyList<GearPriority> WithBudget(IReadOnlyList<GearPriority> chain, int step, int slots)
+        {
+            var copy = new List<GearPriority>(chain.Count);
+            for (int i = 0; i < chain.Count; i++)
+                copy.Add(i != step
+                    ? chain[i]
+                    : new GearPriority
+                    {
+                        Objective = chain[i].Objective,
+                        MaxAccessorySlots = slots,
+                        PinTopPowerWeapon = chain[i].PinTopPowerWeapon,
+                    });
+            return copy;
+        }
+
+        private static string _lastTrimDbg;
+
+        private static void LogTrim(IReadOnlyList<GearPriority> from, IReadOnlyList<GearPriority> to, int step,
+                                    BoostFarmAdvisor.GearLootNeed need)
+        {
+            // Silent while the answer holds: this runs on every gear pass and the interesting event is
+            // the CHANGE, same rule as [SpendDbg] and [ZoneDbg].
+            string line = $"[GearDcDbg] zone={FarmZone()} gear={need.Current:0.###} target={need.Target:0.###}"
+                        + $" slots {from[step].MaxAccessorySlots} -> {to[step].MaxAccessorySlots}"
+                        + $" chain='{GearChain.Describe(to)}'";
+            if (line == _lastTrimDbg) return;
+            _lastTrimDbg = line;
+            Main.LogDebug(line);
+        }
+
+        private static Result OptimizeCore(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
+                                           bool forceTopRespawn = false, bool maxed = false)
         {
             // null means "caller didn't specify" -> fall back to the global pinned-items setting.
             // Callers that need NO pins (e.g. a live titan fight) must pass an empty list, not null.

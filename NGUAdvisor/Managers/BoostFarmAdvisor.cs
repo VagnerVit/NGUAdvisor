@@ -411,6 +411,62 @@ namespace NGUAdvisor.Managers
             return h;
         }
 
+        // HOW MUCH OF THE SATURATION POINT THE GEAR HAS TO CARRY.
+        //
+        // Game truth (decompiled `Character.lootFactor`): every drop-chance source multiplies, and the
+        // gear's whole contribution is ONE of those factors —
+        // `(1 + bonuses[Looting] + bonuses[Looting2] + cubeLootBonus())`. `GearScorer` reproduces exactly
+        // that term: the "Drop Chance" objective is a single base-100 stat and `ScoreVals` divides by
+        // 100, so its score IS the game's gear factor. That equivalence is the whole reason this can
+        // answer "would the zone still cap without those accessories" without re-deriving drop chance.
+        //
+        // So: `lootFactor = nonGear × gear`, and the gear factor the zone needs is
+        // `neededLootFactor / (liveLootFactor / liveGearFactor)`. Rooted zones compare against
+        // `lootFactor^(1/3)` (DcFor roots HaveFactor), so their NeedFactor is CUBED back into the raw
+        // lootFactor domain first — comparing a rooted need against an unrooted supply would demand a
+        // gear factor hundreds of times too small.
+        public struct GearLootNeed
+        {
+            public bool Known;
+            public double Target;    // gear factor at which every roll in the zone caps
+            public double Current;   // what the worn gear supplies right now
+        }
+
+        public static GearLootNeed GearLootFor(int zone)
+        {
+            var need = new GearLootNeed();
+            try
+            {
+                var c = Main.Character;
+                if (c == null) return need;
+
+                ZoneBoost z = null;
+                foreach (ZoneBoost row in Table)
+                    if (row.Zone == zone) { z = row; break; }
+                if (z == null) return need;
+
+                var headroom = DcFor(zone);
+                if (!headroom.Known || headroom.NeedFactor <= 0) return need;
+
+                var dropChance = GearOptimizer.FindObjective(GearObjectives.Stat.DropChance);
+                if (dropChance == null) return need;
+
+                double gearNow = GearOptimizer.CurrentScore(dropChance);
+                double live = c.lootFactor();
+                if (gearNow <= 0 || live <= 0) return need;
+
+                double nonGear = live / gearNow;
+                if (nonGear <= 0) return need;
+
+                double neededLoot = z.Rooted ? Math.Pow(headroom.NeedFactor, 3.0) : headroom.NeedFactor;
+                need.Target = neededLoot / nonGear;
+                need.Current = gearNow;
+                need.Known = true;
+            }
+            catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor.GearLootFor({zone}): {e.Message}"); }
+            return need;
+        }
+
         public static string ModeName(int mode)
         {
             switch (mode)

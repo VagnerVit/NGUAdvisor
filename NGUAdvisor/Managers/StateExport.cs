@@ -188,9 +188,17 @@ namespace NGUAdvisor.Managers
                 var h = BoostFarmAdvisor.DcFor(zone);
                 if (!h.Known) return "";
                 string where = $" in {(ZoneHelpers.ZoneList.TryGetValue(zone, out var n) ? n : $"zone {zone}")}";
+                // The gear half of the same comparison: what the worn accessories supply against what
+                // they would have to supply for the zone to cap. This is the number the optimizer's
+                // Drop Chance trim acts on, so it belongs next to the headroom it comes from.
+                string gear = "";
+                var g = BoostFarmAdvisor.GearLootFor(zone);
+                if (g.Known)
+                    gear = $" · gear {g.Current:0.##}x of {g.Target:0.##}x needed";
+
                 return h.Saturated
-                    ? $" · boost rolls CAPPED{where} (needs {h.NeedFactor * 100:#,0}%)"
-                    : $" · {h.HaveFactor * 100:#,0}% of {h.NeedFactor * 100:#,0}% to cap the boost rolls{where}";
+                    ? $" · boost rolls CAPPED{where} (needs {h.NeedFactor * 100:#,0}%){gear}"
+                    : $" · {h.HaveFactor * 100:#,0}% of {h.NeedFactor * 100:#,0}% to cap the boost rolls{where}{gear}";
             }
             catch { return ""; }
         }
