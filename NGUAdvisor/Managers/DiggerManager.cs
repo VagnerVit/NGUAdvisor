@@ -235,17 +235,8 @@ namespace NGUAdvisor.Managers
             if (!ignoreCap)
                 gps *= Settings.DiggerCap / 100.0;
 
-            // Greedy allocation in PRIORITY order (matches the game's own auto-level: each digger sized
-            // against the gold actually AVAILABLE, not an even gps/count share). The old even split
-            // collapsed every digger to level 1 on Evil, where per-level drains dwarf gross/count (user-
-            // caught: 6-9 diggers all stuck at level 1 with 9e21 gross). Reset to the level-1 baseline, then
-            // level high-priority diggers first against (gps - everyone else's current drain); each digger's
-            // resulting drain <= its budget, so the running total can never exceed gps.
             var ordered = ActiveDiggers?.OrderFrom(priorityOrder).ToArray() ?? new int[0];
-            foreach (var d in ordered)
-                Diggers[d].curLevel = 1;
-            foreach (var d in ordered)
-                SetLevelMaxAffordable(d, gps - (_character.totalGPSDrain() - _dc.drain(d, 0, true)));
+            LevelWithinBudget(ordered, gps);
 
             UpgradeCheapestDigger();
             _dc.refreshMenu();
@@ -253,8 +244,99 @@ namespace NGUAdvisor.Managers
             LogRecap(ordered, gps);
         }
 
-        // Post-recap diagnostic (validation aid). Dumps the greedy PRIORITY ORDER and the resulting
-        // running level + drain per active digger, so the ordering can be confirmed live from inject.log.
+        // BUY THE CHEAPEST NEXT LEVEL, over and over, until nothing else fits in the budget.
+        //
+        // A digger's drain is `base * growth^(level-1)` with growth around 1.5-1.75, so the last level of
+        // an expensive digger costs more than DOZENS of levels further down. The old allocation gave each
+        // digger, in priority order, everything it could carry before moving on — and on a live set that
+        // meant the lead digger ate 98.9 % of the budget and the tail ran on the crumbs. One measured
+        // example, straight out of two consecutive [DiggerDbg] lines: Adventure going L85 -> L86 cost
+        // Drop Chance TWELVE levels (L78 -> L63). Buying by marginal cost instead put the same budget
+        // into 260 levels where priority order bought 230 (user-caught 2026-09-20).
+        //
+        // WHAT THIS DELIBERATELY GIVES UP. Priority no longer decides who gets leveled — it decides who
+        // gets a SLOT (CurrentDiggerSet / ReconcileAdvisorDiggers still rank membership) and it breaks
+        // ties here. An expensive digger the advisor considers important now gets fewer levels than the
+        // old allocation gave it. That is the trade the user asked for, and it is only defensible because
+        // levels are the one currency every digger shares: the bonuses themselves (adventure stats vs.
+        // drop chance vs. NGU speed) have no exchange rate, and inventing one would be a made-up constant
+        // driving real decisions.
+        //
+        // The budget is NOT spent to the last coin: the loop stops at the first level that does not fit,
+        // and that leftover is a genuine result (the cheapest remaining level costs more than what is
+        // left), not a rounding slack to be squeezed out.
+        private static void LevelWithinBudget(int[] ordered, double budget)
+        {
+            if (ordered.Length == 0)
+                return;
+
+            foreach (int d in ordered)
+                Diggers[d].curLevel = 1;
+
+            double spent = 0.0;
+            foreach (int d in ordered)
+                spent += _dc.drain(d, 0, true);
+
+            // Every digger sits at level 1 and each pass adds exactly one level, so the total number of
+            // levels the set can hold is the hard bound on the passes this can take.
+            int maxPasses = 0;
+            foreach (int d in ordered)
+                maxPasses += (int)Math.Max(0, Diggers[d].maxLevel);
+
+            for (int pass = 0; pass < maxPasses; pass++)
+            {
+                int cheapest = -1;
+                double cheapestCost = 0.0;
+                foreach (int d in ordered)
+                {
+                    if (Diggers[d].curLevel >= Diggers[d].maxLevel)
+                        continue;
+                    // Ordered walk with a STRICT comparison: the first digger at a given cost wins, so
+                    // priority order is what breaks a tie.
+                    double cost = _dc.drain(d, 1, true) - _dc.drain(d, 0, true);
+                    if (cheapest < 0 || cost < cheapestCost)
+                    {
+                        cheapest = d;
+                        cheapestCost = cost;
+                    }
+                }
+
+                if (cheapest < 0 || spent + cheapestCost > budget)
+                    break;
+
+                Diggers[cheapest].curLevel++;
+                spent += cheapestCost;
+            }
+
+            // The running total is computed from the same drain() the game bills us with, but it is a sum
+            // of doubles over hundreds of passes — so the LIVE figure decides. Anything given back comes
+            // off the most expensive level in the set, which is the mirror of how it was handed out.
+            while (_character.grossGoldPerSecond() < _dc.totalGPSDrain())
+            {
+                int dearest = -1;
+                double dearestCost = 0.0;
+                foreach (int d in ordered)
+                {
+                    if (Diggers[d].curLevel <= 1)
+                        continue;
+                    double cost = _dc.drain(d, 0, true) - _dc.drain(d, -1, true);
+                    if (dearest < 0 || cost > dearestCost)
+                    {
+                        dearest = d;
+                        dearestCost = cost;
+                    }
+                }
+                if (dearest < 0)
+                    break;
+                Diggers[dearest].curLevel--;
+            }
+        }
+
+        // Post-recap diagnostic (validation aid). Dumps the set in PRIORITY order (which now decides
+        // membership and ties, not who gets leveled first) plus the resulting level + drain per digger,
+        // and the SPENT total — the one number that shows whether the budget was actually usable, since
+        // buying by marginal cost deliberately leaves the remainder unspent when the cheapest remaining
+        // level costs more than what is left.
         // Debug-channel and throttled — the advisor recaps every ~30s and this must not spam.
         private static DateTime _lastRecapDbg = DateTime.MinValue;
 
@@ -276,36 +358,18 @@ namespace NGUAdvisor.Managers
                 string src = Main.Settings.AdvisorDiggers
                     ? "advisor (OptimizationAdvisor — profile digger List is NOT consulted)"
                     : "profile";
+                double spent = 0.0;
+                long levels = 0;
+                foreach (int d in ordered)
+                {
+                    spent += _dc.drain(d, 0, true);
+                    levels += Diggers[d].curLevel;
+                }
                 Main.LogDebug($"[DiggerDbg] src={src} gross={_character.grossGoldPerSecond():0.##e0} budget={budget:0.##e0} "
+                            + $"spent={spent:0.##e0} levels={levels} "
                             + $"order=[{string.Join(" ", ordered.Select(d => d.ToString()).ToArray())}] -> {string.Join(", ", parts)}");
             }
             catch { }
-        }
-
-        private static void SetLevelMaxAffordable(int id, double cap)
-        {
-            if (id < 0 || id >= Diggers.Count)
-                return;
-            var curLevel = Diggers[id].curLevel;
-            Diggers[id].curLevel = 0L;
-            if (cap < _dc.drain(id, 1, true))
-                Diggers[id].curLevel = curLevel;
-            else
-            {
-                var num1 = (long)Math.Floor(Math.Log(cap / _dc.baseGPSDrain[id], _dc.gpsGrowthRate[id]) + 1L);
-                if (num1 < curLevel)
-                    num1 = curLevel;
-                if (num1 > Diggers[id].maxLevel)
-                    num1 = Diggers[id].maxLevel;
-                Diggers[id].curLevel = num1;
-                // Levels only — membership belongs to EquipDiggers / ReconcileAdvisorDiggers. The two
-                // activateDigger arms that lived here were unreachable (RecapDiggers only ever calls this
-                // for already-active diggers, whose level is >= 1, so num1 >= 1), and reachable or not they
-                // toggled ActiveDiggers from inside RecapDiggers' foreach over that same live list — an
-                // enumerator-invalidating InvalidOperationException waiting to happen.
-                if (_character.grossGoldPerSecond() < _dc.totalGPSDrain())
-                    Diggers[id].curLevel = curLevel;
-            }
         }
 
         public static void UpdateCheapestDigger()

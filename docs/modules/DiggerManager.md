@@ -27,18 +27,52 @@ Digger set executor + leveler. TWO distinct write paths — do not merge them:
 - A member that can't afford activation is left missing and retried next pass — no churn.
 - Complete = live active set EXACTLY equals the target (count + membership).
 
-## RecapDiggers — greedy priority leveling
+## RecapDiggers — buy the cheapest next level (2026-09-20)
 
-`RecapDiggers(priorityOrder)`: reset all to level 1, then level in PRIORITY order — each digger
-sized against `gps − everyoneElse'sDrain` via `SetLevelMaxAffordable`
-(`floor(log(cap/base, growthRate) + 1)`, clamped to maxLevel, rolled back if total drain exceeds
-gross). **The old even `gps/count` split collapsed every digger to level 1 on Evil** (per-level
-drains dwarf gross/count — user-caught: 6–9 diggers stuck at L1 with 9e21 gross). The advisor
-MUST pass its ranked set (`RecapDiggers(set)`) — the parameterless overload levels against
-`_curDiggers`, which the reconcile path never updates (stale lock-swap order).
+`RecapDiggers(priorityOrder)` resets the set to level 1 and hands it to `LevelWithinBudget`, which
+repeatedly buys **the cheapest next level anywhere in the set** until the next one does not fit in
+`gps × DiggerCap`.
 
-`SetLevelMaxAffordable` intentionally handles LEVELS ONLY — the activateDigger arms that once
-lived there were unreachable AND would have invalidated RecapDiggers' enumeration.
+Game truth (decompiled `AllGoldDiggerController.drain`): a digger's drain is
+`baseGPSDrain[id] * gpsGrowthRate[id]^(curLevel−1)`, with growth around 1.5–1.75 per digger. So the
+top level of an expensive digger costs more than dozens of levels further down, and the marginal
+cost of the next level is `drain(d, 1) − drain(d, 0)`.
+
+### Why priority-order leveling was replaced
+
+The previous allocation walked the set in priority order and gave each digger everything it could
+carry before moving on. On a live set that meant the lead digger ate **98.9 %** of the budget and the
+tail ran on crumbs. Two consecutive `[DiggerDbg]` lines caught it exactly (user-reported
+2026-09-20): Adventure going L85 → L86 added 3.1e26 drain and cost Drop Chance **twelve levels**
+(L78 → L63) — one level bought at the price of twelve. Same budget, measured: priority order bought
+230 levels, marginal cost bought 260.
+
+**What this deliberately gives up.** Priority no longer decides who gets leveled. It decides who
+gets a SLOT (`CurrentDiggerSet` / `ReconcileAdvisorDiggers` still rank membership) and it breaks
+ties in the buy loop. An expensive digger the advisor ranks first now gets fewer levels than before
+— including the Evil-climb Stats digger, whose "level it first" behaviour was itself a fix. That
+regression is intentional and user-directed; if it needs to come back, it has to come back as a
+membership or budget rule, **not** by restoring a first-come allocation.
+
+It is only defensible because levels are the one currency every digger shares: adventure stats vs.
+drop chance vs. NGU speed have no exchange rate, and inventing one would be a made-up constant
+driving real decisions.
+
+### Two things that look like bugs and are not
+
+- **The budget is not spent to the last coin.** The loop stops at the first level that does not fit.
+  A leftover means the cheapest remaining level costs more than what is left — `spent=` in
+  `[DiggerDbg]` is there to show it.
+- **The old even `gps/count` split is not what this is.** That split collapsed every digger to level
+  1 on Evil (per-level drains dwarf `gross/count` — user-caught: 6–9 diggers stuck at L1 with 9e21
+  gross). Buying by marginal cost has no fixed per-digger share: a digger that cannot afford level 2
+  simply stops bidding and the rest of the budget goes to the others.
+
+The advisor MUST pass its ranked set (`RecapDiggers(set)`) — the parameterless overload levels
+against `_curDiggers`, which the reconcile path never updates (stale lock-swap order).
+
+Give-back after the loop walks the LIVE `totalGPSDrain()` and drops the most expensive level in the
+set, mirroring how they were handed out. It exists for double-summation drift, not for policy.
 
 ## Upgrades
 
