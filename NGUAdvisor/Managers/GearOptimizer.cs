@@ -68,8 +68,9 @@ namespace NGUAdvisor.Managers
 
         // Same, for a priority chain plus pinned item ids.
         public static int[] OptimizeIds(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
-                                        bool forceTopRespawn = false, bool maxed = false)
-            => Optimize(chain, pinnedIds, forceTopRespawn, maxed).AllIds().Where(x => x > 0).Distinct().ToArray();
+                                        bool forceTopRespawn = false, bool maxed = false,
+                                        BoostFarmAdvisor.GearLootNeed? lootNeed = null)
+            => Optimize(chain, pinnedIds, forceTopRespawn, maxed, lootNeed).AllIds().Where(x => x > 0).Distinct().ToArray();
 
         // Optimize for an objective by name (as stored in profiles/settings); null if unknown.
         public static GearObjectives.Objective FindObjective(string name)
@@ -124,6 +125,9 @@ namespace NGUAdvisor.Managers
             var fallback = Main.Settings.TitanLoadout;
 
             bool realFight = false;
+            double barA = 0, barD = 0;
+            // The most any spawning target still needs from drop chance; Known=false = it buys nothing.
+            var lootNeed = new BoostFarmAdvisor.GearLootNeed();
             try
             {
                 var targets = Main.Settings.TitanSwapTargets;
@@ -131,18 +135,27 @@ namespace NGUAdvisor.Managers
                 {
                     if (targets == null || i >= targets.Length || !targets[i]) continue;
                     if (!ZoneHelpers.TitanSpawningSoon(i)) continue;
-                    if (!ZoneHelpers.AutokillAvailable(i)) { realFight = true; break; }
+                    var need = BoostFarmAdvisor.TitanGearLootFor(i);
+                    if (need.Known && (!lootNeed.Known || need.Target > lootNeed.Target)) lootNeed = need;
+                    if (ZoneHelpers.AutokillAvailable(i)) continue;
+                    realFight = true;
+                    OptimizationAdvisor.ProjectedBestStats(out var pa, out var pd);
+                    OptimizationAdvisor.StagedRequirementFor(i, ZoneHelpers.TitanVersion(i), pa, pd,
+                        out var ra, out var rd, out _, out _);
+                    barA = Math.Max(barA, ra);
+                    barD = Math.Max(barD, rd);
                 }
             }
-            catch { }
+            catch (Exception e) { Main.LogDebug($"Titan fight bar: {e.Message}"); }
 
             if (realFight)
             {
                 Main.Log("Titan fight is live (not AK) — kill set overrides the loot objective");
-                obj = "Adventure";
                 // Pins must not override a real fight either -- the same death loop this override
                 // exists for (loot/pinned gear equipped into a live titan) applies to pinned items too.
-                return ResolveModeGear(obj, Main.Settings.TitanObjectiveRespawn, fallback, new int[0]);
+                var killSet = KillSetWithDropChance(barA, barD, Main.Settings.TitanObjectiveRespawn, lootNeed);
+                if (killSet != null && killSet.Length > 0) return killSet;
+                return ResolveModeGear("Adventure", Main.Settings.TitanObjectiveRespawn, fallback, new int[0]);
             }
             if (string.IsNullOrEmpty(obj) && (fallback == null || fallback.Length == 0))
                 obj = "Adventure";
@@ -154,7 +167,9 @@ namespace NGUAdvisor.Managers
             {
                 try
                 {
-                    var ids = OptimizeIds(lootChain, null, Main.Settings.TitanObjectiveRespawn);
+                    // A loot objective that is Drop Chance is sized by the titan's own rolls, not the farm zone's.
+                    var ids = OptimizeIds(lootChain, null, Main.Settings.TitanObjectiveRespawn, false,
+                                          lootNeed.Known ? lootNeed : (BoostFarmAdvisor.GearLootNeed?)null);
                     if (ids.Length > 0)
                     {
                         Main.Log($"Titan gear optimized for '{GearChain.Describe(lootChain)}': {ids.Length} items.");
@@ -164,6 +179,59 @@ namespace NGUAdvisor.Managers
                 catch (Exception e) { Main.LogDebug($"Titan loot chain failed: {e.Message}; using the plain objective."); }
             }
             return ResolveModeGear(obj, Main.Settings.TitanObjectiveRespawn, fallback);
+        }
+
+        // Live-fight kill set (user rule: wear what the kill needs, the rest for drop chance). Adventure
+        // owns the main slots and keeps accessories only while the projected stats still clear the
+        // fight's bar; every accessory it gives back goes to Drop Chance. Attack is projected linearly
+        // in the Power score, as ProjectedBestGear does. Unpinned: pins never enter a real fight.
+        // null when the bar or the objectives can't be read.
+        private static int[] KillSetWithDropChance(double barA, double barD, bool forceTopRespawn,
+                                                   BoostFarmAdvisor.GearLootNeed lootNeed)
+        {
+            try
+            {
+                var adventure = FindObjective("Adventure");
+                var dropChance = FindObjective(GearObjectives.Stat.DropChance);
+                var power = FindObjective("Power");
+                var toughness = FindObjective("Toughness");
+                if (adventure == null || dropChance == null || power == null || toughness == null) return null;
+                if (barA <= 0 || barD <= 0) return null;
+
+                double curP = CurrentScore(power), curT = CurrentScore(toughness);
+                if (curP <= 0 || curT <= 0) return null;
+                double atk = Main.Character.totalAdvAttack(), def = Main.Character.totalAdvDefense();
+                bool Clears(Result r) => atk * ScoreOf(r, power) / curP >= barA
+                                      && def * ScoreOf(r, toughness) / curT >= barD;
+
+                var noPins = new int[0];
+                var full = OptimizeCore(new[] { new GearPriority { Objective = adventure, MaxAccessorySlots = GearChain.Unlimited } },
+                                        noPins, forceTopRespawn);
+                var best = full;
+                int kept = full.Accessories.Count;
+                // Drop chance takes a freed slot only while this titan still has a wanted item behind an
+                // uncapped roll; otherwise the kill keeps every accessory.
+                bool dcPays = lootNeed.Known && lootNeed.Target > ScoreOf(full, dropChance);
+                if (dcPays && Clears(full))
+                {
+                    for (int slots = full.Accessories.Count - 1; slots >= 0; slots--)
+                    {
+                        var run = OptimizeCore(new[]
+                        {
+                            new GearPriority { Objective = adventure, MaxAccessorySlots = slots },
+                            new GearPriority { Objective = dropChance, MaxAccessorySlots = GearChain.Unlimited },
+                        }, noPins, forceTopRespawn);
+                        if (!Clears(run)) break;
+                        best = run;
+                        kept = slots;
+                    }
+                }
+                Main.Log($"Titan kill set: Adventure keeps {kept}/{full.Accessories.Count} accessories, Drop Chance the rest "
+                       + $"(bar {NumberFormatter.Abbrev(barA)} / {NumberFormatter.Abbrev(barD)}, "
+                       + $"projected {NumberFormatter.Abbrev(atk * ScoreOf(best, power) / curP)} / {NumberFormatter.Abbrev(def * ScoreOf(best, toughness) / curT)})");
+                return best.AllIds().Where(x => x > 0).Distinct().ToArray();
+            }
+            catch (Exception e) { Main.LogDebug($"Titan kill set failed: {e.Message}"); return null; }
         }
 
         // Gold gear resolution with a data-driven default: when the user configured NEITHER a gold
@@ -404,13 +472,15 @@ namespace NGUAdvisor.Managers
         // Each priority takes at most maxslots of the slots still FREE (Optimizer.js:135 count_accslots)
         // and the slots it fills are frozen for every later priority. That sequencing -- not the search
         // inside a single priority -- is what produces mixed accessory sets.
+        // lootNeed: the drop-chance saturation to trim against; null = the farm zone's.
         public static Result Optimize(IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds,
-                                      bool forceTopRespawn = false, bool maxed = false)
+                                      bool forceTopRespawn = false, bool maxed = false,
+                                      BoostFarmAdvisor.GearLootNeed? lootNeed = null)
         {
             // null means the trim did not apply and ran NOTHING — only then is a plain run needed. A
             // trim that did run returns its own result, so a chain carrying Drop Chance is never
             // optimized twice for the same answer.
-            return TrimSaturatedDropChance(chain, pinnedIds, forceTopRespawn, maxed)
+            return TrimSaturatedDropChance(chain, pinnedIds, forceTopRespawn, maxed, lootNeed)
                 ?? OptimizeCore(chain, pinnedIds, forceTopRespawn, maxed);
         }
 
@@ -434,7 +504,8 @@ namespace NGUAdvisor.Managers
         // run; every path that has already optimized returns that result rather than making the caller
         // redo it.
         private static Result TrimSaturatedDropChance(
-            IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds, bool forceTopRespawn, bool maxed)
+            IReadOnlyList<GearPriority> chain, IReadOnlyList<int> pinnedIds, bool forceTopRespawn, bool maxed,
+            BoostFarmAdvisor.GearLootNeed? lootNeed = null)
         {
             try
             {
@@ -452,7 +523,7 @@ namespace NGUAdvisor.Managers
                 // would be the made-up constant this codebase keeps refusing to invent.
                 if (step < 0) return null;
 
-                var need = BoostFarmAdvisor.GearLootFor(FarmZone());
+                var need = lootNeed ?? BoostFarmAdvisor.GearLootFor(FarmZone());
                 if (!need.Known || need.Target <= 0) return null;
 
                 var dropChance = chain[step].Objective;
@@ -481,9 +552,13 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"TrimSaturatedDropChance failed: {e.Message}"); return null; }
         }
 
-        // The zone whose rolls the drop chance is being spent on. Same read the digger venue law and the
-        // state export use, so all three agree on WHERE the farming happens.
-        private static int FarmZone() => Main.Settings != null ? Main.Settings.SnipeZone : 1000;
+        // The zone whose rolls the drop chance is being spent on: the routing's own answer (gear hunt >
+        // ITOPOD > SnipeZone). SnipeZone alone kept trimming for zone 18 while the farm was the pod.
+        private static int FarmZone()
+        {
+            try { return Main.Settings != null ? Main.ResolveIntentZone(out _) : 1000; }
+            catch { return 1000; }
+        }
 
         private static IReadOnlyList<GearPriority> WithBudget(IReadOnlyList<GearPriority> chain, int step, int slots)
         {

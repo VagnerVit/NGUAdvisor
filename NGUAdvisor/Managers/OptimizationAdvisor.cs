@@ -659,6 +659,42 @@ namespace NGUAdvisor.Managers
             defMult = _projDefMult;
         }
 
+        // Live P/T carried onto the best P/T set: the stats the titan kill loadout fights with.
+        public static void ProjectedBestStats(out double atk, out double def)
+        {
+            ProjectedBestGear(out var am, out var dm);
+            atk = Main.Character.totalAdvAttack() * am;
+            def = Main.Character.totalAdvDefense() * dm;
+        }
+
+        // The version the kill machinery fights (user rule: push the best version the gear allows):
+        // the highest version past the objective whose staged requirement the best P/T set clears.
+        // NextObjective stays the lowest un-AK'd version — AK progress, the P/T freeze and the LRB
+        // gate read that, not this.
+        public static TitanObjective PushObjective()
+        {
+            var o = NextObjective();
+            if (!o.Known) return o;
+            try
+            {
+                double rgn = Main.Character.totalAdvHPRegen();
+                ProjectedBestStats(out var atk, out var def);
+                for (int v = AkVersionCount(o.Index); v > o.Version; v--)
+                {
+                    if (!TryAkRequirementFor(o.Index, v, out _, out _, out _)) continue;
+                    StagedRequirementFor(o.Index, v, atk, def, out var ra, out var rd, out var rr, out var stage);
+                    if (atk < ra || def < rd || (rr > 0 && rgn < rr)) continue;
+                    return new TitanObjective
+                    {
+                        Known = true, Index = o.Index, Version = v, Stage = stage,
+                        ReqAttack = ra, ReqDefense = rd, ReqRegen = rr,
+                    };
+                }
+            }
+            catch (Exception e) { Main.LogDebug($"PushObjective: {e.Message}"); }
+            return o;
+        }
+
         // Kill-ladder requirement (user rule): never killed -> the guide's MANUAL first-kill stats;
         // killed -> the guide's IDLE stats until met (skipped where the guide lists none); then the
         // game's exact AK stats, which from T4 up include the HP-regen gate (reqR; 0 elsewhere).

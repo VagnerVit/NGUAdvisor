@@ -59,6 +59,15 @@ the tables above (`tests/NGUAdvisor.Tests/TitanDropTablesTests.cs`).
   titan zones outright (`GearFarmAdvisor.cs:369`) — so a titan's loot lives nowhere else in the repo.
 - **The ids are raw and include BOOSTS** (ids 1-39, `docs/ITEM-IDS.md`): T2 drops boost ids
   4-7/17-20/30-33 alongside its gear. Filtering them needs the live `itemInfo.type` read, so it
-  belongs to the caller — `ZoneHelpers.TitanHasWantedDrops`, which is the only consumer.
+  belongs to the caller (`GearFarmAdvisor.WantedTitanNeedFactor`).
+- **`Rolls` (2026-09-23)** — every roll drop chance can raise, per titan: `P = min(Chance × dc, Cap)`,
+  each on its own `Random.value`; `dc = lootFactor()` T1–T6, `lootFactorRooted()` T7+ (`Rooted`),
+  `Cap` 0.25 in the rooted era and none before it; `MinVersion` for V2+/V3+/V4 rolls; `Gate` for the
+  game-gated ones (uugRing, waldo, antiWaldo, titan9SpecialReward). Deliberately absent: guaranteed
+  drops, fixed-chance rolls (T5's 1 % 159, T9's exile 341/336) and T1/T2's Wandoos roll (DC only picks
+  the level of a drop that always happens). `NeedFactor` = the max `Cap / Chance` over counted rolls.
+- **Consumers:** `ZoneHelpers.TitanDropChancePays` (attend an AK titan only while a wanted item sits
+  behind a roll the worn gear does not cap — `[TitanDcDbg]` logs gear/needed per AK titan on change)
+  and `GearOptimizer.ResolveTitanGear` (sizes Drop Chance by the titan's need).
 - **T13/T14 (zones 44/45) are empty on purpose**: the game has no `zone44Drop`/`zone45Drop`. Empty
   reads downstream as "nothing to farm here", which is the correct answer, not a missing table.

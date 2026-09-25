@@ -66,6 +66,11 @@ namespace NGUAdvisor
         private Panel _chipArea;
         private Panel _manualView;
         private readonly Button[] _killToggles = new Button[14];
+        private ComboBox _fightTitan;
+        private ComboBox _fightVersion;
+        private Button _fightBtn;
+        private Label _fightStatus;
+        private readonly List<int> _fightTitanIdx = new List<int>();
         private ComboBox _combatMode;
         private Button _beast;
         private Label _modeLbl;
@@ -89,11 +94,9 @@ namespace NGUAdvisor
                 W - UiTheme.S(54),
                 () => Settings.ManageTitans, v => Settings.ManageTitans = v,
                 () => Settings.AdvisorTitans, v => Settings.AdvisorTitans = v,
-                // Kept short on purpose: the bar is 461px wide here, so the line has ~437px. Anything
-                // longer would ellipsize (FitText) — measured, not guessed.
-                "The advisor picks the target and the tool kills it.",
-                "Your manual kill targets drive it; the tool executes them.",
-                "Automation is off — the tool will not touch titans.")
+                "Advisor picks the target and kills it.",
+                "Your kill targets drive it.",
+                "Off — titans untouched.")
             {
                 Location = new Point(UiTheme.S(10), UiTheme.S(10))
             };
@@ -132,7 +135,7 @@ namespace NGUAdvisor
             // Req boxes grew to fit their floored captions — the card keeps its original 4px bottom margin.
             _heroCard.Height = Math.Max(_heroCard.Height, _akBox.Box.Bottom + UiTheme.S(4));
 
-            _chipArea = new Panel { Location = new Point(UiTheme.S(10), top + UiTheme.S(158)), Size = new Size(W - UiTheme.S(54), UiTheme.S(66)), BackColor = UiTheme.Ground, Tag = "exclusive" };
+            _chipArea = new Panel { Location = new Point(UiTheme.S(10), _heroCard.Bottom + UiTheme.S(8)), Size = new Size(W - UiTheme.S(54), UiTheme.S(66)), BackColor = UiTheme.Ground, Tag = "exclusive" };
             Controls.Add(_chipArea);
 
             // Manual M-A: uniform 4-column grid, centered abbreviations, only unlocked titans.
@@ -173,6 +176,8 @@ namespace NGUAdvisor
                 _killToggles[i] = b;
                 _manualView.Controls.Add(b);
             }
+            int fightBottom = BuildFightSection(UiTheme.S(34) + 4 * UiTheme.S(28) + UiTheme.S(8));
+            _manualView.Height = fightBottom + UiTheme.S(4);
 
             _modeLbl = new Label { Text = "Mode", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
             _combatMode = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
@@ -189,12 +194,13 @@ namespace NGUAdvisor
             };
             // Advisor mode picks combat posture itself (AK-ratio heuristic) — the controls give way to
             // a read-only summary of its choice.
-            _combatSummary = new Label { Text = "", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Visible = false, Location = new Point(UiTheme.S(10), top + UiTheme.S(241)) };
+            int modeRowY = Math.Max(_chipArea.Bottom + UiTheme.S(12), _manualView.Bottom + UiTheme.S(12));
+            _combatSummary = new Label { Text = "", AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Visible = false, Location = new Point(UiTheme.S(10), modeRowY + UiTheme.S(5)) };
             Controls.Add(_modeLbl);
             Controls.Add(_combatMode);
             Controls.Add(_beast);
             Controls.Add(_combatSummary);
-            UiLayout.Row(UiTheme.S(10), top + UiTheme.S(236), UiTheme.S(8), _modeLbl, _combatMode, _beast);
+            UiLayout.Row(UiTheme.S(10), modeRowY, UiTheme.S(8), _modeLbl, _combatMode, _beast);
 
             SyncFromSettings();
         }
@@ -210,7 +216,8 @@ namespace NGUAdvisor
             rb.BarOuter = new Panel { Location = new Point(UiTheme.S(8), UiTheme.S(52)), Size = new Size(w - UiTheme.S(16), UiTheme.S(9)), BackColor = UiTheme.Surface, BorderStyle = BorderStyle.FixedSingle };
             rb.BarInner = new Panel { Location = new Point(0, 0), Size = new Size(0, UiTheme.S(7)), BackColor = UiTheme.Accent };
             rb.BarOuter.Controls.Add(rb.BarInner);
-            rb.Caption = new Label { Text = "", AutoSize = false, Size = new Size(w - UiTheme.S(16), UiTheme.SHead(18)), Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Zebra, Location = new Point(UiTheme.S(8), UiTheme.S(64)) };
+            // Two caption lines: the gear-swap projection does not fit a half-width box on one.
+            rb.Caption = new Label { Text = "", AutoSize = false, Size = new Size(w - UiTheme.S(16), 2 * UiTheme.SHead(18)), Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Zebra, Location = new Point(UiTheme.S(8), UiTheme.S(64)) };
             // The caption is floored at the measured header line, so the 84px box no longer contains it —
             // keep its original 2px bottom padding instead of scaling the box height on its own.
             rb.Box.Height = Math.Max(rb.Box.Height, rb.Caption.Bottom + UiTheme.S(2));
@@ -220,6 +227,133 @@ namespace NGUAdvisor
             rb.Box.Controls.Add(rb.Caption);
             _heroCard.Controls.Add(rb.Box);
             return rb;
+        }
+
+        // BOSS FIGHT (manual): pick a titan + version, one click arms it. Returns the section's bottom.
+        private int BuildFightSection(int y)
+        {
+            var header = new Label { Text = "BOSS FIGHT", AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(0, y) };
+            _manualView.Controls.Add(header);
+            y = header.Bottom + UiTheme.S(4);
+
+            var desc = new Label { AutoSize = false, Width = _manualView.Width, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(0, y) };
+            _manualView.Controls.Add(desc);
+            UiLayout.FitOrGrow(desc, "Fights the picked version in kill gear at spawn.");
+            y = desc.Bottom + UiTheme.S(6);
+
+            _fightTitan = new LineComboBox { Width = UiTheme.S(130), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            UiTheme.StyleCombo(_fightTitan);
+            _fightTitan.SelectedIndexChanged += (s, e) => { if (!_syncing) { FillFightVersions(); UpdateFightStatus(); } };
+            _fightVersion = new LineComboBox { Width = UiTheme.S(70), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
+            UiTheme.StyleCombo(_fightVersion);
+            _fightVersion.SelectedIndexChanged += (s, e) => { if (!_syncing) UpdateFightStatus(); };
+            _fightBtn = new Button { Text = "Fight", Size = new Size(UiLayout.BtnWidth("Fight Godmother v4"), UiTheme.SCtl(24)), Font = UiTheme.Ui, FlatStyle = FlatStyle.Flat };
+            _fightBtn.FlatAppearance.BorderColor = UiTheme.Border;
+            UiTheme.ApplyState(_fightBtn, UiTheme.Cap, Color.White);
+            _fightBtn.Click += (s, e) =>
+            {
+                if (!TryFightChoice(out int i, out int v)) return;
+                Main.RequestTitanFight(i, v);
+                UiLayout.FitInto(_fightStatus, $"Armed — {FightTiming(i)}");
+            };
+            _manualView.Controls.Add(_fightTitan);
+            _manualView.Controls.Add(_fightVersion);
+            _manualView.Controls.Add(_fightBtn);
+            y = UiLayout.Row(0, y, UiTheme.S(8), _fightTitan, _fightVersion, _fightBtn) + UiTheme.S(6);
+
+            _fightStatus = new Label { AutoSize = false, Size = new Size(_manualView.Width, UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(0, y) };
+            _manualView.Controls.Add(_fightStatus);
+            return _fightStatus.Bottom;
+        }
+
+        private bool TryFightChoice(out int titanIndex, out int version)
+        {
+            titanIndex = _fightTitan.SelectedIndex >= 0 && _fightTitan.SelectedIndex < _fightTitanIdx.Count ? _fightTitanIdx[_fightTitan.SelectedIndex] : -1;
+            version = Math.Max(1, _fightVersion.SelectedIndex + 1);
+            return titanIndex >= 0;
+        }
+
+        // Titan list = the grid's visible titans. Rebuilt only when that set changes, so an open
+        // dropdown and the user's pick survive the periodic sync.
+        private void FillFightTitans(List<int> visible)
+        {
+            if (visible.SequenceEqual(_fightTitanIdx)) return;
+            int keep = TryFightChoice(out int cur, out _) ? cur : -1;
+            _fightTitanIdx.Clear();
+            _fightTitanIdx.AddRange(visible);
+            _fightTitan.Items.Clear();
+            foreach (int i in visible) _fightTitan.Items.Add(Abbrev[i]);
+            if (keep < 0)
+            {
+                // First fill: preselect what the advisor would push.
+                try { var push = OptimizationAdvisor.PushObjective(); if (push.Known) keep = push.Index; } catch { }
+            }
+            int sel = _fightTitanIdx.IndexOf(keep);
+            _fightTitan.SelectedIndex = sel >= 0 ? sel : (_fightTitanIdx.Count > 0 ? _fightTitanIdx.Count - 1 : -1);
+            FillFightVersions();
+        }
+
+        private void FillFightVersions()
+        {
+            _fightVersion.Items.Clear();
+            if (!TryFightChoice(out int i, out _)) return;
+            int count = Versioned(i) ? OptimizationAdvisor.AkVersionCount(i) : 1;
+            for (int v = 1; v <= count; v++) _fightVersion.Items.Add($"v{v}");
+            int pick = 1;
+            try
+            {
+                var push = OptimizationAdvisor.PushObjective();
+                pick = push.Known && push.Index == i ? push.Version : ZoneHelpers.TitanVersion(i);
+            }
+            catch { }
+            _fightVersion.SelectedIndex = Math.Min(Math.Max(pick, 1), count) - 1;
+            _fightVersion.Enabled = count > 1;
+        }
+
+        private static string FightTiming(int titanIndex)
+        {
+            try
+            {
+                float? t = ZoneHelpers.TimeTillTitanSpawn(titanIndex);
+                if (t.HasValue && t.Value > 1)
+                {
+                    int m = (int)(t.Value / 60), s = (int)(t.Value % 60);
+                    return m > 0 ? $"fights at spawn in {m}m {s:00}s" : $"fights at spawn in {s}s";
+                }
+                return "titan is up, fighting now";
+            }
+            catch { return "fights at the next spawn"; }
+        }
+
+        private void UpdateFightStatus()
+        {
+            if (!TryFightChoice(out int i, out int v))
+            {
+                _fightBtn.Enabled = false;
+                UiLayout.FitInto(_fightStatus, "No titan unlocked yet.");
+                return;
+            }
+            _fightBtn.Text = Versioned(i) ? $"Fight {Abbrev[i]} v{v}" : $"Fight {Abbrev[i]}";
+            if (!Settings.ManageTitans)
+            {
+                _fightBtn.Enabled = false;
+                _fightStatus.ForeColor = UiTheme.Muted;
+                UiLayout.FitInto(_fightStatus, "Automation is off — turn it on to fight.");
+                return;
+            }
+            _fightBtn.Enabled = true;
+            try
+            {
+                OptimizationAdvisor.ProjectedBestStats(out var pa, out var pd);
+                OptimizationAdvisor.StagedRequirementFor(i, v, pa, pd, out var ra, out var rd, out _, out var stage);
+                bool reach = pa >= ra && pd >= rd;
+                var targets = Settings.TitanSwapTargets;
+                bool armed = targets != null && i < targets.Length && targets[i] && (!Versioned(i) || ZoneHelpers.TitanVersion(i) == v);
+                string lead = armed ? $"Armed — {FightTiming(i)}" : $"{stage} needs {Fmt(ra)} / {Fmt(rd)}";
+                _fightStatus.ForeColor = reach ? UiTheme.Muted : UiTheme.Danger;
+                UiLayout.FitInto(_fightStatus, $"{lead} · best gear ≈ {Fmt(pa)} / {Fmt(pd)}");
+            }
+            catch (Exception ex) { LogDebug($"Titan fight status: {ex.Message}"); }
         }
 
         private static bool Versioned(int i) => i >= FirstVersioned && i <= LastVersioned;
@@ -309,11 +443,13 @@ namespace NGUAdvisor
             var targets = Settings.TitanSwapTargets ?? new bool[14];
 
             int col = 0, row = 0;
+            var visible = new List<int>();
             for (int i = 0; i < 14; i++)
             {
                 bool show = Reachable(i, maxZone) && RiddleUnlocked(i);
                 _killToggles[i].Visible = show;
                 if (!show) continue;
+                visible.Add(i);
 
                 bool on = i < targets.Length && targets[i];
                 _killToggles[i].Text = TitanTag(i);
@@ -322,6 +458,8 @@ namespace NGUAdvisor
                 col++;
                 if (col == 4) { col = 0; row++; }
             }
+            FillFightTitans(visible);
+            UpdateFightStatus();
             UiLayout.AuditOnce(_manualView, "Titans/MANUAL");
         }
 
@@ -332,7 +470,7 @@ namespace NGUAdvisor
                 var c = Main.Character;
                 if (c == null) return;
 
-                var objv = OptimizationAdvisor.NextObjective();
+                var objv = OptimizationAdvisor.PushObjective();
                 int target = objv.Known ? objv.Index : -1;
                 int maxZone = ZoneHelpers.GetMaxReachableZone(true);
 
@@ -342,7 +480,7 @@ namespace NGUAdvisor
                 try { challenge = ChallengeDetector.Current(); } catch { }
                 if (challenge != null)
                 {
-                    SetState($"Challenge active ({challenge})", "Only auto-killed titans are viable — targeting paused until the challenge ends.");
+                    SetState($"Challenge active ({challenge})", "Only auto-killed titans are viable — targeting paused.");
                     RefreshChips(-1, maxZone);
                     return;
                 }
@@ -350,7 +488,7 @@ namespace NGUAdvisor
                 if (target < 0)
                 {
                     SetState("All titans auto-killed at this difficulty",
-                        "Nothing left here until the next difficulty — bosses and NGUs are the push now.");
+                        "Push bosses and NGUs instead.");
                 }
                 else if (!Reachable(target, maxZone))
                 {
@@ -449,8 +587,15 @@ namespace NGUAdvisor
 
         public void TickCountdown()
         {
-            if (!Visible || _countdownTarget < 0 || _titleBase == null) return;
+            if (!Visible) return;
             if ((DateTime.UtcNow - _lastCountdownTick).TotalSeconds < 5) return;
+            if (_manualView.Visible)
+            {
+                _lastCountdownTick = DateTime.UtcNow;
+                UpdateFightStatus();
+                return;
+            }
+            if (_countdownTarget < 0 || _titleBase == null) return;
             _lastCountdownTick = DateTime.UtcNow;
             try { _targetName.Text = _titleBase + SpawnSuffix(_countdownTarget); } catch { }
         }
@@ -469,14 +614,14 @@ namespace NGUAdvisor
         {
             // Tighter separators when the regen gate joins the line — three stats must share it.
             string stats = reqR > 0
-                ? $"ADV P {Fmt(reqA)} / ADV T {Fmt(reqD)} / RGN {Fmt(reqR)}"
+                ? $"P {Fmt(reqA)} · T {Fmt(reqD)} · RGN {Fmt(reqR)}"
                 : $"ADV P {Fmt(reqA)}  /  ADV T {Fmt(reqD)}";
             UiLayout.FitInto(rb.Stats, stats);
             double pct = Math.Min(reqA > 0 ? atk / reqA : 1, reqD > 0 ? def / reqD : 1);
             if (reqR > 0) pct = Math.Min(pct, rgn / reqR);
             pct = Math.Min(1.0, pct);
             rb.BarInner.Width = (int)((rb.BarOuter.Width - 2) * pct);
-            UiLayout.FitInto(rb.Caption, $"{pct * 100:0}% · {caption}");
+            UiLayout.WrapInto(rb.Caption, $"{pct * 100:0}% · {caption}");
         }
 
         // Chip-strip signature of the last build — rebuild only when the content changes. This runs

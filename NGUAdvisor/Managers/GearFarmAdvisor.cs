@@ -314,6 +314,65 @@ namespace NGUAdvisor.Managers
             catch { return false; }
         }
 
+        // An equipment drop still earns something: not maxed (a maxed item takes no more merges) and not
+        // loot-filtered (a filtered item never drops).
+        private static bool StillWanted(int id, ItemList il)
+        {
+            if (!IsEquipment(id)) return false;
+            if (id >= il.itemMaxxed.Count || il.itemMaxxed[id]) return false;
+            bool filtered = false;
+            try { filtered = id < il.itemFiltered.Count && il.itemFiltered[id]; } catch { }
+            return !filtered;
+        }
+
+        // The drop-chance factor at which every roll in the zone that still carries a wanted equipment
+        // item hits its cap: P = min(Base + Chance x dc, Cap), so dc = (Cap - Base) / Chance. 0 when the
+        // zone has no such roll. In the zone's own domain — rooted zones compare lootFactor^(1/3).
+        public static double WantedGearNeedFactor(int zone)
+        {
+            double need = 0;
+            try
+            {
+                if (!Table.TryGetValue(zone, out Roll[] rolls)) return 0;
+                var il = Main.Character.inventory.itemList;
+                foreach (Roll r in rolls)
+                {
+                    if (r.Chance <= 0 || r.Items == null || !r.Items.Any(id => StillWanted(id, il))) continue;
+                    need = Math.Max(need, (r.Cap - r.Base) / r.Chance);
+                }
+            }
+            catch (Exception e) { Main.LogDebug($"GearFarmAdvisor.WantedGearNeedFactor({zone}): {e.Message}"); }
+            return need;
+        }
+
+        // The titan's counterpart of WantedGearNeedFactor, for the version that will spawn: only rolls
+        // whose game gate is open and that carry a wanted equipment item. In the titan's own domain.
+        public static double WantedTitanNeedFactor(int titanIndex)
+        {
+            try
+            {
+                var c = Main.Character;
+                var il = c.inventory.itemList;
+                int version = ZoneHelpers.TitanVersion(titanIndex);
+                return TitanDropTables.NeedFactor(titanIndex, version,
+                    r => GateOpen(r.Gate, c) && r.Items.Any(id => StillWanted(id, il)));
+            }
+            catch (Exception e) { Main.LogDebug($"GearFarmAdvisor.WantedTitanNeedFactor({titanIndex}): {e.Message}"); }
+            return 0;
+        }
+
+        private static bool GateOpen(TitanDropTables.TitanGate gate, Character c)
+        {
+            switch (gate)
+            {
+                case TitanDropTables.TitanGate.UugRing: return c.inventory.itemList.uugRingComplete;
+                case TitanDropTables.TitanGate.Waldo: return c.inventory.itemList.waldoComplete;
+                case TitanDropTables.TitanGate.AntiWaldo: return c.inventory.itemList.antiWaldoComplete;
+                case TitanDropTables.TitanGate.Titan9Special: return c.adventure.titan9SpecialReward;
+                default: return true;
+            }
+        }
+
         // Drops still needed to cap: 100 - highest owned level (a fresh drop is level 1; each
         // merge is +1). Unowned items need the full 100.
         private static int DropsNeeded(int id)
@@ -411,14 +470,7 @@ namespace NGUAdvisor.Managers
 
                         var missing = new List<int>();
                         foreach (var id in kv.Value.SelectMany(r => r.Items).Distinct())
-                        {
-                            if (!IsEquipment(id)) continue;
-                            if (id >= il.itemMaxxed.Count || il.itemMaxxed[id]) continue;
-                            bool filtered = false;
-                            try { filtered = id < il.itemFiltered.Count && il.itemFiltered[id]; } catch { }
-                            if (filtered) continue;   // a loot-filtered item never drops
-                            missing.Add(id);
-                        }
+                            if (StillWanted(id, il)) missing.Add(id);
                         if (missing.Count == 0) continue;
 
                         var plan = new ZonePlan

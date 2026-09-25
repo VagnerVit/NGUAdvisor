@@ -91,7 +91,8 @@ accessories only costs the AK margin least.
 **`MaxAccessorySlots = 0` on the lead step is how "main slots only" is spelled.** Priority 0 owns
 the main slots regardless of its accessory budget (`GearOptimizer.RunChain`), so a 0 there claims no
 accessory and leaves every one of them to the next step. `GearOptimizer.ResolveTitanGear` uses this
-for AK-trivial spawns; a real fight still forces plain `Adventure` and never reaches it.
+for AK-trivial spawns; a real fight gets `Adventure(k) > Drop Chance(all)` with `k` as small as the
+fight's bar allows (`GearOptimizer.KillSetWithDropChance`).
 
 Returns `null` for an unknown objective, and also when the loot objective IS `Adventure` (the chain
 would degenerate to `Adventure(0) > Adventure(all)`) — refuse, don't guess, same as `Resolve`.

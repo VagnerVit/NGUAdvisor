@@ -102,7 +102,7 @@ as a dead key to anyone who just minimized the advisor.
 | `GrowthPanel` | `GrowthTracker` samples, `NGUAdvisors` predicted rates + `Diagnose` (the NGU tile's sub-line names the CAUSE when measurement diverges from prediction — highlighted, full text in the tooltip, logged once per change as `[GrowthDbg]`) |
 | `ChallengesPanel` | `ChallengeOverlay.Feed` / `Block()` / `AllocationStatus` |
 | `ProfilePanel` | profile list, switch/apply (via request), `PresetInstaller` output |
-| `AdventurePanel`, `TitansPanel` | zone routing via **`FarmMode`** (the panel-level FARM MODE row owns the exclusive farm choice — see FarmMode.md; the control bar has no DECISIONS half), `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner) |
+| `AdventurePanel`, `TitansPanel` | zone routing via **`FarmMode`** (the panel-level FARM MODE row owns the exclusive farm choice — see FarmMode.md; the control bar has no DECISIONS half), `ZoneHelpers`/`OptimizationAdvisor` titan ladder (`TitansPanel.Abbrev` is reused by AtHourPlanner). Hero card and the MANUAL BOSS FIGHT row preselect `OptimizationAdvisor.PushObjective()`; the Fight button only REQUESTS (`Main.RequestTitanFight` → `ZoneHelpers.ArmTitanFight` on the main thread: spawn version + kill target + `SwapTitanLoadouts`), the fight itself is the titan-lock machinery's at spawn |
 | `SpendPanel` | `SpendOverview` — one row per currency, each naming the module that owns the ordering (it owns none itself) |
 | `GoldPanel`, `PitPanel` | gold snipe state, `MoneyPitManager.AdvisorPlan`/`PredictNext` |
 | `YggPanel`, `QuestsPanel`, `BloodPanel`, `LoadoutsPanel`, `InventoryAdvisorPanel`, `LightsPanel` | their same-named managers |

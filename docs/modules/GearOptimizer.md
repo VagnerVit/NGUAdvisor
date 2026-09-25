@@ -188,6 +188,15 @@ reference has no equivalent feature.
   fight was a user-reported death loop (twice: empty loadout, then drop gear on a live T6v2). On that
   path it also passes `new int[0]` for `pinnedIds`, i.e. **the real-fight override drops pins too**:
   pinned loot/utility gear equipped into a live titan is the same death loop the override exists for.
+  The live-fight set is `KillSetWithDropChance`: the bar is the highest staged requirement
+  (`OptimizationAdvisor.StagedRequirementFor`, staged on projected best-gear stats) among the
+  spawning real-fight titans; Adventure keeps the main slots and walks its accessory budget down
+  while live P/T × (Power/Toughness score ratio) still clears the bar, handing every freed slot to
+  Drop Chance — **only while the titan's own need (`BoostFarmAdvisor.TitanGearLootFor`) is above the
+  full kill set's drop chance**; a titan with nothing wanted behind an uncapped roll keeps every
+  accessory on Adventure. Full Adventure short of the bar → full Adventure, unchanged.
+  The AK loot chain is trimmed against the same titan need (`Optimize(…, lootNeed)`), never against
+  the farm zone's.
   AK-trivial spawns honor the configured loot objective *and* the global pins — but they get it as
   `GearChain.LootChain(obj)`, i.e. `Adventure(0) > <loot>(all)`: **main slots Adventure, accessories
   loot**. Handing a loot objective the whole set spends the Power/Toughness the AK thresholds are
@@ -259,6 +268,13 @@ The search is sequential, so the only honest way to price a budget is to run it:
 chain, and if the result caps the zone it walks the Drop Chance budget down one slot at a time until
 the set stops capping, keeping the last one that did. With `CachedPools` in place those extra passes
 cost the search and nothing else.
+
+**Saturated means every roll still worth a drop (2026-09-23, user-reported).** The need is the max
+of the zone's boost rolls (`DcFor`) and its equipment rolls that still carry a wanted item
+(`GearFarmAdvisor.WantedGearNeedFactor`: not maxed, not filtered; `(Cap − Base) / Chance`). Boosts
+alone trimmed zone 18 to 3 DC slots while The Stealthiest Armour (lvl 11) needs 0.5 % / 0.0001 % =
+5000×. The zone is `Main.ResolveIntentZone` (hunt > ITOPOD > SnipeZone), not SnipeZone alone; ITOPOD
+has no zone table, so the pod is never trimmed.
 
 ### Rules that keep it honest
 

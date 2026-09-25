@@ -103,6 +103,11 @@ namespace NGUAdvisor
 
         private static volatile bool _gearDiagnosticPending;
 
+        // Titans MANUAL "Fight" button: setting the spawn version writes the save, so it waits for Update().
+        private static Tuple<int, int> _titanFightRequest;
+        public static void RequestTitanFight(int titanIndex, int version)
+            => System.Threading.Interlocked.Exchange(ref _titanFightRequest, Tuple.Create(titanIndex, version));
+
         // HOTKEYS ARE UNITY INPUT, so Update() only ever sees them while the GAME window is the
         // foreground window. The advisor is its own top-level HWND (Mono WinForms), so with the advisor
         // focused Unity receives no keystroke at all and every F-key was dead there (user-reported
@@ -564,6 +569,12 @@ namespace NGUAdvisor
                 _gearDiagnosticPending = false;
                 try { Managers.GearOptimizerDiagnostic.Run(); }
                 catch (Exception e) { LogDebug($"Deferred gear diagnostic failed: {e.Message}"); }
+            }
+            var fight = System.Threading.Interlocked.Exchange(ref _titanFightRequest, null);
+            if (fight != null)
+            {
+                try { Managers.ZoneHelpers.ArmTitanFight(fight.Item1, fight.Item2); }
+                catch (Exception e) { LogDebug($"Deferred titan fight failed: {e.Message}"); }
             }
 
             _formUpdateCooldown -= Time.deltaTime;
@@ -1359,9 +1370,9 @@ namespace NGUAdvisor
 
                 if (Settings.ManageTitans)
                 {
-                    for (int i = 6; i <= 12; i++)
+                    for (int i = 0; i < ZoneHelpers.TitanCount; i++)
                     {
-                        if (!Settings.TitanSwapTargets[i])
+                        if (!ZoneHelpers.IsVersionedTitan(i) || !Settings.TitanSwapTargets[i])
                             continue;
 
                         var version = ZoneHelpers.TitanVersion(i);

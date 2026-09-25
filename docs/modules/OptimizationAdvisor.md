@@ -20,6 +20,11 @@ can act on the row. Read-only itself; `Analyze()` cached 2 s; every rec individu
   on "FIRST KILL (v2)" after a confirmed v2 kill.
 - `ProjectedBestGear()` — best/current Power and Toughness objective-score ratios as attack/def
   projection multipliers (attack ~linear in the Power stat); cached 120 s (two optimizer runs).
+  `ProjectedBestStats()` applies them to live P/T.
+- `PushObjective()` — the version the kill machinery fights: highest version past
+  `NextObjective()` whose staged requirement (staged on projected stats, regen gate included) the
+  best P/T set clears. Only ApplyTitans and the Titans hero card read it; everything tracking AK
+  progress (LevelPlanner P/T freeze, LRB gate, AT hour) keeps `NextObjective()`.
 - `BossUnlockCeiling()` — highest boss that still unlocks anything at this difficulty; past it,
   boss pushing is pure EXP (drives the "NUMBER ritual" row and the diggers' `ceiling0`).
 - `GoldStarvedForAugs/Diggers(c, factor)` — gold-sink starvation checks; `factor` gives callers

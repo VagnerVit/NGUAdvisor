@@ -134,5 +134,8 @@ is that same term (single base-100 stat, `ScoreVals` divides by 100), so
 `nonGear = lootFactor / gearScore` and `Target = neededLootFactor / nonGear`. Rooted zones cube
 their `NeedFactor` back into the raw domain first.
 
+The need also covers the zone's equipment rolls that still carry a wanted item
+(`GearFarmAdvisor.WantedGearNeedFactor`) — a rare gear piece caps long after the zone's boosts.
+
 Consumer: `GearOptimizer.TrimSaturatedDropChance` (GearOptimizer.md has the measured per-zone table
 and the rules the trim follows).

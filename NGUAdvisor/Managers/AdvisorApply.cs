@@ -703,7 +703,7 @@ namespace NGUAdvisor.Managers
                 // best-gear stats actually cover the staged manual requirement (user-reported: the
                 // advisor chased a freshly-AK'd titan's next version nowhere near a manual attempt —
                 // wasted fights, and the spawn was parked off the AK version that pays gold/drops).
-                var objv = OptimizationAdvisor.NextObjective();
+                var objv = OptimizationAdvisor.PushObjective();
                 int primary = objv.Known ? objv.Index : -1;
                 bool attemptReady = true;
                 if (objv.Known && objv.Stage == "first kill")
@@ -719,6 +719,7 @@ namespace NGUAdvisor.Managers
 
                 int maxZone = ZoneHelpers.GetMaxReachableZone(true);
                 var targets = new bool[14];
+                var dcDbg = new System.Text.StringBuilder();
                 for (int i = 0; i < ZoneHelpers.TitanZones.Length && i < 14; i++)
                 {
                     if (ZoneHelpers.TitanZones[i] > maxZone) continue;
@@ -734,11 +735,18 @@ namespace NGUAdvisor.Managers
                     bool ak = false;
                     try { ak = ZoneHelpers.AutokillAvailable(i); } catch { }
                     // Below AK: attend the spawn to FIGHT it. At AK: the titan dies in whatever is
-                    // worn, so attend only while its table still owes us gear — that spawn is then
-                    // worth a swap into loot accessories (ResolveTitanGear), and a titan with nothing
-                    // left to give is worth no swap at all.
-                    if (!ak || ZoneHelpers.TitanHasWantedDrops(i)) targets[i] = true;
+                    // worn, so attend only while drop chance still buys something from it — a wanted
+                    // item behind a roll the worn gear does not already cap. Otherwise no swap pays.
+                    if (!ak || ZoneHelpers.TitanDropChancePays(i)) targets[i] = true;
+                    if (ak)
+                    {
+                        var need = BoostFarmAdvisor.TitanGearLootFor(i);
+                        dcDbg.Append(need.Known ? $" T{i + 1}={need.Current:0.##}/{need.Target:0.##}" : $" T{i + 1}=none");
+                    }
                 }
+                // The change, not every pass: which AK titans still need drop chance (gear now / needed).
+                string dcLine = $"[TitanDcDbg] ak titans gear/needed:{dcDbg}";
+                if (dcLine != _lastTitanDcDbg) { _lastTitanDcDbg = dcLine; Main.LogDebug(dcLine); }
                 // Not ready for the first-kill attempt: don't attend its spawns in kill gear at all.
                 // (The version parking below keeps the AK-able version spawning for gold/drops.)
                 if (!attemptReady && primary >= 0 && primary < targets.Length)
@@ -1312,6 +1320,7 @@ namespace NGUAdvisor.Managers
             // One renderer for every outcome of the bar, so a single line carries both scores it was
             // measured on, their ratio, the bar itself, and whether this pass was a SWITCH (which bypasses
             // the bar). Reads only locals already computed above — no second optimizer run.
+            var ids = best.AllIds().Where(x => x > 0).Distinct().ToArray();
             bool wasAsserted = _gearAsserted;
             Func<string, string> gearLine = why =>
                 $"obj='{objName}' chain='{chainKey}' switch={objectiveChanged} asserted={wasAsserted}"
@@ -1327,15 +1336,18 @@ namespace NGUAdvisor.Managers
                         : "same objective and inside the 5% re-equip bar"));
                     return;
                 }
-                if (objectiveChanged && cur > 0 && best.Score <= cur)
+                // Set membership, not the lead score: a chain whose later steps take accessories from
+                // the lead (ITOPOD Push gives two to Respawn/Move Cooldown) always scores its lead lower
+                // than a set built for the lead alone, so the score would call the old set "optimal".
+                var wornIds = new HashSet<int>(LoadoutManager.CurrentGearIds());
+                if (objectiveChanged && ids.Length > 0 && ids.All(wornIds.Contains))
                 {
                     _lastGearObjective = chainKey;   // verified: equipped gear IS optimal for the new objective
-                    LogGearDbg("HELD", () => gearLine("objective switch, but the worn set is already optimal for it"));
+                    LogGearDbg("HELD", () => gearLine("objective switch, but every item of its best set is already worn"));
                     return;
                 }
             }
 
-            var ids = best.AllIds().Where(x => x > 0).Distinct().ToArray();
             if (ids.Length == 0)
             {
                 LogGearDbg("HELD", () => gearLine("winning loadout had no equippable ids"));

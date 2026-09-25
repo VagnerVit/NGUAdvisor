@@ -203,6 +203,21 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"TitanVersionsBeaten({titanIndex}): {e.Message}"); return 0; }
         }
 
+        // Manual BOSS FIGHT: spawn the chosen version and attend it in kill gear. The fight itself is
+        // the snapshot machinery's (RefreshTitanSnapshots -> titan lock -> kill set -> titan zone), so it
+        // starts the moment the titan is up. Main thread only — SetTitanVersion writes the save.
+        public static void ArmTitanFight(int titanIndex, int version)
+        {
+            if (titanIndex < 0 || titanIndex >= TitanCount) return;
+            if (IsVersionedTitan(titanIndex)) SetTitanVersion(titanIndex, version);
+            var targets = (Settings.TitanSwapTargets ?? new bool[TitanCount]).ToArray();
+            if (targets.Length < TitanCount) Array.Resize(ref targets, TitanCount);
+            targets[titanIndex] = true;
+            Settings.TitanSwapTargets = targets;
+            if (!Settings.SwapTitanLoadouts) Settings.SwapTitanLoadouts = true;
+            Log($"Manual titan fight armed: titan {titanIndex + 1}{(IsVersionedTitan(titanIndex) ? $" v{version}" : "")}");
+        }
+
         public static void SetTitanVersion(int titanIndex, int version)
         {
             if (TitanVersion(titanIndex) == version) return;
@@ -250,21 +265,12 @@ namespace NGUAdvisor.Managers
         // GearFarmAdvisor applies to a farm zone (GearFarmAdvisor.cs:392-401): equipment only (a
         // titan's table also carries boosts — ids 1-39, see docs/ITEM-IDS.md), not already maxxed,
         // not loot-filtered (a filtered item never drops, so it can never be the reason to swap).
-        public static bool TitanHasWantedDrops(int titanIndex)
+        // A swap into loot gear pays for this titan: some roll still carries a wanted item AND the worn
+        // gear does not already cap it. Guaranteed drops need no gear, and a capped roll gains nothing.
+        public static bool TitanDropChancePays(int titanIndex)
         {
-            try
-            {
-                var il = _character.inventory.itemList;
-                foreach (var id in TitanDropTables.For(titanIndex))
-                {
-                    if (id > Consts.MAX_GEAR_ID || (int)_character.itemInfo.type[id] > 5) continue;
-                    if (id >= il.itemMaxxed.Count || il.itemMaxxed[id]) continue;
-                    if (id < il.itemFiltered.Count && il.itemFiltered[id]) continue;
-                    return true;
-                }
-            }
-            catch (Exception e) { LogDebug($"Titan {titanIndex + 1} drop check: {e.Message}"); }
-            return false;
+            var need = BoostFarmAdvisor.TitanGearLootFor(titanIndex);
+            return need.Known && need.Target > need.Current;
         }
 
         public static int? GetHighestSpawningTitanZone()

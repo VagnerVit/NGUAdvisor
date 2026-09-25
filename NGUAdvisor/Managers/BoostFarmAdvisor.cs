@@ -447,23 +447,49 @@ namespace NGUAdvisor.Managers
 
                 var headroom = DcFor(zone);
                 if (!headroom.Known || headroom.NeedFactor <= 0) return need;
+                // A zone also drops equipment, and a rare piece caps far later than its boosts
+                // (The Stealthiest Armour in zone 18: 0.0001 % base, 0.5 % cap = 5000x). Drop chance is
+                // saturated only once every roll still worth a drop is.
+                double needFactor = Math.Max(headroom.NeedFactor, GearFarmAdvisor.WantedGearNeedFactor(zone));
 
-                var dropChance = GearOptimizer.FindObjective(GearObjectives.Stat.DropChance);
-                if (dropChance == null) return need;
-
-                double gearNow = GearOptimizer.CurrentScore(dropChance);
-                double live = c.lootFactor();
-                if (gearNow <= 0 || live <= 0) return need;
-
-                double nonGear = live / gearNow;
-                if (nonGear <= 0) return need;
-
-                double neededLoot = z.Rooted ? Math.Pow(headroom.NeedFactor, 3.0) : headroom.NeedFactor;
-                need.Target = neededLoot / nonGear;
-                need.Current = gearNow;
-                need.Known = true;
+                return GearShare(z.Rooted ? Math.Pow(needFactor, 3.0) : needFactor);
             }
             catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor.GearLootFor({zone}): {e.Message}"); }
+            return need;
+        }
+
+        // The same question for a titan kill: the rolls that still carry a wanted item (version and game
+        // gates applied). Not Known when drop chance buys nothing from this titan.
+        public static GearLootNeed TitanGearLootFor(int titanIndex)
+        {
+            try
+            {
+                double factor = GearFarmAdvisor.WantedTitanNeedFactor(titanIndex);
+                if (factor <= 0) return new GearLootNeed();
+                return GearShare(TitanDropTables.Rooted(titanIndex) ? Math.Pow(factor, 3.0) : factor);
+            }
+            catch (Exception e) { Main.LogDebug($"BoostFarmAdvisor.TitanGearLootFor({titanIndex}): {e.Message}"); }
+            return new GearLootNeed();
+        }
+
+        // Gear factor needed for a raw lootFactor of `neededLoot`: lootFactor = nonGear x gear.
+        private static GearLootNeed GearShare(double neededLoot)
+        {
+            var need = new GearLootNeed();
+            var c = Main.Character;
+            var dropChance = GearOptimizer.FindObjective(GearObjectives.Stat.DropChance);
+            if (c == null || dropChance == null) return need;
+
+            double gearNow = GearOptimizer.CurrentScore(dropChance);
+            double live = c.lootFactor();
+            if (gearNow <= 0 || live <= 0) return need;
+
+            double nonGear = live / gearNow;
+            if (nonGear <= 0) return need;
+
+            need.Target = neededLoot / nonGear;
+            need.Current = gearNow;
+            need.Known = true;
             return need;
         }
 
