@@ -227,8 +227,9 @@ namespace NGUAdvisor.AllocationProfiles.RebirthStuff
                 BloodMagicManager.ironPill.Cast(true);
             }
 
-            // Use whatever blood we have left on blood number before rebirthing
-            if (_character.bloodMagic.bloodPoints > 0)
+            // Use whatever blood we have left on blood number before rebirthing — unless it is float dust
+            // the running NUMBER auto-spell left behind: the cast costs a whole re-allocation pass.
+            if (NumberTopUpWorthIt(_character.bloodMagic.bloodPoints, _character.bloodMagic.rebirthPower))
             {
                 Log($"Casting number blood spell with remaining {_character.bloodMagic.bloodPoints} blood before rebirth");
                 _character.bloodSpells.castRebirthSpell();
@@ -238,5 +239,12 @@ namespace NGUAdvisor.AllocationProfiles.RebirthStuff
 
             return false;
         }
+
+        // castRebirthSpell is rebirthPower += bloodPoints, so the cast gains exactly blood / rebirthPower
+        // of the next multi; below this it is residue, not a bank.
+        private const double NumberTopUpMinGain = 1e-6;
+
+        private static bool NumberTopUpWorthIt(double bloodPoints, double rebirthPower) =>
+            bloodPoints > 0 && (!(rebirthPower > 0) || bloodPoints / rebirthPower >= NumberTopUpMinGain);
     }
 }
