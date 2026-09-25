@@ -4,8 +4,24 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.7] - 2026-09-25
+
 ### Added
 
+- **Quest gear built for quest items per second.** With **Quest Gear** on, a manual quest wears the
+  set that drops the most quest items in the zone it rolled: every spawn stays a one-shot, and the
+  freed accessories split between Quest Drops and Respawn by the kill cadence they actually buy. The
+  set is re-solved when the next quest lands in a different zone. The **Quest Gear** toggle is now
+  on the row visible in advisor mode too — before, it could not be turned on there at all.
+- **ITOPOD Push floor mode.** Push climbs to the highest floor whose fight is won against every
+  ITOPOD enemy type at worst-case rolls, and wears its own push set. It replaces the Optimize picker.
+- **Titan Fight button.** Request a specific titan and version directly instead of waiting for
+  auto-targeting to reach it. A real (non-autokill) fight keeps only the Adventure accessories its
+  stat bar needs and gives the rest to Drop Chance, and an autokill titan whose rolls your gear
+  already caps is no longer attended for drops.
+- **Hover help.** A "?" mark next to controls opens an explanation card (the stock tooltip never
+  appears under the game's runtime).
+- State export lists every drop-chance factor term by term.
 - **The advisor now notices its own releases.** It asks GitHub for the latest version every few
   hours and, when there is a newer one, says so on the version line in the rail. The launcher
   installs it just before it injects, so the update is live the next time you start the game. The
@@ -23,6 +39,19 @@ All notable changes to NGU Advisor are documented in this file.
   updates any slower than before.
 - The four logs that carry over between sessions (pit spins, advisor, Yggdrasil, cards) now roll
   over at 5 MB and keep one previous generation, instead of growing forever.
+- **Blood is split evenly between the enabled spells.** Each run's blood is shared equally, with the
+  game's own +1 % floors as the only stop, instead of a router that sent everything to NUMBER once
+  gold and drop chance read as worthless.
+- **Diggers level by cheapest next level.** Priority decides who gets a slot, not who is levelled
+  first — the lead digger used to eat almost the whole budget.
+- **Gear hands back drop-chance slots a zone no longer pays for.** Past a zone's saturation point
+  more drop chance buys nothing, so those accessories go to the next priority.
+- Texts that did not fit were reworded instead of cut off with an ellipsis.
+
+### Fixed
+
+- A malformed ritual token in a profile no longer reads as an unlocked ritual.
+- No more near-empty NUMBER cast before a rebirth.
 
 ## [1.6.5] - 2026-09-17
 
