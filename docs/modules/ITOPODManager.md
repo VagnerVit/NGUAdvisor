@@ -49,9 +49,9 @@ buffMulti)` passes the multiplier into the solve. `ChooseAttack`/`ChooseMaxAttac
 `AttackChoice { Multiplier, Piercing }` — piercing carries its own flag for the `defense/3` divisor,
 and its multiplier is `strongAttackMulti`, NOT `pierceAttackMulti`: `PlayerController.pierceAttack()`
 reads `adventureController.strongAttackMulti`, which leaves `Character.pierceAttackPower()` dead code
-for damage. Mode 3's `threshold` is `MultiplierForFloor(...) / choice.Multiplier` — the required
-multiplier is not linear in the floor gap, so the old `1.05^maxFloor / normalizedAttack` was wrong
-for the same reason.
+for damage. Any "extra multiplier needed to reach floor L" must be `MultiplierForFloor(...) /
+choice.Multiplier` — the required multiplier is not linear in the floor gap, so
+`1.05^L / normalizedAttack` is wrong for the same reason.
 
 ## `ProfileForMode(combatMode)` — what advisors price ITOPOD with
 
@@ -75,29 +75,15 @@ Two things it deliberately does NOT read live:
   (`×1.5` with Purple Liquid, else `×1.4`).
 - **Floors we cannot reach.** Capped at `highestItopodLevel − 1`; farming above that needs a push.
 
-## Optimize modes (`Settings.ITOPODOptimizeMode`)
+## Floor solve (always the former "PP" mode)
 
-| Mode | Behavior |
-|---|---|
-| 0 | No floor optimization |
-| 1 | "Lazy shifter": best floor for regular/idle attack; defers to the game's own Lazy ITOPOD when bought+on |
-| 2 | Best floor for the strongest attack available within the respawn window, buff-aware; maxFloor rounded down to 10s |
-| 3 | AP-cycle optimizer (see below); maxFloor rounded down to 50s |
-
-Mode 2/3 plan a buff queue (`PlanBuffs` → `nextBuffs`) and re-optimize the floor after every kill
-(`OptimizeFloor` runs between fights only). The floor picked accounts for buffs about to be cast
-(`multi` from queue head + active buff durations vs remaining respawn).
-
-### Mode 3 — the AP-kill cycle
-
-ITOPOD awards AP every N kills (`lootDrop.killsUntilAP`); tiers are 50-floor bands
-(`lootDrop.itopodTier`). Mode 3 farms at the regular-attack default floor, and when the AP kill
-is 3 kills away, schedules a buff burst (`Buff.None, None, <buff>` = "two plain kills, then the
-buffed one") to one-shot a HIGHER tier floor exactly on the AP kill — then returns to the default
-floor. `threshold = 1.05^maxFloor / maxAttack` picks the cheapest sufficient combo in escalating
-order: Charge → OffBuff(×1.2) → UltBuff(×1.3) → combinations → MegaBuff(×1.2·1.2·1.3) → Charge ×
-combos (`chargePower()` is the game read). Floors ≥ 1550 or tier ≥ 20 with fast respawn skip the
-dance.
+`Settings.ITOPODOptimizeMode` is no longer read (user decision 2026-09-22: the Optimize picker was
+dropped as useless). The one solve left: `PlanBuffs` queues the next buff that fits the respawn
+window, and `OptimizeFloor` re-picks, between every pair of kills, the best floor for the strongest
+attack available within that window, buff-aware (`multi` from queue head + active buff durations vs
+remaining respawn). `SolvedMaxFloor` is rounded down to 10s. The former Default (regular attack only,
+defers to the game's Lazy ITOPOD) and EXP/AP (buff burst on the AP kill) paths are gone; the setting
+survives only for the retired grid and old settings files.
 
 ## Floor modes (`Settings.ITOPODFloorMode`)
 
@@ -106,17 +92,47 @@ An axis of its own, orthogonal to the optimize mode above: WHICH floor, not how 
 | Mode | Behavior |
 |---|---|
 | 0 Optimal | the solve above owns the floor; `ITOPODAutoPush` is false, so it never climbs past `highestItopodLevel − 1` |
-| 1 Fixed | `ITOPODTargetFloor` IS the floor. `UpdateMaxFloor` skips the attack solve, `OptimizeFloor` writes the target and returns — no per-kill re-optimization, no buff-aware shifting. Works even with `ITOPODOptimizeMode == 0`: it is an instruction, and the game's Lazy ITOPOD would otherwise drift off it |
-| 2 Max | the solve above, pushing as high as the rotation one-shots (`ITOPODAutoPush` true) |
+| 1 Fixed | `ITOPODTargetFloor` IS the floor. `UpdateMaxFloor` skips the attack solve, `OptimizeFloor` writes the target and returns — no per-kill re-optimization, no buff-aware shifting |
+| 2 Push | climbs to `PushTargetFloor()` — the highest floor whose FIGHT is won (below) — in the `GearChain.ItopodPush` set, then returns to Optimal by itself |
+
+Stored values are `FloorModeOptimal/Fixed/Push`; the picker shows them as Push, Optimal, Fixed
+(`AdventurePanel.FloorModeByItem`), so never write a picker index into the setting.
+
+**Push wears its own gear.** While the floor mode is Push and the character stands in the pod,
+`AdvisorApply`'s gear pass uses `ITOPOD Push` as an override (beside Loot Hunter, below challenge
+rotation). The floor solve reads the gear worn at that moment, so `UpdateMaxFloor` does not START a
+climb while `AdvisorApply.ItopodPushGearPending()` — the gear pass will swap but has not yet. That
+check repeats every exit of the gear pass (advisor off, gear refresh or ManageGear off, quest lock,
+challenge, hunt), so a pass that will never swap cannot stall the push. `PushTargetFloor()` is the
+same solve, read-only, for the page's "Push: floors A-B reachable" line.
 
 `ITOPODAutoPush` survives as the underlying **permission** flag rather than a UI control, because the
 push-death rule needs to revoke permission without discarding the mode the user chose. On a death
-during a push it clears, and mode 2 falls back to Optimal (Max is nothing but the push, so leaving it
+during a push it clears, and Push falls back to Optimal (Push is nothing but the climb, so leaving it
 selected would show a mode that no longer does anything). A **fixed** target survives that death: it
 stops climbing and farms the highest floor reached.
 
 A fixed target above `highestItopodLevel − 1` pushes to the TARGET, not to the solved maximum — the
 "need to push" branch in `UpdateMaxFloor` reads `maxFloor`, which Fixed has already set to the target.
+
+## Push target: the fight, not the one-shot
+
+`ItopodConstants.BestWinnableFloor` replays one fight per ITOPOD AI, action by action, and bisects
+the floor (every enemy stat grows with it, ours do not). Game truth (decomp `EnemyAI`): enemy hit
+`max(0.1·atk, atk − totalAdvDefense/2)·roll`, ×3 in beast mode (`PlayerController.takeDamage`),
+AR 1.2 s; every AI counter resets at spawn, and the pod spawns one of each of normal, charger (4×
+hit every 5th action, actions 3–4 idle), poison (+`floor(0.2·atk·roll)` straight off curHP on 5 of
+every 9 actions — defense does not touch it), rapid (actions 9–14 at 0.3·AR), grower (×(1 +
+⌊n/2⌋/5)) and paralyze (2 s of no attacking every 12 actions, action 1 of each cycle idle). Regen
+ticks on both sides. The enemy side takes its WORST jitter and roll (1.02, 1.2) because a death
+ends the push; our side is the mean sustained rotation (`BoostValueMath.SustainedDamagePerSlot`),
+buffs, heals, block and parry left out — all of them only help. A fight past
+`MaxFightActions` counts as lost. The target is `max(fight floor, one-shot floor)`, rounded DOWN
+to a 10 (user rule 2026-09-23: 418 is not worth the climb over 410; 420 or stay on 410).
+
+**Push finishes by itself.** Once the push set is worn (`ItopodPushGearPending()` false) and the
+target is no longer above `highestItopodLevel − 1`, `UpdateMaxFloor` sets the floor mode back to
+Optimal and clears `ITOPODAutoPush`; the gear override ends with it (user request 2026-09-23).
 
 ## Push mode
 
@@ -127,8 +143,7 @@ advisor won't retry a push it died in.
 
 ## Gotchas
 
-- `UpdateMaxFloor` force-disables the game's `lazyITOPODOn` in modes ≥ 1 (they'd fight over the
-  floor) — mode 1 is the exception that respects it.
+- `UpdateMaxFloor` always force-disables the game's `lazyITOPODOn` (they'd fight over the floor).
 - Beast-mode enable in idle combat briefly toggles `autoattacking` off/on around the cast
   (`CheckBeastMode`) — the game blocks the cast while auto-attacking.
 - `haveCast` gates Fight() so exactly one buff cast happens per respawn window before attacking.

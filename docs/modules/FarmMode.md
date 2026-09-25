@@ -61,7 +61,7 @@ There is no fourth path. Three surfaces write this choice and all three call `Fa
 | Surface | Notes |
 |---|---|
 | `AdventurePanel` FARM MODE row | the owner; panel-level, visible on all three segments |
-| `PpPanel` pod shortcut | on → `Itopod` (+ `ITOPODOptimizeMode = PP`), off → `FarmMode.Previous` |
+| `PpPanel` pod shortcut | on → `Itopod`, off → `FarmMode.Previous` |
 | `SettingsForm.TargetITOPOD` (retired grid) | same on/off pair |
 
 `LoadoutsPanel.GateText` and `GrowthPanel` READ the flags and must stay read-only.

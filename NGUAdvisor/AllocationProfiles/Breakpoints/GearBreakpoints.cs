@@ -204,6 +204,9 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
             current = bp;
             LoadoutManager.ChangeGear(ids);
             Main.InventoryController.assignCurrentEquipToLoadout(0);
+            // An advisor override (ITOPOD Push, Loot Hunter) may have owned the loadout this replaced;
+            // without this the gear refresh keeps believing its set is worn.
+            Managers.AdvisorApply.GearRestored();
 
             return true;
         }

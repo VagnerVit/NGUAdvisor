@@ -127,13 +127,8 @@ still holds.
 
 It is a **routing preference, not a purchase**: it can be turned straight back off and it never spends
 a perk point. `ToggleClicked` writes `Settings` and **nothing else** — it sets
-`Settings.AdventureTargetITOPOD`, and **only on the way ON** also sets
-`Settings.ITOPODOptimizeMode = 2` ("PP"). Turning it off restores `AdventureTargetITOPOD = false` and
-**leaves the optimize mode alone**: `AdventurePanel` owns that choice, and turning the toggle off is
-meant to restore routing, not to rewrite the pod's optimisation target behind the user's back.
-`ITOPODCombatMode` is never touched. `OptimizeModePp = 2` is a named local constant because
-`AdventurePanel.cs:359` builds the list `{ Disabled, Default, PP, EXP/AP }` and stores the raw
-`SelectedIndex` — there is no shared enum in the codebase to reference.
+`Settings.AdventureTargetITOPOD` (through `FarmMode.Set`). It no longer writes an optimize mode: the
+pod always solves floors the former "PP" way (ITOPODManager.md). `ITOPODCombatMode` is never touched.
 
 **Main-thread rule**: the handler must not call allocation or routing code. Doing so would run Unity
 calls off the Unity main thread and hard-crash the game. It sets the flag; the next `Main.Update()`
@@ -178,8 +173,8 @@ a second spend path on a read-only advice surface would be two owners for one ir
 owns no setting of its own, has no automation and no advisor/manual choice, so a System entry would
 promise state and a gate that do not exist.
 
-**The fields column is deliberately empty.** The toggle writes `AdventureTargetITOPOD` and
-`ITOPODOptimizeMode`; `AdventurePanel`'s catalogue entry (`SettingsIndex.cs:248`) already claims
+**The fields column is deliberately empty.** The toggle writes `AdventureTargetITOPOD`;
+`AdventurePanel`'s catalogue entry (`SettingsIndex.cs:248`) already claims
 `AdventureTargetITOPOD` as its own. Naming it again here would put two catalogue rows behind one
 switch and trip the duplicate-surface audit, and the panel that owns the setting is the one the
 catalogue should route to. `Destinations.PerkPoints = "Economy"` — its own name even though it shares

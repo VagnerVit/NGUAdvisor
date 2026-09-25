@@ -1875,6 +1875,7 @@ namespace NGUAdvisor
             _growthPanel?.TickGrowth();
             _bloodPanel?.RefreshStatus();    // no-ops unless the Blood page is visible
             _boostsPanel?.RefreshBoostingNow();   // no-ops unless the Boosts page is visible; 1s throttle
+            _adventurePanel?.TickFloorInfo();     // no-ops unless the ITOPOD page is visible; 5s throttle
         }
 
         // Switch the active allocation profile (used by the dashboard). Validates, persists, reloads.

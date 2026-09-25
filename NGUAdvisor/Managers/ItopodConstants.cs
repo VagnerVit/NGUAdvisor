@@ -89,5 +89,161 @@ namespace NGUAdvisor.Managers
             if (headroom <= 0.0) return double.PositiveInfinity;
             return BaseHp * WorstEnemyRoll / (BoostValueMath.MinRoll * headroom);
         }
+
+        // ---- Push: the highest floor whose FIGHT we win, not the one we one-shot ----
+        //
+        // Game truth (decomp EnemyAI):
+        //   hit        = Mathf.Max(attack * 0.1, attack - totalAdvDefense/2) * Random.Range(0.8, 1.2)
+        //   PlayerController.takeDamage: x3 while beast mode is on
+        //   every AI counter resets to 0 at spawn; the ITOPOD list holds one of each AI below
+        //   AdventureController regen tick: player += totalAdvHPRegen/s, enemy += regen/s (capped)
+        public const double BaseAttack = 10.0;
+        public const double BaseRegen = 1.0;
+        public const double AttackRateSeconds = 1.2;
+        public const double EnemyMinDamageShare = 0.1;
+        public const double BeastDamageTakenFactor = 3.0;
+        public const double PoisonAttackShare = 0.2;
+        public const double RapidIntervalShare = 0.3;
+        public const double ParalyzeSeconds = 2.0;
+        public const double ChargerHitFactor = 4.0;
+
+        // A fight this long (~2 h of enemy actions) is not a push floor; also keeps the replay cheap
+        // enough for the UI thread.
+        public const int MaxFightActions = 20000;
+
+        public enum PodAi { Normal, Charger, Poison, Rapid, Grower, Paralyze }
+
+        public static readonly PodAi[] PodAis =
+            { PodAi.Normal, PodAi.Charger, PodAi.Poison, PodAi.Rapid, PodAi.Grower, PodAi.Paralyze };
+
+        // One manual move of the rotation: damage multiplier, cooldown, and its defense divisor.
+        public sealed class Move
+        {
+            public double Multiplier;
+            public double CooldownSeconds;
+            public bool Piercing;
+        }
+
+        public sealed class Fighter
+        {
+            public double Attack;
+            public double Defense;
+            public double MaxHp;
+            public double Regen;
+            public double RegularMultiplier;
+            public double GlobalCooldownSeconds;
+            public Move[] Moves = new Move[0];
+            public bool BeastMode;
+        }
+
+        // Mean damage per second of the sustained rotation against `defense` (mean roll: a fight is
+        // many swings). Buffs are left out — the conservative side.
+        public static double RotationDps(Fighter f, double defense)
+        {
+            if (f == null || f.GlobalCooldownSeconds <= 0.0) return 0.0;
+            double Raw(bool piercing) => Math.Max(0.0, f.Attack - defense / (piercing ? 3.0 : 2.0));
+            double[][] moves = new double[f.Moves.Length][];
+            for (int i = 0; i < f.Moves.Length; i++)
+                moves[i] = new[] { Raw(f.Moves[i].Piercing) * f.Moves[i].Multiplier, f.Moves[i].CooldownSeconds };
+            double perSlot = BoostValueMath.SustainedDamagePerSlot(Raw(false) * f.RegularMultiplier, f.GlobalCooldownSeconds, moves);
+            return perSlot / f.GlobalCooldownSeconds;
+        }
+
+        // Action-by-action replay of one fight against `ai` on `floor`. Enemy stats and its damage roll
+        // take the WORST side for us (1.02 jitter, 1.2 roll): a push death ends the push.
+        public static bool WinsFight(Fighter f, int floor, PodAi ai)
+        {
+            if (f == null || f.MaxHp <= 0.0) return false;
+            double scale = Math.Pow(FloorGrowthBase, floor) * WorstEnemyRoll;
+            double enemyAttack = BaseAttack * scale;
+            double enemyHp = BaseHp * scale;
+            double enemyRegen = BaseRegen * scale;
+            double netDps = RotationDps(f, BaseDefense * scale) - enemyRegen;
+            if (netDps <= 0.0) return false;
+
+            double hit = Math.Max(enemyAttack * EnemyMinDamageShare, enemyAttack - f.Defense / 2.0)
+                       * BoostValueMath.MaxRoll * (f.BeastMode ? BeastDamageTakenFactor : 1.0);
+            double poisonTick = Math.Floor(enemyAttack * PoisonAttackShare * BoostValueMath.MaxRoll);
+
+            double hp = f.MaxHp;
+            double paralyzedFor = 0.0;
+            bool rapid = false;
+            int counter = 0;
+            int grow = 0;
+            // Paralysis stretches the fight past enemyHp / netDps; twice that bounds it with room to spare.
+            double actionBound = Math.Ceiling(2.0 * enemyHp / netDps / (AttackRateSeconds * RapidIntervalShare)) + 2;
+            if (actionBound > MaxFightActions) return false;
+            int maxActions = (int)actionBound;
+            for (int action = 0; action < maxActions; action++)
+            {
+                double dt = AttackRateSeconds * (rapid ? RapidIntervalShare : 1.0);
+                double attackingFor = Math.Max(0.0, dt - paralyzedFor);
+                paralyzedFor = Math.Max(0.0, paralyzedFor - dt);
+                enemyHp -= netDps * attackingFor - enemyRegen * (dt - attackingFor);
+                if (enemyHp <= 0.0) return true;
+                hp = Math.Min(f.MaxHp, hp + f.Regen * dt);
+
+                switch (ai)
+                {
+                    case PodAi.Charger:
+                        counter++;
+                        if (counter < 3) hp -= hit;
+                        else if (counter >= 5) { hp -= hit * ChargerHitFactor; counter = 0; }
+                        break;
+                    case PodAi.Poison:
+                        hp -= hit;
+                        if (counter >= 1 && counter <= 5) hp -= poisonTick;
+                        if (counter > 5) counter = -3;
+                        counter++;
+                        break;
+                    case PodAi.Rapid:
+                        counter++;
+                        if (counter < 5) hp -= hit;
+                        else if (counter >= 8)
+                        {
+                            hp -= hit;
+                            if (counter == 8) rapid = true;
+                            else if (counter >= 14) { rapid = false; counter = 0; }
+                        }
+                        break;
+                    case PodAi.Grower:
+                        grow++;
+                        hp -= hit * (1.0 + Math.Floor(grow / 2.0) / 5.0);
+                        break;
+                    case PodAi.Paralyze:
+                        if (counter < 0 || counter == 1) hp -= hit;
+                        else if (counter == 2) { hp -= hit; paralyzedFor = ParalyzeSeconds; counter = -10; }
+                        counter++;
+                        break;
+                    default:
+                        hp -= hit;
+                        break;
+                }
+                if (hp <= 0.0) return false;
+            }
+            return false;
+        }
+
+        public static bool WinsEveryFight(Fighter f, int floor)
+        {
+            foreach (PodAi ai in PodAis)
+                if (!WinsFight(f, floor, ai)) return false;
+            return true;
+        }
+
+        // Highest floor won against every ITOPOD AI. Monotone in the floor (every enemy stat grows,
+        // ours do not), so a bisection is exact.
+        public static int BestWinnableFloor(Fighter f)
+        {
+            if (!WinsEveryFight(f, 0)) return 0;
+            int lo = 0, hi = MaxFloor;
+            if (WinsEveryFight(f, hi)) return hi;
+            while (hi - lo > 1)
+            {
+                int mid = (lo + hi) / 2;
+                if (WinsEveryFight(f, mid)) lo = mid; else hi = mid;
+            }
+            return lo;
+        }
     }
 }

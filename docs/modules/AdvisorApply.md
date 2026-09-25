@@ -67,14 +67,28 @@ not a framework:
      objective is still wrong gear" — TM HOUR wearing the push loadout).
   3. `_lastGearObjective` commits ONLY when the switch actually resolves (equip or verified
      optimal) — a fizzled pass must not consume the bypass (segment flipped during a titan lock;
-     stale AT gear then sat inside the 5 % bar forever).
-  `GearRestored()` (called by LockManager) clears both the marker and the throttle.
+     stale AT gear then sat inside the 5 % bar forever). "Verified" on a switch is SET MEMBERSHIP
+     (every id of the best set already worn), never `best.Score <= cur`: the score is the chain's
+     lead objective only, and a chain whose later steps take accessories from the lead (ITOPOD
+     Push) always scores below a set built for the lead alone — the old test declared the profile's
+     pure-NGU set "optimal" and the push set was never equipped (2026-09-22).
+  `GearRestored()` clears both the marker and the throttle. Called by LockManager after a restore
+  and by `GearBreakpoints.PerformSwap` after the profile swaps gear — a breakpoint re-applied on
+  rebirth/reload otherwise overwrote an override set (ITOPOD Push) while the marker still claimed it.
+  **ITOPOD Push override**: floor mode Push + standing in the pod → `ITOPOD Push`, beside Loot
+  Hunter, below challenge rotation. `ItopodPushGearPending()` holds ITOPODManager's climb until it is
+  worn (see ITOPODManager.md). A CHANGE of the override name (Push toggled, leaving the pod, hunt,
+  segment) skips the 120 s throttle, so the set returns on the next 30 s tick — with the throttle,
+  turning Push off left the push set on for up to two minutes (user-reported 2026-09-22).
 - **Wandoos OS switch**: switching wipes the target OS's levels, so it needs BOTH the ≥1.25×
   projected advantage (same threshold that turns the advisor row red — row and auto agree) AND
   projected-hour-from-zero ≥ 1.5× the CURRENT real bonus (pay for itself within the run);
   ≤ 1 switch / 10 min.
 - **Titans** (`ApplyTitans`): targets every reachable below-AK titan (riddle titans 6/7/8 only
   when their quest flags unlock); challenge active → stand down (below-AK titans unviable).
+  The chased version is `OptimizationAdvisor.PushObjective()`: the highest version whose staged
+  requirement projected best gear clears (user rule: push the best version the gear allows),
+  falling back to `NextObjective()`'s lowest un-AK'd version.
   First-kill objectives are ATTEMPTED only when projected best gear covers the manual stage
   (user-reported: doomed fights + spawn parked off the paying version). Spawn-version forcing:
   park on the highest AK-able version while a gold bank is pending (kill is free in gold gear —

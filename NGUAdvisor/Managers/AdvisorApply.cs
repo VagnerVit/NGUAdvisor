@@ -1117,6 +1117,7 @@ namespace NGUAdvisor.Managers
         // re-optimize the same objective and re-equip if a new drop/merge made a meaningfully better
         // loadout available (>= 5%). Optimize is heavy, so this is throttled well beyond the 30s tick.
         private static DateTime _lastGearCheck = DateTime.MinValue;
+        private static string _lastGearOverride;
         // What the last resolved pass equipped for: the rendered chain (GearChain.Describe) on the
         // optimizer path, the bare name on the gear-hunt path. Only ever compared for equality.
         private static string _lastGearObjective;
@@ -1164,6 +1165,32 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"[GearDbg] failed: {e.Message}"); }
         }
 
+        // Floor mode Push, standing in the pod: the gear pass swaps to the ITOPOD Push set.
+        private static bool ItopodPushGearWanted()
+            => Main.Settings.ITOPODFloorMode == ITOPODManager.FloorModePush
+            && Main.Character.adventure.zone >= 1000;
+
+        // True while the gear pass WILL put the push set on but has not yet. ITOPODManager holds the
+        // climb until then, because its floor solve reads the gear worn at that moment. Every gate the
+        // gear pass exits on is repeated here, so a pass that is never going to swap cannot stall the push.
+        public static bool ItopodPushGearPending()
+        {
+            try
+            {
+                var s = Main.Settings;
+                if (s == null || !s.GlobalEnabled || !CompatibilityGate.ActionsAllowed) return false;
+                if (!s.AdvisorGearRefresh || !s.ManageGear || LockManager.HasQuestLock()) return false;
+                if (ChallengeDetector.Current() != null || GearHunter.Active) return false;
+                if (!ItopodPushGearWanted()) return false;
+                return !(_gearAsserted && _lastGearObjective == GearChain.Describe(GearChain.ItopodPush.Priorities));
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"ITOPOD push gear check: {e.Message}");
+                return false;
+            }
+        }
+
         private static void ApplyGearRefresh()
         {
             if (!Main.Settings.ManageGear)
@@ -1186,11 +1213,15 @@ namespace NGUAdvisor.Managers
             // SEGMENT gear whenever AutoProfile is on (not just challenge rotation), so the hunt must
             // be checked FIRST outside challenges — `override ?? hunt` never fell through and the
             // Loot Hunter loadout was never equipped (user-reported).
+            // ITOPOD Push sits beside the hunt for the same reason: it is a deliberate farm choice that
+            // replaces the segment objective, and it yields to challenge rotation.
             bool inChallenge = false;
             try { inChallenge = ChallengeDetector.Current() != null; } catch { }
             string overrideName = !inChallenge && GearHunter.Active
                 ? "LOOT HUNTER"
-                : ChallengeOverlay.GearObjectiveOverride;
+                : !inChallenge && ItopodPushGearWanted()
+                    ? GearChain.ItopodPush.Name
+                    : ChallengeOverlay.GearObjectiveOverride;
             // The profile's own name is the one its chain was RESOLVED FROM, not the chain's lead objective:
             // the preset "Adventure + Respawn" leads with "Adventure", and reporting that as the profile's
             // name is what let a plain "Adventure" override inherit the profile's three-step chain.
@@ -1204,8 +1235,12 @@ namespace NGUAdvisor.Managers
                                        + $" objective={AllocationProfiles.Breakpoints.GearBreakpoints.ActiveObjective ?? "none"})");
                 return;
             }
-            if ((DateTime.UtcNow - _lastGearCheck).TotalSeconds < 120) return;
+            // An override starting or ending (Push toggled, leaving the pod, a hunt) is a switch the user
+            // just asked for; the throttle is for re-optimizing the same objective, not for that.
+            bool overrideSwitched = overrideName != _lastGearOverride;
+            if (!overrideSwitched && (DateTime.UtcNow - _lastGearCheck).TotalSeconds < 120) return;
             _lastGearCheck = DateTime.UtcNow;
+            _lastGearOverride = overrideName;
 
             if (objName == "LOOT HUNTER")
             {

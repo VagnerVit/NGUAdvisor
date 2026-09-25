@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using NGUAdvisor.Managers;
 using Xunit;
 
@@ -19,7 +20,7 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void EveryPresetResolvesItsObjectivesAndRespectsTheLengthCap()
         {
-            foreach (var preset in GearChain.Presets)
+            foreach (var preset in EveryPreset())
             {
                 Assert.NotEmpty(preset.Priorities);
                 Assert.True(preset.Priorities.Count <= GearChain.MaxPriorities);
@@ -28,10 +29,13 @@ namespace NGUAdvisor.Tests
             }
         }
 
+        private static IEnumerable<GearChain.Preset> EveryPreset()
+            => GearChain.Presets.Concat(new[] { GearChain.ItopodPush });
+
         [Fact]
         public void PresetNamesDoNotCollideWithObjectiveNames()
         {
-            foreach (var preset in GearChain.Presets)
+            foreach (var preset in EveryPreset())
                 Assert.Null(GearChain.FindObjective(preset.Name));
         }
 
@@ -83,7 +87,7 @@ namespace NGUAdvisor.Tests
         public void Describe_GivesEveryPresetItsOwnKey()
         {
             var keys = new HashSet<string>();
-            foreach (var preset in GearChain.Presets)
+            foreach (var preset in EveryPreset())
                 Assert.True(keys.Add(GearChain.Describe(preset.Priorities)), $"duplicate key for '{preset.Name}'");
         }
 
@@ -163,12 +167,19 @@ namespace NGUAdvisor.Tests
         }
 
         [Fact]
-        public void ItopodPush_PinsThePowerWeaponAndReservesOneRespawnAndOneMoveCooldown()
+        public void ItopodPush_IsPowerEverywhereExceptOneMoveCooldown()
         {
             var preset = GearChain.FindPreset("ITOPOD Push");
             Assert.NotNull(preset);
-            Assert.Equal("NGUs(0)+PowerWeapon > Respawn(1) > Move Cooldown(1) > NGUs(all)",
+            Assert.Equal("Power(0) > Move Cooldown(1) > Power(all)",
                          GearChain.Describe(preset.Priorities));
+        }
+
+        // The ITOPOD floor mode "Push" is what equips this set, so the gear editor must not offer it.
+        [Fact]
+        public void ItopodPush_IsNotOfferedAsAGearSource()
+        {
+            Assert.DoesNotContain(GearChain.Presets, p => p.Name == GearChain.ItopodPush.Name);
         }
 
         // The pin changes the resulting loadout, so it must change the chain's identity too --

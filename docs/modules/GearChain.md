@@ -66,7 +66,7 @@ step:
 | `Adventure + Energy` | `Adventure(3) > Energy NGU(2) > Adventure(all)` | Keeps energy-support accessories instead of stacking pure Power. |
 | `Drop Chance + Adventure` | `Adventure(0)+PowerWeapon > Drop Chance(all)` | Farm set: every accessory on drop chance, Power/Toughness everywhere else. |
 | `Drop Chance + NGUs` | `NGUs(0)+PowerWeapon > Drop Chance(all)` | Same, with the NGU stats in the main slots instead. |
-| `ITOPOD Push` | `NGUs(0)+PowerWeapon > Respawn(1) > Move Cooldown(1) > NGUs(all)` | Floor push: raw-Power weapon for kill speed, one Respawn and one Move Cooldown accessory to cut the dead time between kills, NGUs everywhere else. Both timing stats are capped at ONE slot — past the first item they are the weakest thing a slot can hold. |
+| `ITOPOD Push` | `Power(0) > Move Cooldown(1) > Power(all)` | Floor push: the push target is the floor the buffed rotation one-shots, which reads `totalAdvAttack`, so Power owns every slot but ONE Move Cooldown accessory (brings the ultimate and buffs round more often; past the first item it is weaker than Power). **Not in `Presets`** (`GearChain.ItopodPush`): the ITOPOD floor mode Push equips it, so the gear editor does not offer it; `FindPreset` still resolves it for profiles that name it. |
 
 **The two farm presets are named loot-first but LEAD with the partner, and that is not a typo.** No
 main-slot item in the game carries Drop Chance — under a pure `Drop Chance` objective the diagnostic

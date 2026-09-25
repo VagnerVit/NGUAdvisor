@@ -245,7 +245,7 @@ namespace NGUAdvisor.Managers
             // "routing" would be answering a different question than the one asked.
             e.Add(Sys(SystemIds.Adventure, "Adventure", Destinations.Adventure,
                 "One exclusive FARM MODE — zone, boosts, gear, hunt or ITOPOD — plus combat style. Titan and quest zones run regardless.",
-                "CombatEnabled AdvisorZones AdvisorFarmBoost AdvisorFarmGear SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODOptimizeMode ITOPODAutoPush ITOPODFloorMode ITOPODTargetFloor AllowZoneFallback SnipeBossOnly BeastMode",
+                "CombatEnabled AdvisorZones AdvisorFarmBoost AdvisorFarmGear SnipeZone GearHuntEnabled GearHuntZone AdventureTargetITOPOD ITOPODAutoPush ITOPODFloorMode ITOPODTargetFloor AllowZoneFallback SnipeBossOnly BeastMode",
                 layers + " adventure combat combat enabled farm mode what am i farming advisor routes zones manual zone farm zone farm boosts boost farm best boost farm gear gear zones target itopod itopod floor fixed floor target floor push max floor gear hunt blacklist boss ceiling snipe boss only bosses only beast mode"));
 
             // No synthetic panel-wide decisions boolean, and — corrected in slice 7.5C — not seven
@@ -435,7 +435,7 @@ namespace NGUAdvisor.Managers
                 Destinations.ApPurchases));
 
             // Perk points is a Reference for the same reason AP purchases is: it owns no setting of its
-            // own. Its one control writes AdventureTargetITOPOD and ITOPODOptimizeMode, both of which
+            // own. Its one control writes AdventureTargetITOPOD, which
             // AdventurePanel already registers as its own — so the fields stay EMPTY here. Naming them
             // twice would put two rows behind one switch and trip the duplicate audit, and the panel
             // that owns the setting is the one the catalogue should route to.

@@ -45,9 +45,11 @@ namespace NGUAdvisor
 
         // ITOPOD view
         private ComboBox _itopodFloor;
+        // Floor picker item -> stored ITOPODFloorMode, in the picker's display order.
+        private static readonly int[] FloorModeByItem =
+            { ITOPODManager.FloorModePush, ITOPODManager.FloorModeOptimal, ITOPODManager.FloorModeFixed };
         private NumericUpDown _itopodTargetFloor;
         private Button _itopodBeast;
-        private ComboBox _itopodOptimize;
         private ComboBox _itopodCombat;
         private Label _floorInfo;
         private Label _zoneDropLine;
@@ -385,28 +387,32 @@ namespace NGUAdvisor
             // a tab hop: the page that owned the flag winning the cascade was not the page that owned
             // the flag you wanted. It is the ITOPOD entry in FARM MODE now; this page is HOW the pod is
             // farmed, never WHETHER.
-            var itopodHint = MkLbl("Selected under FARM MODE above. These settings apply whenever routing lands in the pod.");
+            var itopodHint = MkLbl("");
+            itopodHint.AutoSize = false;
+            itopodHint.Size = new Size(page.Width - UiTheme.S(20), UiTheme.TextH);
             page.Controls.Add(itopodHint);
             itopodHint.Location = new Point(UiTheme.S(10), y);
-            y += UiTheme.LinePitch + UiTheme.S(6);
+            UiLayout.FitOrGrow(itopodHint, "Picked under FARM MODE above; applies whenever routing lands here.", 2);
+            y = itopodHint.Bottom + UiTheme.S(6);
 
             _itopodBeast = MkToggle("Beast Mode", () => Settings.ITOPODBeastMode = !Settings.ITOPODBeastMode);
             page.Controls.Add(_itopodBeast);
             y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), _itopodBeast) + UiTheme.S(14);
 
-            // Floor mode replaces the old Auto-Push checkbox: pushing is what "Max" means, and a fixed
-            // target pushes too — up to the target, not past it. ITOPODAutoPush stays the underlying
-            // permission flag so a death during a push can revoke it without losing the chosen mode.
+            // A fixed target pushes too — up to the target, not past it. ITOPODAutoPush stays the
+            // underlying permission flag so a death during a push can revoke it without losing the mode.
             var floorLbl = MkLbl("Floor");
             _itopodFloor = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodFloor);
-            _itopodFloor.Items.AddRange(new object[] { "Optimal", "Fixed", "Max" });
+            _itopodFloor.Items.AddRange(new object[] { "Push", "Optimal", "Fixed" });
             _itopodFloor.SelectedIndexChanged += (s, e) =>
             {
-                if (_syncing || Settings == null) return;
-                Settings.ITOPODFloorMode = _itopodFloor.SelectedIndex;
-                Settings.ITOPODAutoPush = _itopodFloor.SelectedIndex != 0;
-                _itopodTargetFloor.Enabled = _itopodFloor.SelectedIndex == 1;
+                if (_syncing || Settings == null || _itopodFloor.SelectedIndex < 0) return;
+                int floorMode = FloorModeByItem[_itopodFloor.SelectedIndex];
+                Settings.ITOPODFloorMode = floorMode;
+                Settings.ITOPODAutoPush = floorMode != ITOPODManager.FloorModeOptimal;
+                _itopodTargetFloor.Enabled = floorMode == ITOPODManager.FloorModeFixed;
+                RefreshFloorInfo();
             };
             _itopodTargetFloor = new NumericUpDown
             {
@@ -421,11 +427,6 @@ namespace NGUAdvisor
                 page.Controls.Add(c);
             y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), floorLbl, _itopodFloor, _itopodTargetFloor) + UiTheme.S(14);
 
-            var optLbl = MkLbl("Optimize");
-            _itopodOptimize = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
-            UiTheme.StyleCombo(_itopodOptimize);
-            _itopodOptimize.Items.AddRange(new object[] { "Disabled", "Default", "PP", "EXP/AP" });
-            _itopodOptimize.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.ITOPODOptimizeMode = _itopodOptimize.SelectedIndex; };
             var cmbLbl = MkLbl("Combat");
             _itopodCombat = new LineComboBox { Width = UiTheme.S(110), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui };
             UiTheme.StyleCombo(_itopodCombat);
@@ -439,14 +440,14 @@ namespace NGUAdvisor
             // (ZoneCadence.md, decomp AdventureController).
             _itopodCombat.Items.AddRange(new object[] { "Idle", "Offensive" });
             _itopodCombat.SelectedIndexChanged += (s, e) => { if (!_syncing && Settings != null) Settings.ITOPODCombatMode = _itopodCombat.SelectedIndex; };
-            foreach (Control c in new Control[] { optLbl, _itopodOptimize, cmbLbl, _itopodCombat })
+            foreach (Control c in new Control[] { cmbLbl, _itopodCombat })
                 page.Controls.Add(c);
-            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), optLbl, _itopodOptimize, cmbLbl, _itopodCombat) + UiTheme.S(14);
+            y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), cmbLbl, _itopodCombat) + UiTheme.S(14);
 
             _floorInfo = MkLbl("");
             page.Controls.Add(_floorInfo);
             _floorInfo.Location = new Point(UiTheme.S(10), y);
-            y += UiTheme.LinePitch * 2;
+            y += UiTheme.LinePitch * 5;
 
             _itopodDropLine = MkLbl("");
             _itopodDropLine.AutoSize = false;
@@ -603,12 +604,11 @@ namespace NGUAdvisor
                 if (cm >= 0 && cm < _combatMode.Items.Count) _combatMode.SelectedIndex = cm;
 
                 int fm = Settings.ITOPODFloorMode;
-                if (fm >= 0 && fm < _itopodFloor.Items.Count) _itopodFloor.SelectedIndex = fm;
+                int floorItem = Array.IndexOf(FloorModeByItem, fm);
+                if (floorItem >= 0) _itopodFloor.SelectedIndex = floorItem;
                 _itopodTargetFloor.Value = Math.Min(Math.Max(1, Settings.ITOPODTargetFloor), ItopodConstants.MaxFloor);
-                _itopodTargetFloor.Enabled = fm == 1;
+                _itopodTargetFloor.Enabled = fm == ITOPODManager.FloorModeFixed;
                 StyleOnOff(_itopodBeast, Settings.ITOPODBeastMode);
-                int om = Settings.ITOPODOptimizeMode;
-                if (om >= 0 && om < _itopodOptimize.Items.Count) _itopodOptimize.SelectedIndex = om;
                 // Any non-zero stored value means "manual" to ITOPODManager, so a legacy 2/3 (Defensive/
                 // Offensive, from when this picker offered four) shows as Offensive rather than leaving
                 // the combo blank.
@@ -668,6 +668,38 @@ namespace NGUAdvisor
             return $"Boost drop: {name} · {d.HaveDrops}/{BoostFarmAdvisor.DropInfo.NeedDrops} drops toward level 100 · {eta} (padlock a copy to keep it)";
         }
 
+        // Where Push would climb to. The solve reads the gear worn now, so outside the push set the
+        // number is a preview that the ITOPOD Push set will move.
+        private string PushLine(Character c)
+        {
+            int highest = c.adventure.highestItopodLevel;
+            int target = ITOPODManager.PushTargetFloor();
+            if (target <= highest - 1)
+                return $"Push: nothing to climb, fights are won up to floor {target}";
+            string reach = $"Push: floors {highest - 1}-{target} reachable on the gear worn now";
+            if (Settings?.ITOPODFloorMode != ITOPODManager.FloorModePush)
+                return reach + "\nPick Push to climb there in the ITOPOD Push gear";
+            if (ITOPODManager.Pushing)
+                return reach + "\nClimbing now";
+            if (AdvisorApply.ItopodPushGearPending())
+                return reach + "\nWaiting for the ITOPOD Push gear before climbing";
+            return reach;
+        }
+
+        // The push status (waiting for gear, climbing, fell back after a death) changes without any
+        // settings write, so the ITOPOD page re-reads it while it is on screen.
+        private DateTime _floorInfoAt = DateTime.MinValue;
+        private const double FloorInfoRefreshSeconds = 5;
+
+        public void TickFloorInfo()
+        {
+            if (!Visible || _pages.Count < 2 || !_pages[1].Visible) return;
+            DateTime now = DateTime.UtcNow;
+            if ((now - _floorInfoAt).TotalSeconds < FloorInfoRefreshSeconds) return;
+            _floorInfoAt = now;
+            RefreshFloorInfo();
+        }
+
         private void RefreshFloorInfo()
         {
             try
@@ -690,6 +722,7 @@ namespace NGUAdvisor
                                                      rates.PpPerSecond * 3600.0);
                     if (buys != null) text += $"\nThat pays for {buys}";
                 }
+                text += "\n" + PushLine(c);
                 // Direct assignment, NOT FitOrGrow: this label is AutoSize (MkLbl) and was never given
                 // a Width, so FitOrGrow measured against the width of the empty string it was created
                 // with and wrapped every line into "Optimal / idle f...". FitOrGrow is for labels that

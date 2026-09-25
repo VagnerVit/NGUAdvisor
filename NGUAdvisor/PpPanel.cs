@@ -28,10 +28,6 @@ namespace NGUAdvisor
         // than re-picked so the ETA here cannot disagree with the PP/hr chip on the Status page.
         private const double RateWindowMinutes = 60;
 
-        // AdventurePanel.cs:359 builds the Optimize list { Disabled, Default, PP, EXP/AP } and stores
-        // the raw SelectedIndex; there is no named constant to reference, so the index is named here.
-        private const int OptimizeModePp = 2;
-
         private const string ToggleCaption = "Farm ITOPOD for PP";
 
         private const string Provenance = "Order: community guide perk plan (docs/NGU-KNOWLEDGE.md).";
@@ -187,10 +183,6 @@ namespace NGUAdvisor
                 // whatever the other four flags happened to say.
                 bool on = FarmMode.Current() != FarmModeKind.Itopod;
                 FarmMode.Set(on ? FarmModeKind.Itopod : FarmMode.Previous);
-                // Only on the way ON, and ITOPODCombatMode is deliberately untouched: AdventurePanel
-                // owns that choice, and turning this off is meant to restore routing, not to rewrite
-                // the pod's optimisation target behind the user's back.
-                if (on) Settings.ITOPODOptimizeMode = OptimizeModePp;
             }
             catch (Exception ex) { LogDebug($"PP panel toggle: {ex.Message}"); }
             SyncFromSettings();

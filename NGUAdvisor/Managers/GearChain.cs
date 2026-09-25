@@ -99,20 +99,21 @@ namespace NGUAdvisor.Managers
                 Step("NGUs", 0, pinTopPowerWeapon: true),
                 Step("Drop Chance", Unlimited),
             }),
-            // ITOPOD floor push (user request): the pod is a kill loop, so the weapon is pinned to raw
-            // Power — the floor you can hold is set by how fast the boss dies, not by what the helmet's
-            // specs feed. Respawn and Move Cooldown get ONE accessory each: they shorten the dead time
-            // between kills, and past the first item both are the weakest thing a slot can hold. The
-            // main slots and every remaining accessory go to NGUs, which is what the pod is being run
-            // for in the first place.
-            new Preset("ITOPOD Push", new List<GearPriority>
-            {
-                Step("NGUs", 0, pinTopPowerWeapon: true),
-                Step("Respawn", 1),
-                Step("Move Cooldown", 1),
-                Step("NGUs", Unlimited),
-            }),
         };
+
+        // ITOPOD floor push (user request): the floor a push reaches is the one the rotation still
+        // one-shots, and that solve reads totalAdvAttack — so everything goes to Power. Move Cooldown
+        // gets ONE accessory: it brings the ultimate and the buffs round more often, and the push
+        // target is priced with the whole buff stack. Past the first item it is weaker than Power.
+        //
+        // Not in Presets: the ITOPOD floor mode "Push" equips it, so it is not offered as a gear
+        // source. FindPreset still resolves it for profiles that already name it.
+        public static readonly Preset ItopodPush = new Preset("ITOPOD Push", new List<GearPriority>
+        {
+            Step("Power", 0),
+            Step("Move Cooldown", 1),
+            Step("Power", Unlimited),
+        });
 
         // Kill-safe loot gear: the MAIN slots go to Adventure, the ACCESSORIES to the loot stat.
         //
@@ -140,7 +141,8 @@ namespace NGUAdvisor.Managers
         }
 
         public static Preset FindPreset(string name)
-            => Presets.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+            => Presets.Concat(new[] { ItopodPush })
+                      .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
 
         // One name -> one chain: a named preset first, then a single objective as a one-element
         // unlimited chain, so every caller downstream handles exactly one shape.

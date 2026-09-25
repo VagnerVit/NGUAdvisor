@@ -128,303 +128,40 @@ namespace NGUAdvisor.Managers
             if (mode == CombatMode.Push)
                 return;
 
-            if (Settings.ITOPODOptimizeMode == 2)
+            nextBuffs.Clear();
+
+            float time = RemainingRespawnTime() - BaseGlobalCooldown();
+            float cooldown = RemainingGlobalCooldown();
+            if (ChargeAvailable() && !ChargeActive() && Mathf.Max(ChargeCooldown(), cooldown) <= time)
             {
-                nextBuffs.Clear();
+                nextBuffs.Enqueue(Buff.Charge);
+                return;
+            }
 
-                float time = RemainingRespawnTime() - BaseGlobalCooldown();
-                float cooldown = RemainingGlobalCooldown();
-                if (ChargeAvailable() && !ChargeActive() && Mathf.Max(ChargeCooldown(), cooldown) <= time)
+            if (MegaBuffAvailable())
+            {
+                if (Mathf.Max(MegaBuffCooldown(true), cooldown) <= time)
                 {
-                    nextBuffs.Enqueue(Buff.Charge);
-                    return;
-                }
-
-                if (MegaBuffAvailable())
-                {
-                    if (Mathf.Max(MegaBuffCooldown(true), cooldown) <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.MegaBuff);
-                        return;
-                    }
-                }
-
-                if (UltimateBuffAvailable() && Mathf.Max(UltimateBuffCooldown(), cooldown) <= time)
-                {
-                    nextBuffs.Enqueue(Buff.UltimateBuff);
-                    return;
-                }
-
-                if (OffensiveBuffAvailable() && Mathf.Max(OffensiveBuffCooldown(), cooldown) <= time)
-                {
-                    nextBuffs.Enqueue(Buff.OffensiveBuff);
+                    nextBuffs.Enqueue(Buff.MegaBuff);
                     return;
                 }
             }
 
-            if (Settings.ITOPODOptimizeMode == 3)
+            if (UltimateBuffAvailable() && Mathf.Max(UltimateBuffCooldown(), cooldown) <= time)
             {
-                int kills = _ac.lootDrop.killsUntilAP(maxFloor);
-                if (kills != 3)
-                    return;
+                nextBuffs.Enqueue(Buff.UltimateBuff);
+                return;
+            }
 
-                nextBuffs.Clear();
-
-                if (!OffensiveBuffUnlocked())
-                    return;
-
-                int bestFloor = FloorFor(ChooseMaxAttack(true));
-                if (bestFloor >= 1550)
-                    return;
-
-                // How much extra multiplier the buff burst has to supply to reach maxFloor. Solved
-                // from the game's damage formula instead of scaling a normalized attack: the
-                // defense term is a constant, so the required multiplier is NOT linear in the gap.
-                AttackChoice strongest = ChooseMaxAttack();
-                float threshold = (float)(ItopodConstants.MultiplierForFloor(
-                    _character.totalAdvAttack(), maxFloor, strongest.Piercing) / strongest.Multiplier);
-                if (threshold <= 1f || float.IsInfinity(threshold) || float.IsNaN(threshold))
-                    return;
-
-                int tier = _ac.lootDrop.itopodTier(bestFloor);
-
-                // The burst has to actually reach a HIGHER reward tier than the floor we already
-                // farm, or it buys nothing: every ITOPOD reward keys off the tier, not the floor.
-                //
-                // This replaces a "tier >= 20 with a fast respawn, skip the dance" rule whose only
-                // premise was that killsPerAP bottoms out at tier 20 -- true, but AP is 1 either way,
-                // while the EXP award on that same kill is (T-1)(T-2)+2 and never stops growing.
-                // The dance was being switched off exactly where its payoff was largest.
-                if (ItopodRewards.Tier(maxFloor) <= ItopodRewards.Tier(bestFloor))
-                    return;
-
-                float chargePower = _character.chargePower();
-
-                // Alternate between Charge, Offensive Buff and Ultimate Buff
-                if (threshold <= 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-                    if (tier < 20 && time < 4f)
-                        time = 4f;
-
-                    if (ChargeUnlocked() && ChargeCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.Charge);
-                    }
-                    else if (threshold <= 1.2f && OffensiveBuffCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.OffensiveBuff);
-                    }
-                    else if (UltimateBuffUnlocked() && UltimateBuffCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.UltimateBuff);
-                    }
-
-                    return;
-                }
-
-                // Alternate between Charge and Buffs
-                if (UltimateBuffUnlocked() && threshold <= 1.2f * 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-                    if (tier < 20 && time < 4f)
-                        time = 4f;
-
-                    if (ChargeCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.Charge);
-
-                        return;
-                    }
-
-                    nextBuffs.Enqueue(Buff.None);
-
-                    time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (OffensiveBuffCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.OffensiveBuff);
-                    }
-                    else 
-                    {
-                        nextBuffs.Clear();
-                        return;
-                    }
-
-                    time += BaseGlobalCooldown();
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (UltimateBuffCooldown() <= time)
-                        nextBuffs.Enqueue(Buff.UltimateBuff);
-                    else
-                        nextBuffs.Clear();
-
-                    return;
-                }
-
-                // Alternate between Charge and Mega Buff
-                if (MegaBuffUnlocked() && threshold <= 1.2f * 1.2f * 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-                    if (tier < 20 && time < 4f)
-                        time = 4f;
-
-                    if (ChargeCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.Charge);
-                    }
-                    else if (MegaBuffCooldown(true) <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.MegaBuff);
-                    }
-
-                    return;
-                }
-
-                if (!ChargeUnlocked())
-                    return;
-
-                // Charge is both necessary and sufficient
-                if (threshold <= chargePower)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-                    if (tier < 20 && time < 4f)
-                        time = 4f;
-
-                    if (ChargeCooldown() <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.None);
-                        nextBuffs.Enqueue(Buff.Charge);
-                    }
-
-                    return;
-                }
-
-                // Alternate between Charge + Offensive Buff and Charge + Ultimate Buff
-                if (threshold <= chargePower * 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    nextBuffs.Enqueue(Buff.None);
-
-                    if (threshold <= chargePower * 1.2f && OffensiveBuffCooldown() < time)
-                    {
-                        nextBuffs.Enqueue(Buff.OffensiveBuff);
-                    }
-                    else if (UltimateBuffUnlocked() && UltimateBuffCooldown() < time)
-                    {
-                        nextBuffs.Enqueue(Buff.UltimateBuff);
-                    }
-                    else
-                    {
-                        nextBuffs.Clear();
-                        return;
-                    }
-
-                    time += BaseGlobalCooldown();
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (ChargeCooldown() <= time)
-                        nextBuffs.Enqueue(Buff.Charge);
-                    else
-                        nextBuffs.Clear();
-
-                    return;
-                }
-
-                if (!UltimateBuffUnlocked())
-                    return;
-
-                // Use Charge with both Buffs
-                if (threshold <= chargePower * 1.2f * 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime() - BaseGlobalCooldown());
-
-                    if (OffensiveBuffCooldown() < time)
-                        nextBuffs.Enqueue(Buff.OffensiveBuff);
-                    else
-                        return;
-
-                    time += BaseGlobalCooldown();
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (UltimateBuffCooldown() < time)
-                    {
-                        nextBuffs.Enqueue(Buff.UltimateBuff);
-                    }
-                    else
-                    {
-                        nextBuffs.Clear();
-                        return;
-                    }
-
-                    time += BaseGlobalCooldown();
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (ChargeCooldown() <= time)
-                        nextBuffs.Enqueue(Buff.Charge);
-                    else
-                        nextBuffs.Clear();
-
-                    return;
-                }
-
-                if (MegaBuffUnlocked() && threshold <= chargePower * 1.2f * 1.2f * 1.3f)
-                {
-                    float time = Mathf.Max(RemainingGlobalCooldown(), RemainingRespawnTime());
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    nextBuffs.Enqueue(Buff.None);
-
-                    if (MegaBuffCooldown(true) <= time)
-                    {
-                        nextBuffs.Enqueue(Buff.MegaBuff);
-                    }
-                    else
-                    {
-                        nextBuffs.Clear();
-                        return;
-                    }
-
-                    time += BaseGlobalCooldown();
-                    time += Mathf.Max(BaseGlobalCooldown(), BaseRespawnTime() - BaseGlobalCooldown());
-
-                    if (ChargeCooldown() <= time)
-                        nextBuffs.Enqueue(Buff.Charge);
-                    else
-                        nextBuffs.Clear();
-                }
+            if (OffensiveBuffAvailable() && Mathf.Max(OffensiveBuffCooldown(), cooldown) <= time)
+            {
+                nextBuffs.Enqueue(Buff.OffensiveBuff);
+                return;
             }
         }
 
         private static void OptimizeFloor()
         {
-            if (Settings.ITOPODOptimizeMode == 0 && !FixedFloor)
-                return;
-
             if (mode == CombatMode.Push)
                 return;
 
@@ -450,80 +187,31 @@ namespace NGUAdvisor.Managers
             if (MegaBuffDuration() >= time + 0.05f)
                 multi *= 1.2f;
 
-            // Behaves like lazy ITOPOD shifter
-            if (Settings.ITOPODOptimizeMode == 1)
+            if (nextBuffs.Count > 0)
             {
-                if (_character.arbitrary.boughtLazyITOPOD && _character.arbitrary.lazyITOPODOn)
-                    return;
-
-                int floor = FloorFor(ChooseAttack());
-
-                if (floor > Adventure.highestItopodLevel - 1)
-                    floor = Adventure.highestItopodLevel - 1;
-
-                SetFloor(floor);
-            }
-            else
-            {
-                if (nextBuffs.Count > 0)
+                switch (nextBuffs.First())
                 {
-                    switch (nextBuffs.First())
-                    {
-                        case Buff.Charge:
-                            multi *= _character.chargePower();
-                            break;
-                        case Buff.OffensiveBuff:
-                            multi *= 1.2f;
-                            break;
-                        case Buff.UltimateBuff:
-                            multi *= 1.3f;
-                            break;
-                        case Buff.MegaBuff:
-                            multi *= 1.2f * 1.2f * 1.3f;
-                            break;
-                    }
-                }
-
-                if (Settings.ITOPODOptimizeMode == 2)
-                {
-                    int floor = FloorFor(ChooseAttack(time), multi);
-
-                    if (floor > Adventure.highestItopodLevel - 1)
-                        floor = Adventure.highestItopodLevel - 1;
-
-                    SetFloor(floor);
-                }
-
-                if (Settings.ITOPODOptimizeMode == 3)
-                {
-                    int defaultFloor = FloorFor(ChooseMaxAttack(true), multi);
-                    if (defaultFloor > Adventure.highestItopodLevel - 1)
-                        defaultFloor = Adventure.highestItopodLevel - 1;
-
-                    int floor = FloorFor(ChooseAttack(time), multi);
-                    if (floor > Adventure.highestItopodLevel - 1)
-                        floor = Adventure.highestItopodLevel - 1;
-
-                    if (_ac.lootDrop.itopodTier(floor) <= _ac.lootDrop.itopodTier(defaultFloor))
-                        floor = defaultFloor;
-
-                    int tier = _ac.lootDrop.itopodTier(floor);
-                    for (int i = tier; i > 0; i--)
-                    {
-                        int newFloor = Math.Min(floor, i * 50 - 1);
-                        if (_ac.lootDrop.killsUntilAP(newFloor) == 1)
-                        {
-                            if (_ac.lootDrop.itopodTier(newFloor) == _ac.lootDrop.itopodTier(defaultFloor))
-                                SetFloor(defaultFloor);
-                            else
-                                SetFloor(newFloor);
-                            return;
-                        }
-                    }
-
-                    SetFloor(defaultFloor);
+                    case Buff.Charge:
+                        multi *= _character.chargePower();
+                        break;
+                    case Buff.OffensiveBuff:
+                        multi *= 1.2f;
+                        break;
+                    case Buff.UltimateBuff:
+                        multi *= 1.3f;
+                        break;
+                    case Buff.MegaBuff:
+                        multi *= 1.2f * 1.2f * 1.3f;
+                        break;
                 }
             }
+
+            int floor = FloorFor(ChooseAttack(time), multi);
+
+            if (floor > Adventure.highestItopodLevel - 1)
+                floor = Adventure.highestItopodLevel - 1;
+
+            SetFloor(floor);
         }
 
         private static void CastBuff()
@@ -533,12 +221,6 @@ namespace NGUAdvisor.Managers
 
             if (Settings.ITOPODCombatMode == 0)
                 return;
-
-            if (Settings.ITOPODOptimizeMode < 2)
-            {
-                haveCast = true;
-                return;
-            }
 
             if (RemainingGlobalCooldown() > 0f)
                 return;
@@ -629,17 +311,19 @@ namespace NGUAdvisor.Managers
 
         }
 
-        // Settings.ITOPODFloorMode == 1: the user names the floor, so the solve is skipped entirely.
-        // It still owns the floor even with optimization disabled — the whole point is to sit where
-        // the user said, and the game's own Lazy ITOPOD would otherwise drift off it.
-        private static bool FixedFloor => Settings.ITOPODFloorMode == 1;
+        // Settings.ITOPODFloorMode values. Stored numbers, not UI positions: the settings file and the
+        // retired grid's Auto-Push checkbox both write them.
+        public const int FloorModeOptimal = 0;
+        public const int FloorModeFixed = 1;
+        public const int FloorModePush = 2;
+
+        // Fixed: the user names the floor, so the solve is skipped entirely.
+        private static bool FixedFloor => Settings.ITOPODFloorMode == FloorModeFixed;
+
+        public static bool Pushing => mode == CombatMode.Push;
 
         public static void UpdateMaxFloor()
         {
-            // Floor optimization is disabled
-            if (Settings.ITOPODOptimizeMode == 0 && !FixedFloor)
-                return;
-
             _character.arbitrary.lazyITOPODOn = false;
 
             // Pushing
@@ -658,8 +342,8 @@ namespace NGUAdvisor.Managers
                     // Max mode is nothing BUT the push, so leaving it selected would show a mode that
                     // no longer does anything. A fixed target survives — it just stops climbing and
                     // farms the highest floor reached instead.
-                    if (Settings.ITOPODFloorMode == 2)
-                        Settings.ITOPODFloorMode = 0;
+                    if (Settings.ITOPODFloorMode == FloorModePush)
+                        Settings.ITOPODFloorMode = FloorModeOptimal;
                 }
             }
 
@@ -667,34 +351,32 @@ namespace NGUAdvisor.Managers
             {
                 maxFloor = Math.Min(Math.Max(1, Settings.ITOPODTargetFloor), ItopodConstants.MaxFloor);
             }
+            else if (Settings.ITOPODFloorMode == FloorModePush)
+            {
+                maxFloor = PushTargetFloor();
+            }
             else
             {
-                float buffs = 1f;
+                maxFloor = SolvedMaxFloor();
+            }
 
-                if (OffensiveBuffUnlocked())
-                    buffs *= 1.2f;
+            // The solve above read the gear worn NOW; before the push set is on, its answer is not the
+            // push set's, so neither a climb nor "push finished" may be decided from it.
+            bool pushGearPending = AdvisorApply.ItopodPushGearPending();
 
-                if (ChargeUnlocked())
-                    buffs *= _character.chargePower();
-
-                if (UltimateBuffUnlocked())
-                    buffs *= 1.3f;
-
-                if (MegaBuffUnlocked())
-                    buffs *= 1.2f;
-
-                maxFloor = FloorFor(ChooseMaxAttack(), buffs);
-
-                if (Settings.ITOPODOptimizeMode == 2)
-                    maxFloor -= maxFloor % 10;
-                else if (Settings.ITOPODOptimizeMode == 3)
-                    maxFloor -= maxFloor % 50;
+            // Push finished: nothing left to climb in the push set, so the pod goes back to farming.
+            if (Settings.ITOPODFloorMode == FloorModePush && !pushGearPending
+                && maxFloor <= Adventure.highestItopodLevel - 1)
+            {
+                Settings.ITOPODFloorMode = FloorModeOptimal;
+                Settings.ITOPODAutoPush = false;
+                Main.Log($"ITOPOD push finished at floor {Adventure.highestItopodLevel} — floor back to Optimal");
             }
 
             // Need to push
             if (maxFloor > Adventure.highestItopodLevel - 1)
             {
-                if (Settings.ITOPODAutoPush)
+                if (Settings.ITOPODAutoPush && !pushGearPending)
                 {
                     SetFloor(Adventure.highestItopodLevel - 1, maxFloor + 1);
                     mode = CombatMode.Push;
@@ -707,6 +389,68 @@ namespace NGUAdvisor.Managers
             }
 
             mode = CombatMode.Farm;
+        }
+
+        // Highest floor the strongest owned attack one-shots with every unlocked buff stacked, on the
+        // gear worn now, rounded down to a 10.
+        private static int SolvedMaxFloor()
+        {
+            float buffs = 1f;
+
+            if (OffensiveBuffUnlocked())
+                buffs *= 1.2f;
+
+            if (ChargeUnlocked())
+                buffs *= _character.chargePower();
+
+            if (UltimateBuffUnlocked())
+                buffs *= 1.3f;
+
+            if (MegaBuffUnlocked())
+                buffs *= 1.2f;
+
+            int floor = FloorFor(ChooseMaxAttack(), buffs);
+            return floor - floor % 10;
+        }
+
+        // The floor a Push climbs to: the highest one whose fight is won against every ITOPOD AI, or the
+        // one-shot floor when that is higher (one-shots never let the enemy swing). Read-only.
+        public static int PushTargetFloor()
+        {
+            int won = ItopodConstants.BestWinnableFloor(PushFighter());
+            int target = Math.Min(_ac.maxItopodLevel(), Math.Max(won, SolvedMaxFloor()));
+            return target - target % PushFloorStep;
+        }
+
+        // User rule: a push only ever lands on a round 10 — 418 is not worth the climb over 410.
+        private const int PushFloorStep = 10;
+
+        // Live stats for the fight replay. The rotation is the one ChooseMaxAttack draws from; beast
+        // mode is read live because PlayerController.takeDamage triples what it lets through.
+        private static ItopodConstants.Fighter PushFighter()
+        {
+            bool idle = ZoneCadence.IsIdle(Settings.ITOPODCombatMode);
+            var moves = new List<ItopodConstants.Move>();
+            if (!idle)
+            {
+                if (UltimateAttackUnlocked())
+                    moves.Add(new ItopodConstants.Move { Multiplier = _character.ultimateAttackPower(), CooldownSeconds = _character.ultimateAttackCooldown() });
+                if (PiercingAttackUnlocked())
+                    moves.Add(new ItopodConstants.Move { Multiplier = _character.strongAttackPower(), CooldownSeconds = _character.pierceAttackCooldown(), Piercing = true });
+                if (StrongAttackUnlocked())
+                    moves.Add(new ItopodConstants.Move { Multiplier = _character.strongAttackPower(), CooldownSeconds = _character.strongAttackCooldown() });
+            }
+            return new ItopodConstants.Fighter
+            {
+                Attack = _character.totalAdvAttack(),
+                Defense = _character.totalAdvDefense(),
+                MaxHp = _character.totalAdvHP(),
+                Regen = _character.totalAdvHPRegen(),
+                RegularMultiplier = idle ? _character.idleAttackPower() : _character.regAttackPower(),
+                GlobalCooldownSeconds = idle ? ZoneCadence.SwingSeconds(0) : BaseGlobalCooldown(),
+                Moves = moves.ToArray(),
+                BeastMode = Adventure.beastModeOn,
+            };
         }
 
         // The attack we will actually swing with, and what it multiplies totalAdvAttack() by.
@@ -731,9 +475,6 @@ namespace NGUAdvisor.Managers
             if (Settings.ITOPODCombatMode == 0 || !RegularAttackUnlocked())
                 return Choice(_character.idleAttackPower());
 
-            if (Settings.ITOPODOptimizeMode == 1)
-                return Choice(_character.regAttackPower());
-
             if (time == -1f)
                 time = Mathf.Max(RemainingRespawnTime(), RemainingGlobalCooldown());
 
@@ -747,13 +488,10 @@ namespace NGUAdvisor.Managers
         }
 
         // The strongest attack we own, ignoring cooldowns.
-        private static AttackChoice ChooseMaxAttack(bool regularAttack = false)
+        private static AttackChoice ChooseMaxAttack()
         {
             if (Settings.ITOPODCombatMode == 0 || !RegularAttackUnlocked())
                 return Choice(_character.idleAttackPower());
-
-            if (Settings.ITOPODOptimizeMode == 1 || regularAttack)
-                return Choice(_character.regAttackPower());
 
             if (UltimateAttackUnlocked())
                 return Choice(_character.ultimateAttackPower());
