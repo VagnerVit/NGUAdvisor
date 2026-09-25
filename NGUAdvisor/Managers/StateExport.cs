@@ -92,6 +92,8 @@ namespace NGUAdvisor.Managers
             Section(sb, "NGU — MAGIC", () => Ngus(sb, c, true));
             Section(sb, "ADVANCED TRAINING", () => AdvancedTraining(sb, c));
             Section(sb, "AUGMENTS", () => Augments(sb, c));
+            Section(sb, "BLOOD BUDGET", () => BloodBudget(sb, c));
+            Section(sb, "DROP CHANCE — WHERE IT COMES FROM", () => DropChanceBreakdown(sb, c));
             Section(sb, "DIGGERS", () => Diggers(sb, c));
             Section(sb, "BEARDS", () => Beards(sb, c));
             Section(sb, "ITOPOD PERKS (owned)", () => Perks(sb, c));
@@ -175,6 +177,61 @@ namespace NGUAdvisor.Managers
             sb.AppendLine($"  adv power     {NumberFormatter.Abbrev(c.totalAdvAttack())} attack · {NumberFormatter.Abbrev(c.totalAdvDefense())} defense");
             sb.AppendLine($"  cube          {NumberFormatter.Abbrev(c.inventoryController.cubePower())} P / {NumberFormatter.Abbrev(c.inventoryController.cubeToughness())} T");
             sb.AppendLine($"  drop chance   {c.lootFactor() * 100:#,0}%{FarmZoneDcText()}");
+        }
+
+        // EVERY FACTOR IN `Character.lootFactor`, TERM BY TERM, IN THE GAME'S OWN ORDER.
+        //
+        // Drop chance is a product, so "where do I get more" is not answerable from the total — a term
+        // sitting at 1.00 is either locked, unbought, or capped, and the three want completely different
+        // actions. Several of them are hard-gated on difficulty (the hacks term and the ITOPOD `drop2`
+        // half return 1 below Evil no matter what you own), which is invisible in any aggregate.
+        //
+        // Read straight off the live controllers rather than re-derived, so this cannot drift from what
+        // the game bills: if the listed factors stop multiplying out to the total, the decompiled
+        // formula this mirrors has changed.
+        private static void DropChanceBreakdown(StringBuilder sb, Character c)
+        {
+            var ic = c.inventoryController;
+            bool preEvil = c.settings.rebirthDifficulty < difficulty.evil;
+
+            void Row(string name, double factor, string note = "")
+                => sb.AppendLine($"  {name,-14}{factor,10:0.####}x{(note.Length > 0 ? "   " + note : "")}");
+
+            double gear = 1.0 + ic.bonuses[specType.Looting] + ic.bonuses[specType.Looting2] + ic.cubeLootBonus();
+
+            Row("ITOPOD", c.adventureController.itopod.totalDropChanceBonus(),
+                preEvil ? "newbie perk only — the drop2 half needs Evil" : "");
+            Row("macguffin", c.inventory.macguffinBonuses[10]);
+            Row("gear", gear, "Looting + Looting2 + cube — what the optimizer's Drop Chance score measures");
+            Row("blood", c.bloodMagicController.lootBonus());
+            Row("yggdrasil", c.yggdrasilController.luckBonus());
+            Row("NGU", c.NGUController.lootBonus());
+            Row("beards", c.allBeards.lootBonus());
+            // Same shape as the cards line: the game's own getter returns a flat 1 while the Drop Chance
+            // digger sits inactive, and `skipCheck` is the overload that answers what it WOULD supply at
+            // the level it is already sitting on. A digger benched by the profile's pool is a factor that
+            // can be switched on today, which a bare 1.00 hides completely.
+            bool dcDiggerOn = c.diggers.diggers[0].active;
+            Row("diggers", c.allDiggers.totalDropChanceBonus(),
+                dcDiggerOn ? "" : $"Drop Chance digger is NOT active — at L{c.diggers.diggers[0].curLevel} it would give "
+                                + $"{c.allDiggers.totalDropChanceBonus(0, true):0.####}x");
+            Row("hacks", c.hacksController.totalDropChanceBonus(), preEvil ? "LOCKED — returns 1 below Evil" : "");
+            // getBonus returns a flat 1 while the cards menu is off, which reads identically to "you own
+            // nothing" — so when it IS off, report the bonus the equipped cards would be supplying.
+            // That is the difference between a term with no headroom and a term switched off.
+            double cardsRaw = c.cards.bonuses[(int)cardBonus.dropChance];
+            Row("cards", c.cardsController.getBonus(cardBonus.dropChance),
+                c.cards.cardsOn ? "" : $"cards are OFF — the equipped set would give {cardsRaw:0.####}x");
+            // Set bonuses are all-or-nothing, so an incomplete one is worth naming: it is a factor
+            // sitting at exactly 1.00 that a finished collection would switch on whole.
+            Row("2D set", c.inventory.itemList.twoDComplete ? 1.0743 : 1.0,
+                c.inventory.itemList.twoDComplete ? "" : "incomplete — worth 1.0743x when finished");
+            Row("bonus acc set", c.inventory.itemList.normalBonusAccComplete ? 1.25 : 1.0,
+                c.inventory.itemList.normalBonusAccComplete ? "" : "incomplete — worth 1.25x when finished");
+            if (c.arbitrary.lootcharm1Time.totalseconds > 0.0)
+                Row("loot potion", c.allArbitrary.potionModifier(), "ACTIVE — expires, so the total is temporarily inflated");
+
+            sb.AppendLine($"  {"TOTAL",-14}{c.lootFactor(),10:0.####}x");
         }
 
         // Drop chance is one half of a comparison the advisor makes constantly and nothing else here
