@@ -33,10 +33,7 @@ namespace NGUAdvisor.Managers
             public bool WantLoot;      // Spaghetti: log2(invested/min)% drop chance
             public bool WantGold;      // Counterfeit Gold: log2(invested/min)^2 % GPS (needs TM base gold)
             public string RouteReason;
-            // Per-sink verdicts, so the panel can say WHY a sink isn't taking blood instead of only
-            // naming the winner (user-reported: "Counterfeit set to 500 % and it still farms NUMBER").
-            public SinkVerdict GoldVerdict, LootVerdict;
-            public string GoldDetail, LootDetail;
+            public BudgetPlan Budget;   // how the run's blood splits between the spells, and why each share stops
             public double CdLeftSec, CdTotalSec;   // Iron Pill cooldown state — the panel bar charges toward ready
             public long PillPowerNow;              // what casting the current pool grants (game formula); 0 = below cast min
         }
@@ -181,7 +178,7 @@ namespace NGUAdvisor.Managers
                 // growth over that window, not the whole run. bps itself GROWS with magic cap over the
                 // run — PoolOver projects pooled blood over [t0, t0+T] with the measured growth rate.
                 long eNow = blood >= minBlood ? (long)Math.Floor(Math.Pow(blood, 0.25)) : 0;
-                bool autosDraining = c.bloodMagic.rebirthAutoSpell || c.bloodMagic.lootAutoSpell || c.bloodMagic.goldAutoSpell;
+                bool autosDraining = AdvisorOwnsBlood() || c.bloodMagic.rebirthAutoSpell || c.bloodMagic.lootAutoSpell || c.bloodMagic.goldAutoSpell;
                 double capGrowth = MagicGrowthPerSec(c);
                 double PoolOver(double t0, double T) => T <= 0 ? 0 : bps * T * (1.0 + capGrowth * (t0 + T / 2.0));
 
@@ -265,22 +262,20 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"BloodPlanner: {e.Message}"); return p; }
         }
 
-        // Decide the investment-spell routing. The game's autoSpell() splits blood evenly among the
-        // enabled toggles each second, so "setting the spells properly" means choosing WHICH are on:
-        //  - While the Iron Pill is charging (ready or ready soon), everything is OFF to pool.
-        //  - Counterfeit Gold only helps if the Time Machine has base gold to multiply, and matters
-        //    most while gold-starved for augments.
-        //  - Spaghetti (drop chance) while the farm zone's recommended DC isn't met.
-        //  - NUMBER boost is the default sink — dead only in NORB (no rebirth = the banked multi is
-        //    never cashed) and when no rebirth is scheduled.
+        // Decide the blood budget (BloodRouter.Plan): the run's blood is split equally between the enabled
+        // spells, Counterfeit/Spaghetti snapped to whole +1 % steps. Spend() then casts it. While the Iron
+        // Pill is charging nothing is cast, so the pill gets the pool.
         public static void FillRouting(ref Plan p)
         {
             try
             {
-                var c = Main.Character;
+                Character c = Main.Character;
                 if (c == null || c.bossID <= 36) return;   // game gates auto-spells until boss 37
 
                 p.RouteKnown = true;
+                RebirthOutlook outlook = Outlook();
+                p.Budget = BloodRouter.Plan(BudgetInputs(c, outlook));
+                p.WantGold = p.WantLoot = p.WantRebirth = false;
 
                 double cdLeft = Math.Max(0, c.bloodSpells.adventureSpellCooldown - c.bloodMagic.adventureSpellTime.totalseconds);
                 double trueRunLeft = RunLeftSeconds(c);
@@ -297,105 +292,129 @@ namespace NGUAdvisor.Managers
                     return;
                 }
 
-                // SINGLE-SINK routing (user pick): the game splits blood EVENLY among enabled toggles,
-                // so enabling several DILUTES them — pick exactly one.
-                //
-                // The three sinks are NOT commensurable (decomp):
-                //   NUMBER  rebirthPower += blood  — LINEAR and uncapped (RebirthPowerSpell), and a
-                //           straight multiplier on the WHOLE next-run attack/defense multi
-                //           (Rebirth.calculateNextMultis), re-based to 1.0 every rebirth.
-                //   Gold    1 + floor((log2(b/min)+1)^2)/100   — LOG.
-                //   Loot    +1% drop chance per DOUBLING of b  — LOG.
-                // All three are wiped by bloodMagicController.reset() at rebirth — an earlier comment
-                // here claimed they persist; they do not. Only NUMBER leaves anything behind, as the
-                // multi banked a moment earlier by setNewMultis().
-                //
-                // So gold/loot buy IN-RUN throughput whose value decays with the time left to earn it
-                // back, while NUMBER banks the same blood at a linear rate whenever it is spent. Order:
-                // NUMBER floor > gold > loot (while the investment window is open) > NUMBER.
-                bool norb = false;
-                try { norb = ChallengeDetector.Current() == "NORB"; } catch { }
-                bool rebirthOn = Main.Profile != null && Main.Profile.NextRebirthTargetSeconds() > 0;
-                double bps = 0;
-                try { bps = c.bloodMagicController.totalBloodGainedPerSecond(); } catch { }
-                double rebirthPower = 1;
-                try { rebirthPower = c.bloodMagic.rebirthPower; } catch { }
-                double numTarget = Main.Settings != null ? Main.Settings.BloodNumberThreshold : 0;
-
-                p.WantGold = p.WantLoot = p.WantRebirth = false;
-
-                bool numberEligible = !norb && rebirthOn;
-
-                // With NUMBER off the table (NORB / no rebirth scheduled) there is nothing to bank, so
-                // the in-run sinks are the only use for blood and the window never closes.
-                bool windowOpen = !numberEligible || InvestmentWindowOpen(c);
-
-                // Gold demand = augs OR diggers (user rule): once augs are funded the digger max-level
-                // upgrades are the next gold sink, and they need a far HIGHER gold cap — Counterfeit
-                // stays credited until those are funded too.
-                string goldReason = null, dcReason = null;
-                var goldMode = Mode(true);
-                var lootMode = Mode(false);
-                p.GoldVerdict = BloodRouter.JudgeSink(goldMode, GoldTarget(), CounterfeitPercentNow(c), windowOpen,
-                    () => c.machine.realBaseGold > 0,
-                    () => OptimizationAdvisor.GoldStarvedForAugs(c, 2.0) || OptimizationAdvisor.GoldStarvedForDiggers(c),
-                    () => GoldBelowKnee(c, bps, _held == BloodRoute.Gold, out goldReason));
-                // Spaghetti has no feasibility gate of its own (it unlocks with the other auto-spells at
-                // boss 37) and no cost-curve knee worth gating on — its cost simply doubles per +1 %,
-                // so the ceiling IS the stopping rule. Zone-farming below the zone's recommended drop
-                // chance is DEMAND, which is exactly what Push is allowed to overrule.
-                p.LootVerdict = BloodRouter.JudgeSink(lootMode, LootTarget(), SpaghettiPercentNow(c), windowOpen,
-                    () => true, () => DcBelowZoneRec(c, out dcReason), () => true);
-                p.GoldDetail = goldReason ?? GoldStepDetail(c, bps);
-                p.LootDetail = dcReason;
-
-                var route = BloodRouter.DecideRoute(numberEligible, numTarget, rebirthPower,
-                    goldMode, p.GoldVerdict, lootMode, p.LootVerdict);
-                route = Commit(route, p.GoldVerdict, p.LootVerdict);
-
-                switch (route)
+                double rebirthPower = Math.Max(1.0, c.bloodMagic.rebirthPower);
+                BudgetPlan b = p.Budget;
+                switch (b.Route)
                 {
-                    // The "Number ≥" knob is a FLOOR, not a ceiling: while under it NUMBER outranks the
-                    // in-run sinks. The old code stopped routing at the target, which capped a linear
-                    // uncapped multiplier at a hand-typed number — and because the auto profile funds
-                    // rituals only while a sink is live (ChallengeOverlay), stopping also cut blood
-                    // income for the rest of the run.
-                    case BloodRoute.NumberFloor:
-                        p.WantRebirth = true;
-                        p.RouteReason = $"NUMBER (below floor {ExpBalancer.Fmt(numTarget)} · now x{ExpBalancer.Fmt(rebirthPower)})";
-                        break;
                     case BloodRoute.Gold:
                         p.WantGold = true;
-                        p.RouteReason = (goldMode == SinkMode.Push ? "Counterfeit gold — your target" : goldReason)
-                            + TargetSuffix(GoldTarget());
+                        p.RouteReason = $"Counterfeit gold +{b.Gold.NowPct + 1}% next · pooling {ExpBalancer.Fmt(Math.Min(c.bloodMagic.bloodPoints, b.Gold.NextStepCost))} / {ExpBalancer.Fmt(b.Gold.NextStepCost)}";
                         break;
                     case BloodRoute.Loot:
                         p.WantLoot = true;
-                        p.RouteReason = (lootMode == SinkMode.Push ? "Spaghetti drop chance — your target" : dcReason)
-                            + TargetSuffix(LootTarget());
+                        p.RouteReason = $"Spaghetti +{b.Loot.NowPct + 1}% next · pooling {ExpBalancer.Fmt(Math.Min(c.bloodMagic.bloodPoints, b.Loot.NextStepCost))} / {ExpBalancer.Fmt(b.Loot.NextStepCost)}";
                         break;
-                    case BloodRoute.NumberDefault:
-                        // DEFAULT SINK. Any blood still pooled at rebirth is force-cast here anyway
-                        // (BaseRebirth.CastBloodSpellsForRebirth), so routing it now costs nothing and
-                        // starts compounding immediately.
+                    case BloodRoute.Number:
                         p.WantRebirth = true;
-                        bool ceiling = false;
-                        try { ceiling = c.bossID - 1 >= OptimizationAdvisor.BossUnlockCeiling(); } catch { }
-                        string why = windowOpen ? "default sink" : "banking the run's tail";
-                        p.RouteReason = ceiling
-                            ? $"NUMBER (boss EXP push · {why} · now x{ExpBalancer.Fmt(rebirthPower)})"
-                            : $"NUMBER ({why} · now x{ExpBalancer.Fmt(rebirthPower)})";
+                        p.RouteReason = $"NUMBER (gold/loot at their share · x{ExpBalancer.Fmt(rebirthPower)})";
                         break;
                     default:
-                        // Genuinely nothing to bank: keep every auto-spell OFF so blood magic doesn't drain
-                        // the marathon's magic cap (BR-30 gates on a live sink).
-                        p.RouteReason = norb
-                            ? "blood idle — NORB: no rebirth to cash a NUMBER multi into"
-                            : "blood idle — no rebirth scheduled to bank NUMBER for";
+                        // Nothing to bank: keep every auto-spell OFF so blood magic doesn't drain the
+                        // marathon's magic cap (BR-30 gates on a live sink).
+                        p.RouteReason = IdleReason(outlook);
                         break;
                 }
             }
             catch (Exception e) { Main.LogDebug($"BloodPlanner routing: {e.Message}"); }
+        }
+
+        // Cast the plan with exact amounts (RebirthPowerSpell.castGoldSpell/castLootSpell/castRebirthSpell
+        // take one) instead of the auto-spell toggles, which cast the WHOLE pool every second and so could
+        // only ever pour blood into a step that is not yet paid for. A step is cast only once the pool
+        // covers it; NUMBER takes the pool once both in-run spells hold their share (it is time-
+        // indifferent, and the rebirth force-cast banks whatever is still pooled). Main thread only.
+        // Returns what was cast, for the log; null when nothing was.
+        public static string Spend(Plan p)
+        {
+            if (!p.RouteKnown || p.PoolForPill) return null;
+            Character c = Main.Character;
+            List<string> cast = new List<string>();
+            for (int guard = 0; guard < 64; guard++)
+            {
+                BudgetPlan b = p.Budget;
+                double pool = c.bloodMagic.bloodPoints;
+                if (b.Route == BloodRoute.Gold || b.Route == BloodRoute.Loot)
+                {
+                    bool gold = b.Route == BloodRoute.Gold;
+                    SinkPlan s = gold ? b.Gold : b.Loot;
+                    if (!(s.NextStepCost > 0) || s.NextStepCost > pool) break;
+                    if (gold) c.bloodSpells.castGoldSpell(s.NextStepCost);
+                    else c.bloodSpells.castLootSpell(s.NextStepCost);
+                    cast.Add($"{(gold ? "Counterfeit" : "Spaghetti")} +{s.NowPct + 1}% for {ExpBalancer.Fmt(s.NextStepCost)}");
+                }
+                else if (b.Route == BloodRoute.Number)
+                {
+                    if (!(pool > 0)) break;
+                    c.bloodSpells.castRebirthSpell(pool);
+                    cast.Add($"NUMBER +{ExpBalancer.Fmt(pool)}");
+                    break;
+                }
+                else break;
+                p = Analyze();
+                FillRouting(ref p);
+                if (!p.RouteKnown || p.PoolForPill) break;
+            }
+            return cast.Count > 0 ? string.Join(", ", cast.ToArray()) : null;
+        }
+
+        // Is a rebirth going to cash the NUMBER bank — a different question from WHEN it happens. With
+        // Auto Rebirth off the player rebirths by hand, which cashes it just the same.
+        public enum RebirthOutlook { Coming, NoRebirthChallenge, NothingArmed }
+
+        private static RebirthOutlook Outlook()
+        {
+            bool norb = false;
+            try { norb = ChallengeDetector.Current() == "NORB"; } catch { }
+            if (norb) return RebirthOutlook.NoRebirthChallenge;
+            SavedSettings s = Main.Settings;
+            if (s == null || !s.AutoRebirth) return RebirthOutlook.Coming;
+            bool armed = (Main.Profile != null && Main.Profile.RebirthArmed()) || s.MoneyPitRunMode;
+            return armed ? RebirthOutlook.Coming : RebirthOutlook.NothingArmed;
+        }
+
+        private static string IdleReason(RebirthOutlook o)
+        {
+            switch (o)
+            {
+                case RebirthOutlook.NoRebirthChallenge: return "blood idle — NORB: no rebirth to cash a NUMBER multi into";
+                default: return "blood idle — the profile arms no rebirth to bank NUMBER for";
+            }
+        }
+
+        // Horizon when the rebirth has no clock (a Number/Bosses trigger, money-pit runs, or none at
+        // all): project one hour of income, the same default BestAug prices augments over.
+        private const double UnclockedHorizonSec = 3600;
+
+        private static BudgetInput BudgetInputs(Character c, RebirthOutlook outlook)
+        {
+            double elapsed = c.rebirthTime.totalseconds;
+            double target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1;
+            bool clocked = target > 0 && outlook == RebirthOutlook.Coming;
+            double horizon = clocked ? Math.Max(0, target - elapsed) : UnclockedHorizonSec;
+
+            double bps = 0;
+            try { bps = c.bloodMagicController.totalBloodGainedPerSecond(); } catch { }
+            return new BudgetInput
+            {
+                BloodOnHand = c.bloodMagic.bloodPoints,
+                Bps = bps,
+                CapGrowthPerSec = MagicGrowthPerSec(c),
+                HorizonSec = horizon,
+                NumberEligible = outlook == RebirthOutlook.Coming,
+                RebirthPower = Math.Max(1.0, c.bloodMagic.rebirthPower),
+                Gold = new SinkInput
+                {
+                    Mode = Mode(true),
+                    Invested = c.bloodMagic.goldSpellBlood,
+                    MinBlood = c.bloodSpells.minGoldBlood()
+                },
+                Loot = new SinkInput
+                {
+                    Mode = Mode(false),
+                    Invested = c.bloodMagic.lootSpellBlood,
+                    MinBlood = c.bloodSpells.minLootBlood()
+                }
+            };
         }
 
         // TRUE seconds to the scheduled rebirth; MaxValue when none is scheduled.
@@ -408,23 +427,6 @@ namespace NGUAdvisor.Managers
             }
             catch { }
             return double.MaxValue;
-        }
-
-        // Gold/loot only outrank NUMBER while enough of the run remains for their LOG-scaled, in-run
-        // bonus to earn back the blood it costs — both are wiped at rebirth and must be re-earned, so
-        // their value decays to nothing as the deadline approaches. NUMBER is time-indifferent, so it
-        // always owns the tail of the run.
-        private const double InvestmentWindowFraction = 0.5;
-
-        private static bool InvestmentWindowOpen(Character c)
-        {
-            try
-            {
-                double tgt = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1;
-                if (tgt <= 0) return true;
-                return Math.Max(0, tgt - c.rebirthTime.totalseconds) > tgt * InvestmentWindowFraction;
-            }
-            catch { return true; }
         }
 
         // Mirrors ApplyBlood's gate (AdvisorApply: AdvisorBlood, then CastBloodSpells). Both must be on
@@ -477,12 +479,8 @@ namespace NGUAdvisor.Managers
             return _bloodMattersCache;
         }
 
-        // USER TARGETS (Systems > BLOOD inputs). Neither log sink is capped by the game, so without a
-        // ceiling Counterfeit/Spaghetti would hold the pool for the rest of the run once they win the
-        // routing. The checkbox is a permission and the number is a ceiling; inside what they allow the
-        // advisor's own gates (investment window, gold demand, the knee, zone DC) still decide. These
-        // read the same bonuses as the MANUAL AutoSpellSwap path (Main.cs), so a target means the same
-        // thing in both modes. 0 = no ceiling, matching BloodNumberThreshold's "0 = no floor".
+        // The game's own bonus reads — the same values Main's manual AutoSpellSwap path uses, so a
+        // ceiling means the same thing in both modes.
         public static int CounterfeitPercentNow(Character c)
         {
             try { return (int)Math.Round((c.bloodMagicController.goldBonus() - 1) * 100); }
@@ -495,135 +493,27 @@ namespace NGUAdvisor.Managers
             catch { return 0; }
         }
 
-        public static bool TargetOpen(int target, int now) => target <= 0 || now < target;
-
-        // Checkbox + Push flag -> the three states the panel offers.
         public static SinkMode Mode(bool gold)
         {
             var s = Main.Settings;
-            if (s == null) return SinkMode.Auto;
-            bool want = gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti;
-            if (!want) return SinkMode.Off;
-            return (gold ? s.BloodPushCounterfeit : s.BloodPushSpaghetti) ? SinkMode.Push : SinkMode.Auto;
+            if (s == null) return SinkMode.On;
+            return (gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti) ? SinkMode.On : SinkMode.Off;
         }
 
-        // MINIMUM DWELL. See BloodRouter.HoldPrevious for why: the knee is self-retriggering, and the
-        // shipped build bounced Counterfeit <-> NUMBER about once a minute. Latching here (rather than
-        // in ApplyBlood) keeps the panel honest — it renders the route that will actually be written.
-        private const double MinDwellSeconds = 300;
-        private static BloodRoute _held = BloodRoute.Idle;
-        private static DateTime _heldAt = DateTime.MinValue;
-
-        private static BloodRoute Commit(BloodRoute route, SinkVerdict gold, SinkVerdict loot)
-        {
-            double dwell = _heldAt == DateTime.MinValue ? double.MaxValue : (DateTime.UtcNow - _heldAt).TotalSeconds;
-            if (route != _held && BloodRouter.HoldPrevious(_held, gold, loot, dwell, MinDwellSeconds))
-                return _held;
-            if (route != _held) { _held = route; _heldAt = DateTime.UtcNow; }
-            return route;
-        }
-
-        private static int GoldTarget() => Main.Settings != null ? Main.Settings.CounterfeitThreshold : 0;
-        private static int LootTarget() => Main.Settings != null ? Main.Settings.SpaghettiThreshold : 0;
-
-        private static string TargetSuffix(int target) => target > 0 ? $" · to {target}%" : "";
-
-        // Counterfeit gold cost-curve knee. Game: +N% GPS needs goldSpellBlood = minGold x 2^(sqrt(N)-1).
-        // There is NO game cap (goldBonus = 1 + floor((log2(blood/min)+1)^2)/100 — user-corrected; the
-        // old "<100%" cutoff here discredited Counterfeit far too early). The only knee is the cost
-        // curve itself: eligible while the next +1% is reachable within ~20min of the FULL blood
-        // income (single-sink → no sharing). Past that the step is too slow to be worth the pool.
-        // HYSTERESIS (user-reported flip-flop). The knee is self-retriggering: routing gold buys the
-        // next +1 %, the step after it costs ~2x, its ETA jumps past the entry threshold, gold drops
-        // out — and blood income then grows until the very same step fits again. Entering costs 20 min,
-        // but staying is allowed up to 60 min, so a sink that already owns the pool finishes the step
-        // it started instead of handing the pool back to NUMBER halfway through.
-        private const double KneeEnterSeconds = 20 * 60;
-        private const double KneeHoldSeconds = 60 * 60;
-
-        private static bool GoldBelowKnee(Character c, double bps, bool holding, out string reason)
-        {
-            reason = null;
-            try
-            {
-                double eta = GoldNextStepEta(c, bps, out double cur);
-                if (eta > (holding ? KneeHoldSeconds : KneeEnterSeconds)) return false;
-                reason = $"Counterfeit gold +{cur:0}% GPS (next +1% in ~{Math.Max(1, eta / 60):0}m)";
-                return true;
-            }
-            catch { return false; }
-        }
-
-        // Seconds until the next +1 % GPS at the FULL current blood income (single-sink → no sharing).
-        // Game: +N% needs goldSpellBlood = minGold x 2^(sqrt(N)-1).
-        private static double GoldNextStepEta(Character c, double bps, out double cur)
-        {
-            cur = 0;
-            double gb = Math.Max(0, c.bloodMagic.goldSpellBlood);
-            double gm = c.bloodSpells.minGoldBlood();
-            if (gm <= 0) return double.MaxValue;
-            cur = gb >= gm ? Math.Floor(Math.Pow(Math.Log(gb / gm, 2.0) + 1.0, 2.0)) : 0;
-            double nextInvest = gm * Math.Pow(2.0, Math.Sqrt(cur + 1.0) - 1.0);
-            return bps > 0 ? (nextInvest - gb) / bps : double.MaxValue;
-        }
-
-        // What the gold row shows when gold ISN'T the reason string's author — the panel needs the step
-        // ETA even for a sink that lost, otherwise "blocked" has no number behind it.
-        private static string GoldStepDetail(Character c, double bps)
+        // Compact investment status for the expanded detail row: each spell's bonus now against its plan.
+        public static string InvestmentDetail(in Plan p)
         {
             try
             {
-                double eta = GoldNextStepEta(c, bps, out double cur);
-                return eta >= double.MaxValue
-                    ? $"+{cur:0}% GPS · no blood income"
-                    : $"+{cur:0}% GPS · next +1% in ~{FmtH(eta)}";
-            }
-            catch { return null; }
-        }
-
-        // Spaghetti drop chance: worth it only while zone-farming a zone whose recommended drop chance
-        // isn't met yet. Cost DOUBLES per +1%, so there's no reason to push past the zone target.
-        private static bool DcBelowZoneRec(Character c, out string reason)
-        {
-            reason = null;
-            try
-            {
-                if (Main.Settings == null || !Main.Settings.GoldCBlockMode) return false;
-                int zone = ZoneStatHelper.GetBestZone()?.Zone ?? -1;
-                if (zone < 0 || !ZoneStatHelper.RecommendedDcPercent.TryGetValue(zone, out var rec)) return false;
-                double cur = c.lootFactor() * 100.0;
-                if (cur >= rec) return false;
-                reason = $"Spaghetti DC — {cur:0}% < zone rec {rec:0}%";
-                return true;
-            }
-            catch { return false; }
-        }
-
-        // Compact investment status for the expanded detail row.
-        public static string InvestmentDetail()
-        {
-            try
-            {
-                var c = Main.Character;
-                var s = c.bloodSpells;
-                var parts = new List<string>();
-                double lb = c.bloodMagic.lootSpellBlood, lm = s.minLootBlood();
-                if (lb >= lm && lm > 0)
-                {
-                    int cur = (int)Math.Floor(Math.Log(lb / lm, 2.0));
-                    parts.Add($"Spaghetti +{cur}% DC (next at {ExpBalancer.Fmt(lm * Math.Pow(2, cur + 1))})");
-                }
-                double gb = c.bloodMagic.goldSpellBlood, gm = s.minGoldBlood();
-                if (gb >= gm && gm > 0)
-                {
-                    // Exact game formula: floor((log2(invested/min)+1)^2).
-                    double cur = Math.Floor(Math.Pow(Math.Log(gb / gm, 2.0) + 1.0, 2.0));
-                    double nextAt = gm * Math.Pow(2.0, Math.Sqrt(cur + 1.0) - 1.0);
-                    parts.Add($"Gold +{cur:0}% GPS (next at {ExpBalancer.Fmt(nextAt)})");
-                }
-                if (c.bloodMagic.rebirthPower > 1)
-                    parts.Add($"NUMBER x{ExpBalancer.Fmt(c.bloodMagic.rebirthPower)}");
-                return parts.Count > 0 ? string.Join(" · ", parts.ToArray()) : null;
+                if (!p.RouteKnown) return null;
+                BudgetPlan b = p.Budget;
+                List<string> parts = new List<string>();
+                if (b.Gold.Mode != SinkMode.Off)
+                    parts.Add($"Gold {ExpBalancer.Fmt(b.Gold.Invested)} blood (+{b.Gold.NowPct}% GPS)");
+                if (b.Loot.Mode != SinkMode.Off)
+                    parts.Add($"Spaghetti {ExpBalancer.Fmt(b.Loot.Invested)} blood (+{b.Loot.NowPct}% DC)");
+                parts.Add($"NUMBER {ExpBalancer.Fmt(b.NumberInvested)} blood · share {ExpBalancer.Fmt(b.Share)} each");
+                return string.Join(" · ", parts.ToArray());
             }
             catch { return null; }
         }

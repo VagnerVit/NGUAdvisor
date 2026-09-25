@@ -1,10 +1,9 @@
 # BloodPlanner (`Managers/BloodPlanner.cs` + `Managers/BloodRouter.cs`)
 
 Blood Magic planner: Iron Pill cast timing + investment-spell routing from breakpoint math, all
-live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` toggle). The routing
-LADDER itself lives in `BloodRouter` — Unity-free and unit-tested (`BloodRouterTests`); BloodPlanner
-supplies the game reads as lazy predicates so evaluation order is unchanged and an expensive read
-never runs for a sink a cheaper gate already rejected.
+live game reads. Executor is `BloodMagicManager` (via AdvisorApply's `blood` toggle). The blood
+BUDGET itself lives in `BloodRouter.Plan` — Unity-free and unit-tested (`BloodRouterTests`);
+BloodPlanner only gathers the game reads into a `BudgetInput` and maps the plan to the toggles.
 
 ## Game-truth formulas (decomp)
 
@@ -16,12 +15,14 @@ never runs for a sink a cheaper gate already rejected.
 - **Counterfeit Gold**: `1 + floor((log2(b/min)+1)²)/100` % GPS — LOG, **NO game cap**
   (user-corrected; an old "<100 %" cutoff discredited Counterfeit far too early). Needs TM base
   gold to multiply.
-- **Spaghetti**: +1 % drop chance per DOUBLING of invested blood — LOG.
+- **Spaghetti**: `1 + floor(log2(b/min)+1)/100` drop chance — +1 % per DOUBLING, 1 % at the minimum.
 - **All three investment pools are WIPED at rebirth** (`bloodMagicController.reset()`) — an
   earlier comment claimed they persist; they do not. Only NUMBER leaves anything behind (the
   multi banked by `setNewMultis()` a moment earlier).
 - The game's auto-spells split blood EVENLY among enabled toggles every second → enabling several
   DILUTES them → **single-sink routing**: exactly one toggle on at a time.
+- Pre-rebirth top-up (`BaseRebirth.CastBloodSpellsForRebirth`) skips float residue below 1e-6 of
+  `rebirthPower`: the cast gains exactly `blood / rebirthPower` and costs a whole re-allocation pass.
 
 ## Pill decision rules (each labeled with its origin)
 
@@ -43,52 +44,41 @@ never runs for a sink a cheaper gate already rejected.
   with cap over the run, so pooled-blood projections use `PoolOver(t0,T)` with the measured rate.
   Statics reset on reload → growth reads 0 for the first minute (conservative).
 
-## Routing priority (`FillRouting`; game gates auto-spells until boss 37)
+## The blood budget (`BloodRouter.Plan`, 2026-09-23)
 
-1. **Pool for pill** — only when the advisor owns blood (`AdvisorBlood && CastBloodSpells`,
-   mirroring ApplyBlood's gate), pill worthwhile, reachable, cd < 15 min.
-2. **NUMBER floor**: `BloodNumberThreshold` is a FLOOR, not a ceiling — below it NUMBER outranks
-   the in-run sinks. (Old code stopped at the target, capping a linear uncapped multiplier AND
-   cutting ritual funding for the rest of the run.)
-3. **A PUSH sink** — gold before loot.
-4. **An AUTO sink** — gold before loot.
-5. **NUMBER default sink** — rebirth scheduled and not NORB; the rebirth force-cast banks
-   leftovers anyway, so routing early costs nothing.
-6. **All off** — NORB / no rebirth: nothing to bank; keep rituals from draining the marathon.
+The run's blood — in the spells, on hand, and the income still to come by the rebirth (`bps`,
+growing with the magic cap) — is split **equally** between the enabled spells (user decision
+2026-09-23, after a marginal-value version priced gold only through augments and drop chance at 0,
+so it routed everything to NUMBER). Blood already cast cannot be taken back, so a spell above the
+level keeps what it has and the rest is levelled across the others (water-filling, `Level`).
 
-Whether a sink is a candidate at all is `BloodRouter.JudgeSink`, in this order — the FIRST one that
-fails is the `SinkVerdict` the panel shows, so the reason the user reads is the reason that decided:
+- **Whole steps only.** Both bonuses are floored by the game, so blood between two thresholds buys
+  nothing: each in-run share is snapped DOWN to the last whole +1 % it pays for, and the remainder
+  goes to NUMBER, where every point counts.
+- **Exact casts, toggles off.** `BloodPlanner.Spend` casts with `castGoldSpell/castLootSpell(amount)`
+  only once the pool covers the whole next step, and `castRebirthSpell(pool)` once both in-run spells
+  hold their share. The game's auto-spell toggles stay off: they cast the whole pool every second,
+  into a step not yet paid for. The ritual gate (`ChallengeOverlay`) therefore reads
+  `BloodMatters()` intent — a toggle read would see "nothing live" and drop the rituals.
+- **Order**: the in-run spell with the cheaper next step first, then NUMBER (time-indifferent; the
+  rebirth force-cast banks whatever is still pooled). An Iron Pill cast takes the whole pool.
+- **No ceilings, no floor, no Push.** `CounterfeitThreshold`, `SpaghettiThreshold`,
+  `BloodNumberThreshold` and `BloodPush*` are no longer read in advisor mode (Main's manual
+  AutoSpellSwap path still reads the three thresholds). The dropdown is Off / Equal share.
+- **Known cost of the rule**: NUMBER is linear and multiplies the whole next run, the other two are
+  log bonuses for this run, so a third each gives up roughly two thirds of the next run's NUMBER for
+  a small bonus gain. The user chose it knowing that.
+- **Blood income depends on rituals being funded.** In the auto profile `BR-30` sits LAST in the
+  magic list, after NGU lanes that take the whole pool, so outside the augment hour `bps` is 0 and
+  the budget has nothing new to split (open, 2026-09-23).
 
-| gate | Counterfeit | Spaghetti | Push overrules it? |
-|---|---|---|---|
-| `Off` | `BloodWantCounterfeit` | `BloodWantSpaghetti` | — (Push implies on) |
-| `TargetReached` | `CounterfeitThreshold` %, 0 = none | `SpaghettiThreshold` %, 0 = none | no — it IS the target |
-| `NotFeasible` | TM has base gold to multiply | (none — unlocks with the others) | **no** |
-| `WindowClosed` | first 50 % of the run | same | **no** — both are wiped at rebirth, so this is arithmetic, not opinion |
-| `NoDemand` | augs (×2 hysteresis) OR digger upgrades unfunded | zone-farming below the zone's `RecommendedDcPercent` | **yes** |
-| `PastKnee` | next +1 % within the knee (below) | — (cost doubles per +1 %; the ceiling is the stopping rule) | **yes** |
+### Rebirth outlook — "is one coming", not "when"
 
-## The flip-flop, and the two fixes (user-reported 2026-09-12)
-
-Reported as "Counterfeit set to 500 % and it still farms NUMBER". `inject.log` showed the toggle
-bouncing Counterfeit ↔ NUMBER roughly once a minute for the whole run, so Counterfeit ran at about a
-20 % duty cycle — the 500 % ceiling was never even close to binding (the bonus stood at 272 %).
-
-**The knee is self-retriggering.** Route gold → it buys the next +1 % → the step after costs ~2× → its
-ETA jumps past the threshold → gold drops out to NUMBER → blood income grows → the same step fits
-again. Two independent fixes, because they answer different halves:
-
-- **Hysteresis**: entering the gold sink costs an ETA under `KneeEnterSeconds` (20 min), but HOLDING
-  it is allowed up to `KneeHoldSeconds` (60 min), so a sink that owns the pool finishes the step it
-  started instead of handing it back halfway.
-- **Minimum dwell** (`MinDwellSeconds`, 5 min, `BloodRouter.HoldPrevious`): a sink that wins holds the
-  pool — but only against gates that fix themselves (`NoDemand`, `PastKnee`). Off, target reached,
-  not feasible and window-closed hand it over at once. The latch lives in `FillRouting`, not in
-  `ApplyBlood`, so the panel renders the route that will actually be written.
-
-**And the ceiling was not an intent.** `SinkMode` (Off / Auto / **Push**) is now what the user states;
-Push overrules the advisor's discretionary gates up to the ceiling. See the table above for what it
-does NOT overrule.
+`NUMBER` is only worth banking if a rebirth will cash it: not NORB, and either the profile
+arms an entry (`CustomAllocation.RebirthArmed`, `RebirthTime >= 0`) or money-pit run mode is on — or Auto Rebirth is off, because then the player rebirths by hand. A
+Number/Bosses entry without a `Time` key parses to `RebirthTime 0` — armed, no clock — which the old
+`NextRebirthTargetSeconds() > 0` test read as "no rebirth" and idled blood on CBlock profiles. Without
+a clock the plan projects one hour (`UnclockedHorizonSec`, BestAug's default) — an assumption.
 
 ## `BloodMatters()` — the deadlock fix
 
@@ -108,8 +98,7 @@ of the run. The two Systems > BLOOD fields are now that ceiling:
   settings file written before Push reads back as the Off/Auto it already meant.
 - **Number** (`SpaghettiThreshold` / `CounterfeitThreshold`) = ceiling in %, **0 = no ceiling**
   (mirroring `BloodNumberThreshold`'s 0 = no floor). Reached -> the sink drops out of the routing.
-- Inside what they allow, every existing gate still decides — the targets FILTER the candidates,
-  they do not override the math.
+- Superseded 2026-09-23: the numbers and Push are no longer read in advisor mode (see the budget).
 - Both defaults are **true**: a settings file written before these existed routed gold/loot freely,
   and a false default would silently switch a sink off on upgrade.
 - NUMBER carries no checkbox: it is the FALLBACK branch, so "off" is not a state it can be in, and
@@ -117,7 +106,7 @@ of the run. The two Systems > BLOOD fields are now that ceiling:
 
 `CounterfeitPercentNow()` / `SpaghettiPercentNow()` read `bloodMagicController.goldBonus()` and
 `lootBonus()` — the same values Main's manual `AutoSpellSwap` path uses, so a target means the same
-thing in both modes, and BloodPanel renders its rows through them rather than recomputing.
+thing in both modes. BloodPanel renders its rows from the plan (`Plan.Budget`), never recomputing.
 
 **Why this existed as a bug (user-reported):** in ADVISOR mode the two % fields were read by nothing
 at all. Their only reader is `Main.cs`'s `if (Settings.AutoSpellSwap && !Settings.CastBloodSpells)`

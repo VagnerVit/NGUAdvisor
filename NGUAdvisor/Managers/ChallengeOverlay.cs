@@ -692,15 +692,10 @@ namespace NGUAdvisor.Managers
             // bootstrap rituals from zero — a pre-existing limit; revisit with potential income if it bites.)
             if (!e)
             {
+                // The routing INTENT, not the toggles: the advisor casts exact amounts with every
+                // auto-spell toggle off, so a toggle read would drop rituals the plan still wants.
                 bool bloodMatters = true;
-                try
-                {
-                    var bm = Main.Character.bloodMagic;
-                    bool spellLive = bm.rebirthAutoSpell || bm.lootAutoSpell || bm.goldAutoSpell;
-                    bool pillWorth = Main.Settings != null && Main.Settings.CastBloodSpells
-                        && BloodPlanner.PillWorthPursuing();
-                    bloodMatters = spellLive || pillWorth;
-                }
+                try { bloodMatters = BloodPlanner.BloodMatters(); }
                 catch { bloodMatters = true; }   // fail-safe: keep rituals if the state read throws
                 if (bloodMatters) list.Add("BR-30");
             }

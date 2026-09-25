@@ -235,6 +235,11 @@ namespace NGUAdvisor.AllocationProfiles
             return best;
         }
 
+        // Whether any rebirth entry can fire, clock or not: a Number/Bosses entry without a "Time" key
+        // parses to RebirthTime 0 (armed, no time floor), which NextRebirthTargetSeconds reads as none.
+        // -1 disarms, the same filter DoRebirth applies.
+        public bool RebirthArmed() => _wrapper != null && _wrapper.rebirth.Any(x => x.RebirthTime >= 0.0);
+
         // Seconds of augment funding left on the energy timeline (see EnergyBreakpoints), -1 when the
         // phase is open-ended.
         public double AugmentPhaseSecondsLeft() => _wrapper?.energy?.AugmentPhaseSecondsLeft() ?? -1;

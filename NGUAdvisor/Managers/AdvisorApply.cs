@@ -303,7 +303,9 @@ namespace NGUAdvisor.Managers
 
         // Blood planner auto: cast Iron Pill at the breakpoint-optimal moment (BloodPlanner decides;
         // the threshold path in CastBloodSpells is disabled for the pill while this is on).
+        private static string _lastTitanDcDbg;
         private static DateTime _lastBloodCheck = DateTime.MinValue;
+        private static string _lastBloodRoute;
 
         private static void ApplyBlood()
         {
@@ -315,21 +317,23 @@ namespace NGUAdvisor.Managers
             if (plan.Known && plan.CastIronNow)
                 BloodMagicManager.ironPill.CastPlanned();
 
-            // Route the investment auto-spells (the game splits blood evenly among enabled toggles;
-            // pooling turns them all off so the Iron Pill can actually charge).
+            // The advisor casts exact amounts (BloodPlanner.Spend), so the game's auto-spell toggles stay
+            // OFF: they cast the whole pool every second, into a step that may not be paid for yet.
             BloodPlanner.FillRouting(ref plan);
             if (plan.RouteKnown)
             {
                 var bm = Main.Character.bloodMagic;
-                bool r = !plan.PoolForPill && plan.WantRebirth;
-                bool l = !plan.PoolForPill && plan.WantLoot;
-                bool g = !plan.PoolForPill && plan.WantGold;
-                if (bm.rebirthAutoSpell != r || bm.lootAutoSpell != l || bm.goldAutoSpell != g)
+                if (bm.rebirthAutoSpell || bm.lootAutoSpell || bm.goldAutoSpell)
+                    bm.rebirthAutoSpell = bm.lootAutoSpell = bm.goldAutoSpell = false;
+                string cast = BloodPlanner.Spend(plan);
+                if (cast != null) Main.Log($"Advisor: blood cast -> {cast}");
+                // Keyed on the decision, not the text: the reason carries the pool size, which moves every tick.
+                BudgetPlan b = plan.Budget;
+                string key = plan.PoolForPill ? "pill" : $"{b.Route}|{b.Gold.TargetPct}|{b.Loot.TargetPct}";
+                if (key != _lastBloodRoute)
                 {
-                    bm.rebirthAutoSpell = r;
-                    bm.lootAutoSpell = l;
-                    bm.goldAutoSpell = g;
-                    Main.Log($"Advisor: blood routing -> {(plan.PoolForPill ? "pooling for Iron Pill (all auto-spells off)" : plan.RouteReason)}");
+                    _lastBloodRoute = key;
+                    Main.Log($"Advisor: blood routing -> {(plan.PoolForPill ? "pooling for Iron Pill" : plan.RouteReason)}");
                 }
             }
         }

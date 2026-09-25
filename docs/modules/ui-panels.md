@@ -270,21 +270,19 @@ lines tall — a value line and a muted WHY line:
 
 | column | Spaghetti / Counterfeit | NUMBER |
 |---|---|---|
-| caption | plain label | plain label — it is the fallback sink, so "off" is not a state |
-| intent | `LineComboBox`: **Off / Advisor decides / Push to** | `floor` label — NUMBER has no intent to state |
-| number | ceiling in %, 0 = none; disabled while Off | floor, 0 = none; finite and non-negative only |
-| status | `now 19% -> 40%` / `target reached` / `no ceiling` / `off` | `now x500M -> floor 100M` / `floor met` |
-| WHY | `routing now` / `not routed: <gate>` / `eligible — another sink holds the pool` | `routing now` / `fallback sink — …` |
+| caption | plain label | plain label — it banks what the others do not take, so "off" is not a state |
+| intent | `LineComboBox`: **Off / Equal share** | — NUMBER always takes its share |
+| status | `17.1T blood (12%) · +626% GPS → share 47.4T · +780% GPS` | `125T blood (88%) · x125T → share …` |
+| WHY | `routing now · <deficit> to its share` / `waits its turn` / `at its share` / `off` | `routing now` / `takes the pool once gold and loot are at their share` |
 
-**The dropdown is the 2026-09-12 fix.** A checkbox could only say "allowed", so a ceiling the user
-typed read like a goal and behaved like a filter — Counterfeit set to 500 % kept losing the pool to
-NUMBER and the panel gave no hint why. `SinkMode` is now the intent; the panel writes it as the two
-flags behind it (`BloodWant*` = permission, `BloodPush*` = push), which is why a settings file from
-before this reads back as the Off/Auto it already meant.
+Above the rows, `_budgetLine` states the whole budget the plan splits: invested + on hand + the income
+still to come by the rebirth. Every number on the page comes from the one `BudgetPlan` the routing
+follows (BloodPlanner.md).
 
-**The WHY line is the other half.** It names the gate that actually decided (`BloodRouter.Describe`),
-and when that gate is one Push may overrule (`NoDemand`, `PastKnee`) it says so in place — the fix is
-a dropdown away, and nothing else in the UI could tell the user that.
+**The dropdown** writes only `BloodWant*` (Off / Equal share); the `BloodPush*` flags are no longer read.
+
+**Ceilings and the floor are gone from this panel (2026-09-23)**: the split is equal by rule, so the
+rows show how much blood each spell HOLDS against its share instead of a user-typed target.
 
 Geometry: `SinkCapX`/`SinkModeX` are scaled constants, `SinkNumX`/`SinkStatX` are **derived** from
 `UiTheme.NumWidthFor` because `UiTheme.Num` is font-measured (ui-infra.md — a tuned spinner width

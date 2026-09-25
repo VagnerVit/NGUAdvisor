@@ -446,7 +446,7 @@ namespace NGUAdvisor.Managers
                         BloodPlanner.FillRouting(ref bp2);
                         if (bp2.RouteKnown && !bp2.PoolForPill && !string.IsNullOrEmpty(bp2.RouteReason))
                             text += $" | route: {bp2.RouteReason}";
-                        var detail = BloodPlanner.InvestmentDetail();
+                        var detail = BloodPlanner.InvestmentDetail(bp2);
                         if (detail != null)
                             text += $" | {detail}";
                         list.Add(new Rec { System = "Blood", AutoKey = "blood", Text = text, Severity = bp2.Severity, Optimal = bp2.Optimal });

@@ -244,6 +244,20 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // The plan the blood routing follows, plus the live inputs that shaped it.
+        private static void BloodBudget(StringBuilder sb, Character c)
+        {
+            BloodPlanner.Plan p = BloodPlanner.Analyze();
+            BloodPlanner.FillRouting(ref p);
+            if (!p.RouteKnown) return;
+            BudgetPlan b = p.Budget;
+            sb.AppendLine($"  bps {c.bloodMagicController.totalBloodGainedPerSecond():E3}  on hand {c.bloodMagic.bloodPoints:E3}  future {b.FutureBlood:E3}  total {b.TotalBlood:E3}  spells {b.Spells}  share {b.Share:E3}");
+            sb.AppendLine($"  Counterfeit {b.Gold.Mode,-3} in {b.Gold.Invested:E3} ({b.Gold.NowPct}%)  plan {b.Gold.TargetBlood:E3} ({b.Gold.TargetPct}%)");
+            sb.AppendLine($"  Spaghetti   {b.Loot.Mode,-3} in {b.Loot.Invested:E3} ({b.Loot.NowPct}%)  plan {b.Loot.TargetBlood:E3} ({b.Loot.TargetPct}%)");
+            sb.AppendLine($"  NUMBER          in {b.NumberInvested:E3}  plan {b.NumberTarget:E3}");
+            sb.AppendLine($"  route {b.Route}{(p.PoolForPill ? " (pooling for pill)" : "")} — {p.RouteReason}");
+        }
+
         private static void Diggers(StringBuilder sb, Character c)
         {
             var active = c.diggers.activeDiggers;
