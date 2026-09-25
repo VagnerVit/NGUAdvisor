@@ -329,7 +329,7 @@ namespace NGUAdvisor
                     if (!c.Visible) continue;
                     c.SetWidth(w);
                     c.Location = new Point(SideMargin, y);
-                    y += RowH + RowGap;
+                    y += c.Height + RowGap;
                     shown++;
                 }
 
@@ -352,7 +352,7 @@ namespace NGUAdvisor
                         if (!r.Visible) continue;
                         r.SetWidth(w);
                         r.Location = new Point(SideMargin, y);
-                        y += RowH + RowGap;
+                        y += r.Height + RowGap;
                     }
                 }
                 else if (_refsCap.Visible) _refsCap.Visible = false;
@@ -634,8 +634,33 @@ namespace NGUAdvisor
                 int cw = ClientSize.Width;
 
                 _open.Left = cw - _open.Width - UiTheme.S(10);
-                _status.Width = Math.Max(UiTheme.S(80), _open.Left - UiTheme.S(12) - StatusX);
-                UiLayout.FitInto(_status, _statusRaw);
+                PlaceStatus();
+            }
+
+            // Inline beside the chips when the status fits there; otherwise it takes its own line under
+            // them, across the row, and wraps — the card grows instead of cutting the sentence.
+            private void PlaceStatus()
+            {
+                int inline = _open.Left - UiTheme.S(12) - StatusX;
+                int bottom;
+                if (UiLayout.MeasureText(_statusRaw, _status.Font) + UiTheme.S(8) <= inline)
+                {
+                    _status.Location = new Point(StatusX, UiTheme.S(7));
+                    _status.Width = inline;
+                    bottom = UiLayout.FitOrGrow(_status, _statusRaw, 1);
+                }
+                else
+                {
+                    _status.Location = new Point(TitleX, RowH - UiTheme.S(4));
+                    _status.Width = _open.Left - UiTheme.S(12) - TitleX;
+                    bottom = UiLayout.FitOrGrow(_status, _statusRaw, 3);
+                }
+                int h = Math.Max(RowH, bottom + UiTheme.S(6));
+                if (Height != h)
+                {
+                    Height = h;
+                    (Parent as SystemIndexPanel)?.Relayout();
+                }
             }
 
             public void Sync()
@@ -663,7 +688,7 @@ namespace NGUAdvisor
 
                     _statusRaw = s.Status ?? "";
                     _status.ForeColor = s.StatusColor;
-                    UiLayout.FitInto(_status, _statusRaw);
+                    PlaceStatus();
                 }
                 catch (Exception e) { LogDebug($"SystemIndex sync {Entry.Id}: {e.Message}"); }
             }
@@ -770,7 +795,7 @@ namespace NGUAdvisor
                 else right = cw - UiTheme.S(10);   // no button, no reserved gap where one would have been
 
                 _blurb.Width = Math.Max(UiTheme.S(80), right - ColX);
-                UiLayout.FitInto(_blurb, _blurbRaw);
+                Height = Math.Max(RowH, UiLayout.FitOrGrow(_blurb, _blurbRaw, 3) + UiTheme.S(6));
             }
         }
     }

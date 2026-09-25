@@ -13,6 +13,10 @@ namespace NGUAdvisor
     // card (click to expand/collapse).
     public class ActionsPanel : Panel
     {
+        // Name column measured from the longest system name the advisor emits, with the renderer's
+        // extra width as cushion — a tuned 100 clipped "ADV TRAINING".
+        private static int NameColW => UiLayout.MeasureText("ADV TRAINING", UiTheme.Chip) + UiTheme.S(16);
+
         private class ActSlot
         {
             public Panel Card;
@@ -83,9 +87,9 @@ namespace NGUAdvisor
                     Visible = false
                 };
                 a.Stripe = new Panel { Location = new Point(0, 0), Size = new Size(UiTheme.S(4), UiTheme.S(24)), BackColor = UiTheme.Energy };
-                // Name column sized to the longest real system name ("ADV TRAINING" clipped at 86).
-                a.Name = new Label { Text = "", AutoSize = false, Size = new Size(UiTheme.S(100), UiTheme.SHead(20)), Font = UiTheme.Chip, ForeColor = UiTheme.Accent, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(10), UiTheme.S(4)) };
-                a.Text = new Label { Text = "", AutoSize = false, Size = new Size(chipX - UiTheme.S(122), UiTheme.SText(20)), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(114), UiTheme.S(2)) };
+                a.Name = new Label { Text = "", AutoSize = false, Size = new Size(NameColW, UiTheme.SHead(20)), Font = UiTheme.Chip, ForeColor = UiTheme.Accent, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(10), UiTheme.S(4)) };
+                int textX = a.Name.Right + UiTheme.S(4);
+                a.Text = new Label { Text = "", AutoSize = false, Size = new Size(chipX - UiTheme.S(8) - textX, UiTheme.SText(20)), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Surface, Location = new Point(textX, UiTheme.S(2)) };
                 a.Chip = new Label
                 {
                     Text = "", AutoSize = false, Size = new Size(UiTheme.S(74), UiTheme.SHead(18)), Font = UiTheme.Chip,
@@ -218,7 +222,7 @@ namespace NGUAdvisor
                     a.Card.Cursor = Cursors.Default;
                     a.Stripe.BackColor = rec.Optimal ? UiTheme.Cap : rec.Severity >= 2 ? UiTheme.Danger : UiTheme.Energy;
                     UiLayout.FitInto(a.Name, rec.System.ToUpperInvariant());
-                    UiLayout.FitOrGrow(a.Text, Report(rec.Text));   // card grows a second line, no "…"
+                    UiLayout.FitOrGrow(a.Text, Report(rec.Text), 3);   // card grows, no "…"
                     a.AutoKey = rec.AutoKey;
                     bool hasKey = rec.AutoKey != null;
                     a.Chip.Visible = hasKey;
@@ -253,7 +257,7 @@ namespace NGUAdvisor
                     a.Card.Visible = true;
                     a.Card.Cursor = Cursors.Hand;
                     a.Stripe.BackColor = UiTheme.Cap;
-                    UiLayout.FitOrGrow(a.Text, "Hide the optimal rows again");
+                    UiLayout.FitOrGrow(a.Text, "Hide the optimal rows");
                     UiLayout.FitInto(a.Name, "COLLAPSE");
                     a.AutoKey = null;
                     a.Chip.Visible = true;

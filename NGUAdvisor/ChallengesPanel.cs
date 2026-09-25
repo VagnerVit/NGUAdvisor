@@ -149,7 +149,7 @@ namespace NGUAdvisor
                 }
                 else
                 {
-                    UiLayout.FitOrGrow(_current, "No challenge active — overlays idle, profile rules apply.");
+                    UiLayout.FitOrGrow(_current, "No challenge active");
                     _current.ForeColor = UiTheme.Muted;
                 }
                 y = _current.Bottom + UiTheme.S(4);
@@ -164,6 +164,7 @@ namespace NGUAdvisor
                     _lsc.ForeColor = lsc.Recommended ? UiTheme.Cap : UiTheme.Muted;
                     _lsc.Font = lsc.Recommended ? UiTheme.Bold : UiTheme.Ui;
                     UiLayout.FitOrGrow(_lsc, lsc.Text);
+                    UiLayout.Tip(_lsc, "LSC does not reset NUMBER; the next auto-rebirth enters it.");
                     y = _lsc.Bottom + UiTheme.S(4);
                 }
 
@@ -194,7 +195,7 @@ namespace NGUAdvisor
                 if (_note.Visible)
                 {
                     _note.Top = y + UiTheme.S(6);
-                    UiLayout.FitOrGrow(_note, "⚠ Challenge gear rotation is OFF — turn on Manage Gear + Advisor Gear Refresh (Settings).");
+                    UiLayout.FitOrGrow(_note, "⚠ Gear rotation OFF — enable Manage Gear + Advisor Gear Refresh");
                     y = _note.Bottom;
                 }
 

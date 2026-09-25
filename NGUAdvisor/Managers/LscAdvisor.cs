@@ -103,8 +103,8 @@ namespace NGUAdvisor.Managers
                 v.EstMinutes = seconds / 60.0;
                 v.Recommended = v.EstMinutes <= 48;   // fits comfortably inside the Augs hour
                 v.Text = v.Recommended
-                    ? $"LSC finishable in ~{Math.Max(1, v.EstMinutes):0}m (laser sword to lv {target}) — number is NOT reset; next auto-rebirth enters it"
-                    : $"LSC needs ~{v.EstMinutes:0}m for lv {target} — not yet an Augs-hour freebie";
+                    ? $"LSC finishable in ~{Math.Max(1, v.EstMinutes):0}m (laser sword lv {target})"
+                    : $"LSC needs ~{v.EstMinutes:0}m (laser sword lv {target})";
             }
             catch (Exception e) { Main.LogDebug($"LscAdvisor: {e.Message}"); }
             return Cache(v);

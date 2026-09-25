@@ -104,8 +104,8 @@ namespace NGUAdvisor
                 () => Settings.CombatEnabled, v => Settings.CombatEnabled = v,
                 null, null,
                 null, null,
-                "Adventure routing off — titan and quest zones still run.",
-                "Routing runs as FARM MODE says. Titan and quest zones run regardless.",
+                "Off — titans and quests still fight.",
+                "Follows FARM MODE below.",
                 null,
                 "FARM MODE");
             _controlBar.Changed += SyncFromSettings;
@@ -116,6 +116,7 @@ namespace NGUAdvisor
             var modeCap = MkHead("FARM MODE");
             Controls.Add(modeCap);
             modeCap.Location = new Point(UiTheme.S(10), my);
+            UiLayout.HelpMark(this, modeCap, "Gold and quest routing keep their own overrides regardless of this pick.");
             my += UiTheme.HeadPitch;
 
             // The exclusive set, in the cascade's own precedence order so the row reads the way routing
@@ -364,16 +365,9 @@ namespace NGUAdvisor
                 new Control[] { _beast, _bossesOnly, _fallthrough });
             y = UiLayout.Row(UiTheme.S(10), y, UiTheme.S(8), modeLbl, _combatMode) + UiTheme.S(8);
 
-            // Two short stacked lines: the single long line measured past the page edge and clipped.
-            var note1 = MkLbl("Advisor routing: gold and quest logic keep their overrides;");
-            var note2 = MkLbl("otherwise the best boost farm wins.");
-            page.Controls.Add(note1);
-            page.Controls.Add(note2);
-            note1.Location = new Point(UiTheme.S(10), y);
-            note2.Location = new Point(UiTheme.S(10), y + UiTheme.LinePitch);
-            // The page height is a fixed constant while every stacked line inside it is floored at the
-            // measured pitch — the closing notes fell off the bottom. Derive from the last line.
-            page.Height = Math.Max(page.Height, note2.Bottom + UiTheme.S(8));
+            // Gold/quest override note now lives on the FARM MODE "?" tip above — this page no longer
+            // repeats it.
+            page.Height = Math.Max(page.Height, y);
             return page;
         }
 
@@ -586,7 +580,7 @@ namespace NGUAdvisor
                     { _huntZone.SelectedIndex = i; break; }
                 string hunt;
                 if (mode != FarmModeKind.Hunt)
-                    hunt = "Not the farm mode — pick HUNT above; curate the accessory pool in Loadouts › Loot Hunter";
+                    hunt = "Not the farm mode — pick HUNT above.";
                 else if (Settings.GearHuntZone < 0)
                     hunt = "On — pick a stage to hunt";
                 else if (!GearHunter.ZoneReachable())
@@ -659,14 +653,14 @@ namespace NGUAdvisor
         private static string DropLine(BoostFarmAdvisor.DropInfo d)
         {
             if (!d.Known)
-                return "Boost drop: none here, or auto transform is set to None.";
+                return "Boost drop: none here.";
             string name = Main.ItemNameNice(d.Id);
             if (d.Maxxed)
-                return $"Boost drop: {name} — already maxed; the game blocks further merges of it.";
+                return $"Boost drop: {name} — maxed.";
 
             int left = Math.Max(0, BoostFarmAdvisor.DropInfo.NeedDrops - d.HaveDrops);
             if (left == 0)
-                return $"Boost drop: {name} — you hold enough drops for level 100; merge them.";
+                return $"Boost drop: {name} — ready to merge to 100.";
             // Duration() takes HOURS.
             string eta = d.DropsPerSecond > 0
                 ? $"~{NumberFormatter.Duration(left / d.DropsPerSecond / 3600.0)} left"

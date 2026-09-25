@@ -50,7 +50,6 @@ namespace NGUAdvisor
         private readonly Panel _autoLight;
         private readonly Label _autoState;   // explicit ON/OFF text (state readable without relying on color)
 
-        private readonly ToolTip _tips;      // ONE instance; content set only when a full value changes
 
         // Wrap-safe throttle. (Environment.TickCount goes NEGATIVE after ~24.9 days uptime, which made the
         // old `TickCount - last < 250` check true forever => the strip never updated. Root cause of the saga.)
@@ -68,7 +67,6 @@ namespace NGUAdvisor
             Height = PanelHeight;
             BackColor = UiTheme.Surface;
 
-            _tips = new ToolTip();
 
             Controls.Add(new Panel { Dock = DockStyle.Top, Height = AccentH, BackColor = UiTheme.Accent });
 
@@ -95,10 +93,10 @@ namespace NGUAdvisor
             _autoState.Click += ToggleAuto;
 
             const string autoTip = "Turns automation execution on or off. Advisor decision ownership is configured separately.";
-            _tips.SetToolTip(_autoCell, autoTip);
-            _tips.SetToolTip(_autoCap, autoTip);
-            _tips.SetToolTip(_autoLight, autoTip);
-            _tips.SetToolTip(_autoState, autoTip);
+            UiLayout.Tip(_autoCell, autoTip);
+            UiLayout.Tip(_autoCap, autoTip);
+            UiLayout.Tip(_autoLight, autoTip);
+            UiLayout.Tip(_autoState, autoTip);
 
             // ---- the seven dynamic chips ----
             foreach (var name in _order)
@@ -210,11 +208,14 @@ namespace NGUAdvisor
             DoLayout();
         }
 
-        // Displayed value = measured-fit; full value lives in the tooltip. Never blanks a nonempty value.
+        // Bold where it fits; a value too wide for its cell in bold drops to the regular weight before it
+        // would lose its end. Never blanks a nonempty value.
         private void ApplyFit(Chip ch)
         {
-            string fit = UiLayout.FitText(ch.Full, UiTheme.Bold, Math.Max(10, ch.Val.Width));
-            if (ch.Val.Text != fit) ch.Val.Text = fit;
+            string full = ch.Full ?? "";
+            Font f = UiLayout.FitText(full, UiTheme.Bold, ch.Val.Width - UiTheme.S(4)) == full ? UiTheme.Bold : UiTheme.Ui;
+            if (ch.Val.Font != f) ch.Val.Font = f;
+            UiLayout.FitInto(ch.Val, full);
         }
 
         // Called each frame from Main.Update (main thread). Throttled; reads live state and updates labels.
@@ -269,7 +270,6 @@ namespace NGUAdvisor
             if (ch.Full != value)
             {
                 ch.Full = value;
-                _tips.SetToolTip(ch.Val, value);
                 ApplyFit(ch);
                 _dirty = true;
             }
@@ -304,11 +304,5 @@ namespace NGUAdvisor
 
         private static string Capitalize(string s)
             => string.IsNullOrEmpty(s) ? "-" : char.ToUpper(s[0]) + s.Substring(1);
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _tips?.Dispose();   // the one owned ToolTip has no container to dispose it
-            base.Dispose(disposing);
-        }
     }
 }

@@ -112,7 +112,7 @@ namespace NGUAdvisor.Managers
                             list.Add(new Rec
                             {
                                 System = "Power",
-                                Text = $"{Fmt(atk)} of {Fmt(reqA)} atk / {Fmt(def)} of {Fmt(reqD)} def{regenPart} for Titan {idx + 1} AK ({pct:0}%)",
+                                Text = $"{Fmt(atk)} of {Fmt(reqA)} atk / {Fmt(def)} of {Fmt(reqD)} def{regenPart} for Titan {idx + 1} AK",
                                 Severity = pct >= 80 ? 1 : 2
                             });
                         }
@@ -151,7 +151,7 @@ namespace NGUAdvisor.Managers
                         {
                             System = "Wandoos",
                             AutoKey = "wandoos",
-                            Text = $"Switch OS {w.CurrentName} -> {w.BestName}: ~{WandoosAdvisor.FmtX(w.Advantage)} more A/D bonus at your cap ({Fmt(cap)})",
+                            Text = $"Switch OS {w.CurrentName} -> {w.BestName}: ~{WandoosAdvisor.FmtX(w.Advantage)} more A/D at cap {Fmt(cap)}",
                             Severity = big ? 2 : 1
                         });
                     }
@@ -161,7 +161,7 @@ namespace NGUAdvisor.Managers
                         {
                             System = "Wandoos",
                             AutoKey = "wandoos",
-                            Text = $"OS {WandoosOsNames[Clamp((int)c.wandoos98.os)]} is best for your cap",
+                            Text = $"OS {WandoosOsNames[Clamp((int)c.wandoos98.os)]} best at cap",
                             Optimal = true
                         });
                     }
@@ -191,7 +191,7 @@ namespace NGUAdvisor.Managers
                 else if (mode == "push")
                     list.Add(new Rec { System = "Adv Training", Text = "Raise AT Attack/Defense targets for the titan run", Severity = 1 });
                 else
-                    list.Add(new Rec { System = "Adv Training", Text = "Minimal AT is right for farming", Optimal = true });
+                    list.Add(new Rec { System = "Adv Training", Text = "Minimal AT for farming", Optimal = true });
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
 
@@ -227,7 +227,7 @@ namespace NGUAdvisor.Managers
                     {
                         string advice = (addable.Count > 0 ? "Add " + string.Join("/", addable) : "")
                             + (broke.Count > 0 ? (addable.Count > 0 ? " " : "") + "(" + string.Join("/", broke) + ": GPS too low)" : "");
-                        if (recappable > 0) advice += (advice == "" ? "Recap" : " | recap") + $": {recappable} digger(s) can run higher levels";
+                        if (recappable > 0) advice += (advice == "" ? "Recap" : " | recap") + $": {recappable} can level higher";
                         list.Add(new Rec { System = "Diggers", AutoKey = "diggers", Text = advice, Severity = addable.Count > 0 || recappable > 0 ? 1 : 0 });
                     }
                 }
@@ -264,7 +264,7 @@ namespace NGUAdvisor.Managers
                         System = "Yggdrasil",
                         AutoKey = "yggbuys",
                         Text = $"Buy next: {fb.Name} tier {fb.CurLevel + 1} — {FmtSeeds(fb.Cost)} seeds"
-                            + (fb.Affordable ? "" : $" (save up - {FmtSeeds(c.yggdrasil.seeds)} now)"),
+                            + (fb.Affordable ? "" : $" (have {FmtSeeds(c.yggdrasil.seeds)})"),
                         Severity = fb.Affordable ? 1 : 0
                     });
                 else if (c.yggdrasil != null && c.yggdrasil.fruits != null && c.yggdrasil.fruits.Any(f => f.maxTier > 0))
@@ -377,11 +377,11 @@ namespace NGUAdvisor.Managers
                             }
                         }
                         if (totalGain <= 0 && tf <= 0)
-                            list.Add(new Rec { System = "Beard perm", Text = "Rebirthing before the 1h mark banks NO permanent beard levels — wait", Severity = 1 });
+                            list.Add(new Rec { System = "Beard perm", Text = "Rebirth before 1h banks 0 perm beard levels — wait", Severity = 1 });
                         else if (nextHours != double.MaxValue && nextHours <= 12)
-                            list.Add(new Rec { System = "Beard perm", Text = $"Rebirth now banks +{totalGain} permanent beard levels; +1 more if you hold ~{FmtH(nextHours)}", Severity = 0 });
+                            list.Add(new Rec { System = "Beard perm", Text = $"Rebirth now banks +{totalGain} perm beard lvls; +1 more if held ~{FmtH(nextHours)}", Severity = 0 });
                         else if (totalGain > 0)
-                            list.Add(new Rec { System = "Beard perm", Text = $"Rebirth banks +{totalGain} permanent beard levels", Optimal = true });
+                            list.Add(new Rec { System = "Beard perm", Text = $"Rebirth banks +{totalGain} perm beard lvls", Optimal = true });
                     }
                 }
             }
@@ -402,11 +402,11 @@ namespace NGUAdvisor.Managers
                         {
                             System = "EXP",
                             AutoKey = "exp",
-                            Text = $"Walking toward guide ratio {xb.Phase} — {xb.BalancePct:0}% balanced; next EXP → {xb.NextNames}",
+                            Text = $"Guide ratio {xb.Phase}: {xb.BalancePct:0}% balanced; next EXP → {xb.NextNames}",
                             Severity = 1
                         });
                     else if (xb.Known)
-                        list.Add(new Rec { System = "EXP", AutoKey = "exp", Text = $"Purchases match the guide ratio for this phase ({xb.Phase})", Optimal = true });
+                        list.Add(new Rec { System = "EXP", AutoKey = "exp", Text = $"Matches guide ratio ({xb.Phase})", Optimal = true });
                 }
             }
             catch (Exception ex) { Main.LogDebug($"Advisor rec failed: {ex.Message}"); }
@@ -427,7 +427,7 @@ namespace NGUAdvisor.Managers
                         if (banked)
                             list.Add(new Rec { System = "Gold", AutoKey = "titangold", Text = $"Titan {best + 1} (v{ver}) gold banked this run", Optimal = true });
                         else
-                            list.Add(new Rec { System = "Gold", AutoKey = "titangold", Text = $"Bank gold on the next Titan {best + 1} (v{ver}) auto-kill", Severity = 1 });
+                            list.Add(new Rec { System = "Gold", AutoKey = "titangold", Text = $"Bank gold on Titan {best + 1} (v{ver}) AK", Severity = 1 });
                     }
                 }
             }
@@ -507,7 +507,7 @@ namespace NGUAdvisor.Managers
                     list.Add(new Rec
                     {
                         System = "NGUs",
-                        Text = $"{plan.Summary} — running {plan.EnergyTargets.Length}E/{plan.MagicTargets.Length}M"
+                        Text = $"{plan.Summary} — {plan.EnergyTargets.Length}E/{plan.MagicTargets.Length}M"
                             + (spare > 0 ? $" (+{spare} surplus lanes)" : ""),
                         Severity = 1
                     });
@@ -525,7 +525,7 @@ namespace NGUAdvisor.Managers
                     list.Add(new Rec
                     {
                         System = "Boss push",
-                        Text = $"Unlocks done at this difficulty (last: boss {ceiling}) — NUMBER ritual + boss EXP are the push",
+                        Text = $"Unlocks done (last boss {ceiling}) — NUMBER ritual + boss EXP are the push",
                         Severity = 1
                     });
             }

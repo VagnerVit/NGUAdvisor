@@ -63,7 +63,9 @@ namespace NGUAdvisor
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
-            toolbar.Controls.Add(new Label { Text = "Rank every item; set your available slots. The top items (above the line) are active.", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) });
+            var rankNote = new Label { Text = "Top slots active", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) };
+            toolbar.Controls.Add(rankNote);
+            UiLayout.Tip(rankNote, "Rank every item. The Slots number picks how many, from the top, are active; the rest sit as bench.");
 
             Controls.Add(_scroll);
             Controls.Add(toolbar);

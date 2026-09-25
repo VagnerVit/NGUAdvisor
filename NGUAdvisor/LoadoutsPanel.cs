@@ -174,13 +174,13 @@ namespace NGUAdvisor
             // What the panel owes the user instead is the truth, in two lines.
             var note1 = new Label
             {
-                Text = "No single gear switch: each mode swaps when its OWN setting is on (Titans · Gold · Quests · Yggdrasil · Cooking · Gear Hunt).",
+                Text = "Each mode swaps on its OWN setting — Titans · Gold · Quests · Yggdrasil · Cooking · Gear Hunt.",
                 AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground,
                 Location = new Point(UiTheme.S(10), UiTheme.S(6))
             };
             var note2 = new Label
             {
-                Text = "Per mode — ADVISOR: the optimizer picks the set for an objective.  MANUAL: your item list below.",
+                Text = "ADVISOR: optimizer picks the set.  MANUAL: your item list below.",
                 AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground,
                 Location = new Point(UiTheme.S(10), UiTheme.S(6) + UiTheme.LinePitch)
             };
@@ -465,7 +465,7 @@ namespace NGUAdvisor
             m.RefreshState.Click += (s, e) => RefreshSnapshot(mSnap);
             page.Controls.Add(m.RefreshState);
             int snapHelpY = snapY + headToText;
-            m.SnapHelp = new Label { Text = "Captured when this page was opened or manually refreshed — it does not update by itself.", Location = new Point(UiTheme.S(10), snapHelpY), AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground };
+            m.SnapHelp = new Label { Text = "Captured on open or Refresh State.", Location = new Point(UiTheme.S(10), snapHelpY), AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground };
             page.Controls.Add(m.SnapHelp);
             int snapListY = snapHelpY + textToList;
             m.Snapshot = new ListBox { Location = new Point(UiTheme.S(10), snapListY), Size = new Size(fullW, listH), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle };
@@ -485,10 +485,10 @@ namespace NGUAdvisor
         private static string ReqHelpText(Mode m)
         {
             if (m.LootHunter)
-                return "Pool accessories plus the optimizer's best Power/Toughness gear, resolved live at the next Gear Hunt.";
+                return "Pool accessories + best Power/Toughness gear, resolved live at the next Gear Hunt.";
             if (m.StaticOnly)
-                return "This daycare set is placed by the existing Money Pit / daycare path — it is not an equipment swap.";
-            return "The set the manager will request when this mode next acquires its equipment lock.";
+                return "Placed by the Money Pit / daycare path.";
+            return "Requested when this mode next acquires its equipment lock.";
         }
 
         private void SetSource(Mode m, bool manual)
@@ -673,7 +673,7 @@ namespace NGUAdvisor
             if (g == null) return "SWAP STATUS: CONTROLLED BY ITS MANAGER SETTINGS";
             return g.Value
                 ? "SWAP STATUS: ENABLED"
-                : "SWAP STATUS: DISABLED — this loadout is configured, but its automatic swap won't run.";
+                : "SWAP STATUS: DISABLED — configured but won't auto-swap.";
         }
 
         public void RefreshPreviews()

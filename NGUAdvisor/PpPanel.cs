@@ -141,6 +141,7 @@ namespace NGUAdvisor
             _toggle.FlatAppearance.BorderColor = UiTheme.Border;
             _toggle.Click += ToggleClicked;
             Controls.Add(_toggle);
+            UiLayout.Tip(_toggle, "Combat off, a gear hunt, or an EVIL CLIMB segment can all override this.");
 
             // Four lines reserved: the toggle can be gated, outranked, climb-overridden AND bypassing
             // the advisor all at once, and the whole point of the note is that none of the four ever
@@ -235,7 +236,7 @@ namespace NGUAdvisor
                     // user: one is "wait a minute", the other is "you are not farming PP at all".
                     perHour = modelledPerHour;
                     rateLabel = hasMeasured
-                        ? "modelled — you are not gaining PP right now"
+                        ? "modelled — not gaining PP now"
                         : "modelled — no measured rate yet";
                 }
 
@@ -247,7 +248,7 @@ namespace NGUAdvisor
 
                 UiLayout.FitInto(_modelled, rates.Known
                     ? $"ITOPOD would pay {NumberFormatter.Abbrev(modelledPerHour)} PP/hr ({BoostFarmAdvisor.ModeName(rates.CombatMode)}, floors {rates.DefaultFloor}-{rates.PeakFloor})"
-                    : "ITOPOD rate unavailable — the floor solve could not be read.");
+                    : "ITOPOD rate unavailable");
 
                 RenderToggle();
             }
@@ -264,8 +265,8 @@ namespace NGUAdvisor
                 UiLayout.FitInto(_cardValue, planned.Known ? "NOTHING BUYABLE RIGHT NOW" : "PERK PLAN COMPLETE");
                 _cardCost.ForeColor = UiTheme.Muted;
                 UiLayout.FitInto(_cardCost, planned.Known
-                    ? "The next guide step is gated — see below for what the bank is for."
-                    : "Every perk the guide schedules reads as bought.");
+                    ? "next guide step is gated"
+                    : "all scheduled perks bought");
                 UiLayout.WrapInto(_cardNote, "");
                 return;
             }
@@ -318,27 +319,25 @@ namespace NGUAdvisor
             var notes = new System.Collections.Generic.List<string>();
 
             if (!Settings.CombatEnabled)
-                notes.Add("Combat is OFF — routing never runs, so this changes nothing until you enable combat.");
+                notes.Add("Combat OFF — toggle has no effect.");
 
             bool hunting = false;
             try { hunting = GearHunter.Active && GearHunter.ZoneReachable(); } catch { }
             if (hunting)
-                notes.Add("A gear hunt is running and outranks ITOPOD targeting — this takes effect when the hunt ends.");
+                notes.Add("Gear hunt running — outranks ITOPOD, takes effect after.");
 
             // Main.cs:1404 — an EVIL CLIMB segment farms the furthest clearable zone and ignores this
             // toggle outright, because honoring it during a climb parked the run in the pod after one
             // kill and collapsed gross gold, i.e. the digger budget (user-caught). ChallengeOverlay
-            // blanks the segment whenever AutoProfile is off (ChallengeOverlay.cs:142-143), so this
-            // never fires on a manual profile — and the wording says so, rather than warning every
-            // Evil player that their toggle is dead.
+            // blanks the segment whenever AutoProfile is off, so this never fires on a manual profile.
             bool evilClimb = false;
             try { evilClimb = ChallengeOverlay.Segment == "EVIL CLIMB"; } catch { }
             if (evilClimb)
-                notes.Add("Auto profile is running an EVIL CLIMB segment, which farms the furthest clearable zone for its bosses and gold and ignores this toggle until the segment ends (manual profiles are unaffected).");
+                notes.Add("EVIL CLIMB running — toggle ignored until it ends.");
 
             notes.Add(on
-                ? "ON — adventuring is parked in the ITOPOD and the advisor's gear/boost zone routing is bypassed."
-                : "Off — turning it on parks adventuring in the ITOPOD and bypasses the advisor's gear/boost zone routing.");
+                ? "ON — parked in ITOPOD, zone routing bypassed."
+                : "Off — turns this on to park in ITOPOD.");
 
             _toggleNote.ForeColor = !Settings.CombatEnabled || hunting || evilClimb ? UiTheme.Danger : UiTheme.Muted;
             UiLayout.WrapInto(_toggleNote, string.Join(" ", notes.ToArray()), 4);

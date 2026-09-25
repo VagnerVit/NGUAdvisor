@@ -191,7 +191,7 @@ namespace NGUAdvisor
                 _cardValue.ForeColor = UiTheme.Muted;
                 UiLayout.FitInto(_cardValue, "NOTHING LEFT TO RECOMMEND");
                 _cardCost.ForeColor = UiTheme.Muted;
-                UiLayout.FitInto(_cardCost, "Every entry in the tier list reads as owned.");
+                UiLayout.FitInto(_cardCost, "table fully owned");
                 UiLayout.WrapInto(_cardNote, "");
                 return;
             }
@@ -204,7 +204,7 @@ namespace NGUAdvisor
             // read up as a verdict about the balance.
             _cardCost.ForeColor = rec.CostKnown ? (rec.Affordable ? UiTheme.Cap : UiTheme.Energy) : UiTheme.Muted;
             UiLayout.FitInto(_cardCost, rec.CostKnown
-                ? $"{NumberFormatter.Abbrev(rec.Cost)} AP — {(rec.Affordable ? "you can afford this now" : "keep saving")}"
+                ? $"{NumberFormatter.Abbrev(rec.Cost)} AP — {(rec.Affordable ? "affordable" : "keep saving")}"
                 : "cost unknown");
 
             UiLayout.WrapInto(_cardNote, rec.Item.Note ?? "");

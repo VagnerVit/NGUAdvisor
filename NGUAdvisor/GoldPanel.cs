@@ -76,9 +76,9 @@ namespace NGUAdvisor
                 // happen, it just cannot execute yet. Promising a "next pass" swap while the gate is shut
                 // was the lie; saying nothing at all would be the next one.
                 if (Settings.ManageGoldLoadouts)
-                    Activity.Queued("Re-snipe armed — the gold loadout swaps on the next pass.");
+                    Activity.Queued("Re-snipe armed.");
                 else
-                    Activity.Warning("Re-snipe armed, but automation is off — nothing swaps until you turn it on.");
+                    Activity.Warning("Re-snipe armed — automation is off, nothing swaps.");
 
                 RefreshPipeline();
             };
@@ -102,9 +102,9 @@ namespace NGUAdvisor
                 W - UiTheme.S(54),
                 () => Settings.ManageGoldLoadouts, v => Settings.ManageGoldLoadouts = v,
                 () => Settings.AdvisorGold, v => Settings.AdvisorGold = v,
-                "The advisor arms the snipe triggers and funds the TM.",
-                "Your trigger chips below decide when to re-snipe.",
-                "Automation is off — no gold loadout swap and no snipe.")
+                "Advisor arms triggers, funds TM.",
+                "Your chips decide re-snipe timing.",
+                "Off — no snipe or swap.")
             {
                 Location = new Point(UiTheme.S(10), UiTheme.S(10))
             };
@@ -198,15 +198,12 @@ namespace NGUAdvisor
                 Location = new Point(UiTheme.S(10), content + UiTheme.S(106)),
                 Tag = "exclusive"
             };
-            // Unchanged disclosure of the trigger truth table: in advisor mode the advisor arms these
-            // itself (starvation regardless of its chip), which is why the manual strip gives way to this
-            // note rather than pretending every chip is still authoritative.
-            UiLayout.FitOrGrow(_advisorNote,
-                // Length is load-bearing: the two-line budget ellipsized at ~126 chars (PrintWindow check
-                // — the audit calls it clean, Mono draws wider than the measurement). Keep it at the
-                // length of the sentence this replaced.
-                "Re-snipes on: new zone · rebirth · gold starvation · gold drop improved — challenge mode auto-detected.");
+            // In advisor mode the advisor arms these itself (starvation regardless of its chip), which is
+            // why the manual strip gives way to this note rather than pretending every chip is still
+            // authoritative.
+            UiLayout.FitOrGrow(_advisorNote, "Auto: new zone · rebirth · starvation · better drop.");
             Controls.Add(_advisorNote);
+            UiLayout.Tip(_advisorNote, "These triggers fire on their own in advisor mode; challenge mode is detected without a manual switch.");
 
             BuildDrainLedger(W, Math.Max(content + UiTheme.S(100) + _manualStrip.Height, _advisorNote.Bottom) + UiTheme.S(10));
 
@@ -261,6 +258,7 @@ namespace NGUAdvisor
 
             var augLbl = new Label { Text = "Augments", AutoSize = false, Size = new Size(labelW, UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Accent, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(8), UiTheme.S(124)) };
             box.Controls.Add(augLbl);
+            UiLayout.HelpMark(box, augLbl, "Gold starvation for augments also arms the re-snipe trigger.");
             _augVal = new Label { Text = "", AutoSize = false, Size = new Size(boxW - UiTheme.S(16) - barX, UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Surface, Location = new Point(barX, UiTheme.S(124)) };
             box.Controls.Add(_augVal);
         }
@@ -446,7 +444,7 @@ namespace NGUAdvisor
 
                 bool starved = false;
                 try { starved = OptimizationAdvisor.GoldStarvedForAugs(c, 1.0); } catch { }
-                UiLayout.FitInto(_augVal, starved ? "STARVED — snipe trigger armed" : "FUNDED");
+                UiLayout.FitInto(_augVal, starved ? "STARVED" : "FUNDED");
                 _augVal.ForeColor = starved ? UiTheme.Danger : UiTheme.Cap;
             }
             catch (Exception ex) { LogDebug($"Gold pipeline: {ex.Message}"); }

@@ -32,7 +32,6 @@ namespace NGUAdvisor
         private Label _fileLine;     // read-only: active/standby file
         private Label _recProfile;   // read-only: recommendation
         private Panel _divider;      // vertical rule between the two zones; height follows the card's
-        private readonly ToolTip _tips = new ToolTip();
         private readonly int _planW;    // left zone width
         private readonly int _stripX;   // right zone x inside the card
         private readonly int _chipH = UiTheme.SHead(18);   // floored 7.5pt line box; also the chip row pitch
@@ -106,9 +105,7 @@ namespace NGUAdvisor
         // Fixed-width measured fit + full text in the shared tooltip (Mono blanks an overflowing fixed label).
         private void SetSummary(Label l, string text)
         {
-            _tips.SetToolTip(l, text ?? "");
-            string fit = UiLayout.FitText(text ?? "", l.Font, l.Width);
-            if (l.Text != fit) l.Text = fit;
+            UiLayout.FitInto(l, text);
         }
 
         private Label MkLine()
@@ -217,16 +214,16 @@ namespace NGUAdvisor
                 {
                     UiLayout.FitOrGrow(_title, "AUTO PROFILE — off");
                     _title.ForeColor = UiTheme.Muted;
-                    UiLayout.FitOrGrow(_eLine, $"Allocation comes from the profile timeline: {Settings.AllocationFile ?? "-"}");
-                    UiLayout.FitOrGrow(_mLine, "Flip the toggle and the advisor generates priorities from run phase + TM state.");
+                    UiLayout.FitOrGrow(_eLine, "");
+                    UiLayout.FitOrGrow(_mLine, "");
                     UiLayout.FitOrGrow(_rLine, "");
                 }
                 else if (challenge != null && Settings.AdvisorChallenges)
                 {
                     UiLayout.FitOrGrow(_title, $"AUTO PROFILE — standing by ({challenge} overlay owns allocation)");
                     _title.ForeColor = UiTheme.Energy;
-                    UiLayout.FitOrGrow(_eLine, "Challenge strips/templates outrank the generator while the challenge runs.");
-                    UiLayout.FitOrGrow(_mLine, "Generation resumes the moment the challenge ends.");
+                    UiLayout.FitOrGrow(_eLine, "");
+                    UiLayout.FitOrGrow(_mLine, "");
                     UiLayout.FitOrGrow(_rLine, "");
                 }
                 else
@@ -234,7 +231,7 @@ namespace NGUAdvisor
                     UiLayout.FitOrGrow(_title, $"AUTO PROFILE — {ChallengeOverlay.AutoStatus()}");
                     _title.ForeColor = UiTheme.Accent;
                     var mTokens = ChallengeOverlay.AutoTokens(ResourceType.Magic);
-                    string ritual = Array.IndexOf(mTokens, "BR-30") < 0 ? "   · rituals off (no live consumer)" : "";
+                    string ritual = Array.IndexOf(mTokens, "BR-30") < 0 ? "   · rituals off" : "";
                     // The run plan is the one thing that must never truncate.
                     UiLayout.FitOrGrow(_eLine, PlanLine("E", ResourceType.Energy));
                     UiLayout.FitOrGrow(_mLine, PlanLine("M", ResourceType.Magic) + ritual);
@@ -257,8 +254,15 @@ namespace NGUAdvisor
 
                 string caps = string.IsNullOrEmpty(LevelPlanner.Status) ? "" : $"caps: {LevelPlanner.Status}";
                 UiLayout.FitOrGrow(_note1, caps);
+                // Strip the guide's trailing "(...)" reasoning here — the panel wants the target
+                // length only, not why the guide picked it.
                 string runLen = OptimizationAdvisor.RecommendedRunLength();
-                UiLayout.FitOrGrow(_note2, string.IsNullOrEmpty(runLen) ? "" : $"Guide run length: {runLen}");
+                if (!string.IsNullOrEmpty(runLen))
+                {
+                    int paren = runLen.IndexOf('(');
+                    if (paren > 0) runLen = runLen.Substring(0, paren).TrimEnd();
+                }
+                UiLayout.FitOrGrow(_note2, string.IsNullOrEmpty(runLen) ? "" : $"run: {runLen}");
 
                 Reflow();
             }
@@ -300,12 +304,6 @@ namespace NGUAdvisor
                 Height = _card.Bottom + UiTheme.S(8);
             }
             catch (Exception ex) { LogDebug($"Autopilot reflow: {ex.Message}"); }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _tips?.Dispose();   // the one owned ToolTip has no container to dispose it
-            base.Dispose(disposing);
         }
     }
 }

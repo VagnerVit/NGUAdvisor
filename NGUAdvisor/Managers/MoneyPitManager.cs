@@ -282,13 +282,13 @@ namespace NGUAdvisor.Managers
                 {
                     float t = TimeUntilReady();
                     p.Verdict = t > 3600 ? $"COOLDOWN {t / 3600:0.#}h" : $"COOLDOWN {t / 60:0}m";
-                    p.Detail = "PIT NOT READY";
+                    p.Detail = "";
                     return p;
                 }
                 if (c.machine.realBaseGold <= 0.0)
                 {
                     p.Verdict = "HOLD";
-                    p.Detail = "TM UNFUNDED — GOLD NEEDED";
+                    p.Detail = "TM UNFUNDED";
                     return p;
                 }
                 if (OptimizationAdvisor.GoldStarvedForAugs(c, 1.0))
@@ -300,7 +300,7 @@ namespace NGUAdvisor.Managers
                 if (gold < 1e13)
                 {
                     p.Verdict = "WAIT — below 1e13";
-                    p.Detail = "OUTCOME TIERS START AT 1E13";
+                    p.Detail = "";
                     return p;
                 }
 

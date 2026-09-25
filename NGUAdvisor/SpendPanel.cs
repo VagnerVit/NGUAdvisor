@@ -19,8 +19,6 @@ namespace NGUAdvisor
     // already has its owner in AdvisorApply.
     public class SpendPanel : Panel
     {
-        private const string Provenance = "Each row is the owning module's own answer — this page holds no ordering of its own.";
-
         private class RowUi
         {
             public Label Currency;
@@ -46,6 +44,7 @@ namespace NGUAdvisor
                 Location = new Point(UiTheme.S(10), UiTheme.S(10))
             };
             Controls.Add(head);
+            UiLayout.HelpMark(this, head, "Each row is the owning module's own answer — this page holds no ordering of its own.");
 
             // The currency column is sized from the widest caption it will ever hold, so the main
             // column starts at the same x on every row without a hand-tuned pixel.
@@ -82,18 +81,9 @@ namespace NGUAdvisor
                 y = row.Note.Bottom + UiTheme.S(6);
             }
 
-            var provenance = new Label
-            {
-                AutoSize = false, Size = new Size(inner, UiTheme.TextH), Font = UiTheme.Ui,
-                ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(10), y + UiTheme.S(4))
-            };
-            Controls.Add(provenance);
-            UiLayout.FitOrGrow(provenance, Provenance);
-
             // Derived, never tuned: the panel is hosted in a scrolling section and does not scroll
             // itself, so a hand-set height would clip the last row at real DPI.
-            ContentHeight = provenance.Bottom + UiTheme.S(10);
+            ContentHeight = y + UiTheme.S(6);
 
             VisibleChanged += (s, e) => { if (Visible) SyncFromSettings(); };
         }

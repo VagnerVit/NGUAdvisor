@@ -138,7 +138,7 @@ namespace NGUAdvisor
                 _dirty = false;
                 UpdateSaveText();
                 UpdateHeader();
-                SetStatus("New profile — add breakpoints, then Save Profile to create the file.", false);
+                SetStatus("New profile — not saved yet.", false);
                 return;
             }
 
@@ -147,7 +147,7 @@ namespace NGUAdvisor
             var validation = ProfileValidator.Validate(raw);
             if (!validation.Ok)
             {
-                SetStatus($"Invalid JSON at line {validation.Line}, col {validation.Col}: {validation.Message}. Fix the file, then Reload.", true);
+                SetStatus($"Invalid JSON at line {validation.Line}, col {validation.Col}: {validation.Message}", true);
                 _model = null;
                 UpdateSaveText();
                 UpdateHeader();
@@ -173,7 +173,7 @@ namespace NGUAdvisor
                 }
                 else
                 {
-                    SetStatus($"Loaded E:{_model.Energy.Count} M:{_model.Magic.Count} R3:{_model.R3.Count} Gear:{_model.Gear.Count} Diggers:{_model.Diggers.Count} Beards:{_model.Beards.Count} breakpoints. Other systems preserved.", false);
+                    SetStatus($"Loaded E:{_model.Energy.Count} M:{_model.Magic.Count} R3:{_model.R3.Count} Gear:{_model.Gear.Count} Diggers:{_model.Diggers.Count} Beards:{_model.Beards.Count} breakpoints.", false);
                 }
             }
             catch (Exception e)
@@ -306,7 +306,7 @@ namespace NGUAdvisor
                 _isNewProfile = false;
                 UpdateSaveText();
                 UpdateHeader();
-                SetStatus($"{(wasNew ? "Created" : "Updated")} {_profile}.json. The advisor will hot-reload it.", false);
+                SetStatus($"{(wasNew ? "Created" : "Updated")} {_profile}.json.", false);
                 Main.Log($"Profile \"{_profile}\" {(wasNew ? "created" : "updated")} from the Profile Editor.");
             }
             catch (Exception e)

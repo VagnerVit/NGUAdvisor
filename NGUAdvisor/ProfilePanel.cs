@@ -23,7 +23,6 @@ namespace NGUAdvisor
     public class ProfilePanel : Panel
     {
         private readonly SettingsForm _form;
-        private readonly ToolTip _tips = new ToolTip();
 
         private Button _srcAuto, _srcFile;   // ALLOCATION SOURCE segment
         private Label _srcExplain;
@@ -175,21 +174,21 @@ namespace NGUAdvisor
                 StyleSeg(_srcAuto, advisor);
                 StyleSeg(_srcFile, !advisor);
                 SetNote(_srcExplain, advisor
-                    ? "The advisor generates allocation decisions. The selected file remains configured as a standby file."
-                    : "The selected profile file drives the allocation timeline.", UiTheme.Muted);
+                    ? "Advisor decides — file on standby."
+                    : "Selected file drives allocation.", UiTheme.Muted);
 
                 bool haveFiles = _combo.Items.Count > 0;
                 _combo.Visible = _switchBtn.Visible = _fileStatus.Visible = _fileValid.Visible = haveFiles;
                 _emptyNote.Visible = !haveFiles;
                 if (!haveFiles)
                 {
-                    SetNote(_emptyNote, "No profile files found. Use EDIT to create a profile or FILES to inspect the profile folder.", UiTheme.Muted);
+                    SetNote(_emptyNote, "No profile files found.", UiTheme.Muted);
                 }
                 else
                 {
                     if (_combo.Items.Contains(file) && _combo.SelectedItem?.ToString() != file) _combo.SelectedItem = file;
 
-                    SetValue(_fileStatus, advisor ? $"Standby profile file: {file}" : $"Active profile file: {file}");
+                    SetValue(_fileStatus, advisor ? $"Standby: {file}" : $"Active: {file}");
                     var (state, msg) = ValidateFile(file, advisor);
                     SetNote(_fileValid, msg, state == FileState.Valid ? UiTheme.Muted : UiTheme.Danger);
                 }
@@ -230,17 +229,17 @@ namespace NGUAdvisor
             try
             {
                 if (string.IsNullOrEmpty(name) || name == "-")
-                    return (FileState.Missing, advisor ? "No standby file configured." : "No profile file configured.");
+                    return (FileState.Missing, advisor ? "No standby file." : "No profile file.");
                 var path = Path.Combine(GetProfilesDir(), name + ".json");
                 if (!File.Exists(path))
                     return (FileState.Missing, advisor
-                        ? "Standby profile file is missing. Advisor-generated allocation remains active."
-                        : "Selected profile file is missing. The profile timeline is unavailable.");
+                        ? "Standby file missing."
+                        : "File missing — no allocation running.");
                 var v = ProfileValidator.Validate(File.ReadAllText(path));
                 if (!v.Ok)
                     return (FileState.Invalid, advisor
-                        ? "Standby profile file is invalid. Advisor-generated allocation remains active."
-                        : "Selected profile file is invalid. It was not applied.");
+                        ? "Standby file invalid."
+                        : "File invalid — not applied.");
                 return (FileState.Valid, "Valid.");
             }
             catch (Exception e) { LogDebug($"Profile validate: {e.Message}"); return (FileState.Invalid, "Unavailable."); }
@@ -287,23 +286,13 @@ namespace NGUAdvisor
         // fixed label whose text overflows, so every dynamic string goes through FitText).
         private void SetValue(Label l, string text)
         {
-            _tips.SetToolTip(l, text ?? "");
-            string fit = UiLayout.FitText(text ?? "", l.Font, l.Width);
-            if (l.Text != fit) l.Text = fit;
+            UiLayout.FitInto(l, text);
         }
 
         private void SetNote(Label l, string text, Color color)
         {
-            _tips.SetToolTip(l, text ?? "");
-            string fit = UiLayout.FitText(text ?? "", l.Font, l.Width);
-            if (l.Text != fit) l.Text = fit;
+            UiLayout.FitInto(l, text);
             if (l.ForeColor != color) l.ForeColor = color;
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _tips?.Dispose();   // the one owned ToolTip has no container to dispose it
-            base.Dispose(disposing);
         }
     }
 }

@@ -253,7 +253,7 @@ namespace NGUAdvisor
             int footerY = bottomY + UiTheme.S(8);
             var footer = new Label
             {
-                Text = "Detailed options (loadout IDs, zones, thresholds, priorities) live in the tabs to the right.",
+                Text = "Advanced options: tabs to the right.",
                 Location = new Point(UiTheme.S(20), footerY),
                 AutoSize = true,
                 Font = UiTheme.Ui,
@@ -601,38 +601,27 @@ namespace NGUAdvisor
 
         private static int[] CurrentPins() => Settings?.PinnedGearIds ?? new int[0];
 
-        // The band: a note, the list, and the paste/copy/clear/undo row. Sized from what it holds — the
-        // list in ROWS (a pixel height means a different row count at every scale), the buttons from
-        // BtnWidth, and the container from where its children actually end.
+        // The band: the list, and the paste/copy/clear/undo row. Sized from what it holds — the list in
+        // ROWS (a pixel height means a different row count at every scale), the buttons from BtnWidth,
+        // and the container from where its children actually end.
         private Panel BuildPins(int x, int y)
         {
             // S(700), not S(560): the status line below carries variable prose (paste refusals run to ~300px
-            // at the tuning baseline) and it has to fit BESIDE nothing — it gets its own line — but the note
-            // and the list want the room too. The canvas is ~1030 wide and x0 is S(16), so this is well
-            // inside it.
+            // at the tuning baseline) and it has to fit BESIDE nothing — it gets its own line — but the
+            // list wants the room too. The canvas is ~1030 wide and x0 is S(16), so this is well inside it.
             int w = UiTheme.S(700);
             var host = new Panel { Location = new Point(x, y), Width = w, BackColor = UiTheme.Ground };
 
-            var note = new Label
-            {
-                Text = "Kept in every optimized loadout, ahead of the objective's own picks.",
-                Location = new Point(0, 0),
-                AutoSize = true,
-                Font = UiTheme.Ui,
-                ForeColor = UiTheme.Muted,
-                BackColor = UiTheme.Ground
-            };
-            host.Controls.Add(note);
-
             _pinsList = new ListBox
             {
-                Location = new Point(0, UiTheme.LinePitch),
+                Location = new Point(0, 0),
                 Size = new Size(w, UiTheme.ListH(4)),
                 Font = UiTheme.Ui,
                 BorderStyle = BorderStyle.FixedSingle,
                 SelectionMode = SelectionMode.None
             };
             UiTheme.StyleList(_pinsList);
+            UiLayout.Tip(_pinsList, "Kept in every optimized loadout, ahead of the objective's own picks.");
             host.Controls.Add(_pinsList);
 
             _pinsPaste = new Button { Text = "Paste IDs", Width = UiLayout.BtnWidth("Paste IDs"), Height = UiTheme.SCtl(24), Font = UiTheme.Ui };

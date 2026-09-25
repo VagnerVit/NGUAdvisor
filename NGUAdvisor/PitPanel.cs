@@ -41,7 +41,7 @@ namespace NGUAdvisor
         private Label _shockNote;
 
         private bool _syncing;
-        private const string ShockAdvice = "Shockwave set not configured — a Pit Run is worth considering once you have Worn gear to farm.";
+        private const string ShockAdvice = "Shockwave set not configured.";
 
         // canvasW: explicit canvas width when hosted in an M1 section column (0 = UiLayout.PanelW).
         public PitPanel(int canvasW = 0)
@@ -166,9 +166,9 @@ namespace NGUAdvisor
                 Location = new Point(UiTheme.S(10), UiTheme.S(154)),
                 Tag = "exclusive"
             };
-            UiLayout.FitOrGrow(_advisorNote,
-                "Throws only when TM is funded and augments stay affordable; holds when the next reward tier is close.");
+            UiLayout.FitOrGrow(_advisorNote, "Timing follows the THROW PLAN chip above.");
             Controls.Add(_advisorNote);
+            UiLayout.Tip(_advisorNote, "Throws once TM is funded and augments stay affordable; holds near the next reward tier.");
 
             _shockNote = new Label
             {
@@ -268,6 +268,9 @@ namespace NGUAdvisor
             ch.Box.BackColor = bg;
             ch.Title.BackColor = ch.Value.BackColor = ch.Sub.BackColor = bg;
             ch.Title.ForeColor = lit ? UiTheme.Energy : UiTheme.Muted;
+            // Bold where it fits; a value too wide for the chip in bold ("COOLDOWN 3,8h") drops to the
+            // regular weight instead of losing its end.
+            ch.Value.Font = UiLayout.FitText(value, UiTheme.Bold, ch.Value.Width - UiTheme.S(4)) == value ? UiTheme.Bold : UiTheme.Ui;
             UiLayout.FitInto(ch.Value, value);
             UiLayout.WrapInto(ch.Sub, sub);
         }
@@ -318,7 +321,15 @@ namespace NGUAdvisor
                 if (Settings.AdvisorPit)
                 {
                     var plan = MoneyPitManager.AdvisorPlan();
-                    SetChip(2, plan.Throw, plan.Verdict, plan.Detail);
+                    // A third-width chip holds the verdict word in bold, not "COOLDOWN 57m": the time goes below.
+                    string verdict = plan.Verdict ?? "", detail = plan.Detail ?? "";
+                    int sp = verdict.IndexOf(' ');
+                    if (sp > 0 && verdict.StartsWith("COOLDOWN", StringComparison.Ordinal))
+                    {
+                        detail = verdict.Substring(sp + 1) + (detail.Length > 0 ? " · " + detail : "");
+                        verdict = verdict.Substring(0, sp);
+                    }
+                    SetChip(2, plan.Throw, verdict, detail);
                 }
                 else
                 {

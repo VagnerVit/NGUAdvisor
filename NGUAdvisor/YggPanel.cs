@@ -55,7 +55,7 @@ namespace NGUAdvisor
         // Elastic tiles (round-3): every width reads from the tile's own bar, no fixed 105px.
         private static void SetBar(Tile t, double frac, Color fill, string text, Color baseFg)
         {
-            // MEASURE WITH THE FONT THAT PAINTS. These two labels render in UiTheme.Ui (9pt) but were
+            // MEASURE WITH THE FONT THAT PAINTS. These two labels render in UiTheme.Chip (the bar is narrower than the unlock price in Ui) and were once
             // measured against UiTheme.Chip (7.5pt), so the fit believed more fitted than does — and a
             // fixed Mono label with overflowing text paints it CUT, with no ellipsis to hint at it
             // ("UNLOCK: 100K SEEDS" arrived as "UNLOCK: 100K SEE"). Reading the label's own Font keeps
@@ -135,15 +135,15 @@ namespace NGUAdvisor
                 () => Settings.ManageYggdrasil, v => Settings.ManageYggdrasil = v,
                 null, null,   // no decisions layer exists for Yggdrasil harvesting
                 null, null,
-                "Automation is off — the tool will not harvest Yggdrasil.",
-                "The tool harvests on your rules below. Yggdrasil has no advisor strategy to choose.")
+                "Off — no harvesting.",
+                "Harvests on your rules below.")
             {
                 Location = new Point(UiTheme.S(10), UiTheme.S(10))
             };
             _controlBar.Changed += SyncFromSettings;
             Controls.Add(_controlBar);
 
-            _info = new Label { Text = "…", AutoSize = false, Size = new Size(UiTheme.S(240), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
+            _info = new Label { Text = "…", AutoSize = false, Size = new Size(UiLayout.MeasureText("NEXT HARVEST: none maxed yet · SEEDS 999.99M", UiTheme.Ui) + UiTheme.S(12), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
             _harvestNow = MkBtn("Harvest Now");
             UiTheme.StyleFlat(_harvestNow);
             _harvestNow.Click += (s, e) =>
@@ -227,10 +227,11 @@ namespace NGUAdvisor
                 t.Box = new Panel { Size = new Size(_tileW, _tileH), BackColor = UiTheme.Surface, BorderStyle = BorderStyle.FixedSingle, Visible = false };
                 t.Name = new Label { Text = "", AutoSize = false, Size = new Size(_tileW - UiTheme.S(24), nameH), Font = UiTheme.Bold, ForeColor = UiTheme.Accent, BackColor = UiTheme.Surface, Location = new Point(UiTheme.S(6), nameY) };
                 t.Dot = new Panel { Location = new Point(_tileW - UiTheme.S(14), UiTheme.S(6)), Size = new Size(UiTheme.S(8), UiTheme.S(8)), BackColor = UiTheme.Surface, Visible = false };
+                UiLayout.Tip(t.Dot, "Brown = advisor's best poop target. Grey = poop is here, but a better fruit exists.");
                 t.BarOuter = new Panel { Location = new Point(UiTheme.S(6), barY), Size = new Size(_tileW - UiTheme.S(12), barH), BackColor = UiTheme.Zebra, BorderStyle = BorderStyle.FixedSingle };
-                t.TxtBase = new Label { Text = "", AutoSize = false, Size = new Size(_tileW - UiTheme.S(12) - 2, barH - 2), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Zebra, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(0, 0), Tag = "exclusive" };
+                t.TxtBase = new Label { Text = "", AutoSize = false, Size = new Size(_tileW - UiTheme.S(12) - 2, barH - 2), Font = UiTheme.Chip, ForeColor = UiTheme.Ink, BackColor = UiTheme.Zebra, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(0, 0), Tag = "exclusive" };
                 t.Fill = new Panel { Location = new Point(0, 0), Size = new Size(0, barH - 2), BackColor = UiTheme.Cap, Tag = "exclusive" };
-                t.TxtFill = new Label { Text = "", AutoSize = false, Size = new Size(_tileW - UiTheme.S(12) - 2, barH - 2), Font = UiTheme.Ui, ForeColor = Color.White, BackColor = UiTheme.Cap, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(0, 0) };
+                t.TxtFill = new Label { Text = "", AutoSize = false, Size = new Size(_tileW - UiTheme.S(12) - 2, barH - 2), Font = UiTheme.Chip, ForeColor = Color.White, BackColor = UiTheme.Cap, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(0, 0) };
                 t.Fill.Controls.Add(t.TxtFill);
                 t.BarOuter.Controls.Add(t.TxtBase);
                 t.BarOuter.Controls.Add(t.Fill);
@@ -332,16 +333,6 @@ namespace NGUAdvisor
             return $"{s / 60:0}m";
         }
 
-        // Mono blanks a fixed-size label whose text overflows — everything variable gets fitted.
-        private static string Fit(string text, Font font, int width)
-        {
-            if (string.IsNullOrEmpty(text)) return "";
-            if (UiLayout.MeasureText(text, font) <= width) return text;
-            while (text.Length > 1 && UiLayout.MeasureText(text + "…", font) > width)
-                text = text.Substring(0, text.Length - 1);
-            return text + "…";
-        }
-
         // Poop priority (guide verbatim: "poop Pom ALWAYS, others at max"): Pomegranate first,
         // then macguffins > knowledge (EXP) > quirk > luck > gold > adventure.
         private static int PoopRank(string shortName)
@@ -439,7 +430,7 @@ namespace NGUAdvisor
                         bool affordable = fi.UnlockCost > 0 && seeds >= fi.UnlockCost;
                         t.Name.ForeColor = UiTheme.Faint;
                         SetBar(t, 0, UiTheme.Cap,
-                            fi.UnlockCost > 0 ? $"UNLOCK: {FmtSeeds(fi.UnlockCost)} SEEDS" : "LOCKED",
+                            fi.UnlockCost > 0 ? $"UNLOCK {FmtSeeds(fi.UnlockCost)} seeds" : "LOCKED",
                             affordable ? UiTheme.Cap : UiTheme.Faint);
                     }
                     else if (!fi.Active)
@@ -484,18 +475,18 @@ namespace NGUAdvisor
                 var bestNames = infos.Where(x => best.Contains(x.Idx)).Select(x => x.Name).ToList();
                 string advice;
                 if (curNames.Count == 0)
-                    advice = $"Advisor: poop unassigned — best targets (brown dots): {string.Join(", ", bestNames.ToArray())}.";
+                    advice = $"Poop unassigned — best: {string.Join(", ", bestNames.ToArray())}.";
                 else if (curNames.All(n => bestNames.Contains(n)))
-                    advice = $"Advisor: poop on {string.Join(", ", curNames.ToArray())} — matches the best targets.";
+                    advice = $"Poop on {string.Join(", ", curNames.ToArray())} — already best.";
                 else
                 {
                     var better = bestNames.Where(n => !curNames.Contains(n)).ToList();
-                    advice = $"Advisor: poop on {string.Join(", ", curNames.ToArray())} — better: {string.Join(", ", better.ToArray())} (brown dots).";
+                    advice = $"Poop on {string.Join(", ", curNames.ToArray())} — better: {string.Join(", ", better.ToArray())}.";
                 }
                 var buy = infos.Where(x => x.Locked && x.UnlockCost > 0 && seeds >= x.UnlockCost)
                     .OrderBy(x => x.UnlockCost).FirstOrDefault();
                 if (buy != null)
-                    advice += $" · Can unlock {buy.Name} ({buy.UnlockCost} seeds).";
+                    advice += $" · Unlock {buy.Name} ({buy.UnlockCost} seeds).";
                 UiLayout.FitOrGrow(_advice, advice);   // last element on the panel — free to wrap
             }
             catch (Exception ex) { LogDebug($"Ygg panel: {ex.Message}"); }

@@ -203,7 +203,7 @@ namespace NGUAdvisor
                 else
                 {
                     float? t = ZoneHelpers.TimeTillTitanSpawn(o.Index);
-                    string cd = t.HasValue ? (t.Value > 60 ? $" · {(int)(t.Value / 60)}m" : " · soon") : "";
+                    string cd = !t.HasValue ? "" : t.Value > 5400 ? $" · {t.Value / 3600:0.#}h" : t.Value > 60 ? $" · {(int)(t.Value / 60)}m" : " · soon";
                     bool imminent = t.HasValue && t.Value < 300;
                     string stage = o.Stage == "first kill" ? "1st" : o.Stage == "auto-kill" ? "AK" : o.Stage;
                     // Version tag only on versioned titans (T6+); "Walderp v1" was a mislabel.

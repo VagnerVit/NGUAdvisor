@@ -57,7 +57,7 @@ namespace NGUAdvisor
             int capH = UiTheme.SHead(14);
             int valH = UiTheme.SText(22);
             int rateH = UiTheme.SHead(15);
-            int subH = UiTheme.SHead(14);
+            int subH = 3 * UiTheme.SHead(14);   // three lines: the NGU tile names what is starving the plan
             int capY = UiTheme.S(4);
             int valY = capY + capH;
             int rateY = valY + valH;
@@ -82,6 +82,8 @@ namespace NGUAdvisor
                 _tiles[i] = t;
             }
             Height = tileTop + tileH;
+            UiLayout.HelpMark(_tiles[4].Box, _tiles[4].Name,
+                "Resets each rebirth. \"predicted\" is the plan's target lanes at their live share.");
 
             StyleChips();
             VisibleChanged += (s, e) => { if (Visible) RefreshTiles(); };
@@ -108,7 +110,7 @@ namespace NGUAdvisor
             UiLayout.FitInto(t.Value, value);
             if (perHour == null)
             {
-                UiLayout.FitInto(t.Rate, "Sampling…");
+                UiLayout.FitInto(t.Rate, "—");
                 t.Rate.ForeColor = UiTheme.Faint;
             }
             else
@@ -116,7 +118,7 @@ namespace NGUAdvisor
                 UiLayout.FitInto(t.Rate, $"+{Fmt(Math.Max(0, perHour.Value))}/hr");
                 t.Rate.ForeColor = perHour.Value > 0 ? UiTheme.Cap : UiTheme.Faint;
             }
-            UiLayout.FitInto(t.Sub, sub);
+            UiLayout.WrapInto(t.Sub, sub, 3);
         }
 
         private void RefreshTiles()
@@ -178,7 +180,7 @@ namespace NGUAdvisor
                 // NGU LEVELS — per-run metric; measured vs NGUAdvisors prediction calibrates the
                 // tick-rate constant (predicted = the plan's levels/hr at each target's share).
                 bool nguHasRate = GrowthTracker.Rate(s => s.GNgu, win, true, out r);
-                string nguSub = "resets each rebirth";
+                string nguSub = "";
                 string nguTip = null;
                 try
                 {

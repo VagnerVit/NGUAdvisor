@@ -78,7 +78,9 @@ namespace NGUAdvisor
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
-            toolbar.Controls.Add(new Label { Text = "Applied top → bottom; the advisor uses the latest breakpoint whose time has passed.", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) });
+            var orderNote = new Label { Text = "Latest passed applies", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) };
+            toolbar.Controls.Add(orderNote);
+            UiLayout.Tip(orderNote, "Breakpoints apply top to bottom; the advisor uses the latest one whose time has passed.");
 
             Controls.Add(_scroll);
             Controls.Add(toolbar);

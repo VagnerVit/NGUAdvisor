@@ -68,9 +68,9 @@ namespace NGUAdvisor
                 W - UiTheme.S(98),   // leaves room for the refresh button on the same row
                 () => Settings.AutoQuest, v => Settings.AutoQuest = v,
                 () => Settings.AdvisorQuests, v => Settings.AdvisorQuests = v,
-                "The advisor runs quests: picks them, butters, banks and abandons.",
-                "Your quest rules below drive it; the tool executes them.",
-                "Automation is off — the tool will not start or manage quests.");
+                "Advisor runs quests.",
+                "Your rules below drive it.",
+                "Off — no quest automation.");
             _controlBar.Changed += SyncFromSettings;
             _refresh = new Button { Text = "↻", Size = new Size(Math.Max(UiTheme.S(36), UiLayout.BtnWidth("↻")), UiTheme.SCtl(24)), Font = UiTheme.Ui };
             UiTheme.StyleFlat(_refresh);

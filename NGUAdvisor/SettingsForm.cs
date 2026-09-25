@@ -1861,6 +1861,7 @@ namespace NGUAdvisor
             // already exists). Cheap by construction: Sync returns after two comparisons when the painted
             // state is current, which is every frame except the one where an outcome arrives or expires.
             _ribbon?.Sync(DateTime.UtcNow);
+            HelpPopup.Poll();
             _statusPanel?.UpdateStatus();
             _titansPanel?.TickCountdown();
             _lights?.TickBoard();                    // 3s cadence while the Advisors canvas shows

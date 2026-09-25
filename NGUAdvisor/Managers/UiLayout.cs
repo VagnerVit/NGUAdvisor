@@ -59,11 +59,7 @@ namespace NGUAdvisor.Managers
         // fitted value: it measures with the font that PAINTS, sets the shortened text, and hangs the
         // complete string on the control as a tooltip — but only when it actually had to shorten it, so
         // hovering never shows a pointless tooltip repeating what is already on screen.
-        //
-        // ONE shared ToolTip for the whole app: WinForms tooltips are per-instance windows, and a
-        // per-label instance would burn GDI handles in a process that already dies of GDI exhaustion when
-        // controls leak (see DisposeChildren). It lives as long as the injected assembly, by design.
-        private static readonly ToolTip _tips = new ToolTip();
+        // The tip is a HelpPopup hover card (the WinForms ToolTip never fires on hover under Mono).
 
         public static void FitInto(Control c, string full, Font font = null, int width = 0)
         {
@@ -74,6 +70,52 @@ namespace NGUAdvisor.Managers
             string shown = FitText(full, f, w);
             if (c.Text != shown) c.Text = shown;
             Tip(c, shown == full ? null : full);
+            if (shown != full) ReportTruncation(c, full, w);
+        }
+
+        // Every ellipsis is a layout defect to fix, not a feature: log each truncated control once per
+        // session, with its panel and the full text, so the inventory comes from the live UI.
+        private static readonly HashSet<string> _truncReported = new HashSet<string>();
+
+        private static void ReportTruncation(Control c, string full, int width)
+        {
+            if (!c.Visible) return;   // a panel still being built or not on screen is not what the user sees
+            string panel = "?";
+            for (Control p = c.Parent; p != null; p = p.Parent)
+            {
+                string n = p.GetType().Name;
+                if (n.EndsWith("Panel", StringComparison.Ordinal) && n != "Panel" && n != "ScrollPanel") { panel = n; break; }
+            }
+            if (!_truncReported.Add($"{panel}|{c.GetType().Name}|{c.Left},{c.Top}")) return;
+            Main.LogDebug($"UI TRUNCATED [{panel}]: w={width} '{full}'");
+        }
+
+        // A "?" right after a caption: the explanation lives in its tooltip instead of taking a line of
+        // the layout. Returns the mark so a caller that reflows can move it.
+        public static Label HelpMark(Control parent, Control after, string tip)
+        {
+            // A fixed-width caption spans the space the mark needs; trim it to its text so they don't overlap.
+            int textW = MeasureText(after.Text, after.Font) + UiTheme.S(6);
+            if (!after.AutoSize && after.Width > textW) after.Width = textW;
+            // The caption's own font and height: a bold AutoSize mark is taller than a column header and
+            // its background painted over whatever sits right below the heading.
+            Label mark = new Label
+            {
+                Text = "?", AutoSize = false, Font = after.Font, ForeColor = UiTheme.Accent,
+                BackColor = parent.BackColor, Cursor = Cursors.Help, TextAlign = ContentAlignment.MiddleCenter,
+                Bounds = new Rectangle(after.Left + MeasureText(after.Text, after.Font) + UiTheme.S(6), after.Top,
+                                       MeasureText("?", after.Font) + UiTheme.S(8), after.Height)
+            };
+            parent.Controls.Add(mark);
+            AttachHelp(mark, tip);
+            return mark;
+        }
+
+        // Hover opens the card at once; clicking toggles it.
+        public static void AttachHelp(Control mark, string tip)
+        {
+            HelpPopup.Set(mark, tip, instant: true);
+            mark.Click += (s, e) => HelpPopup.Toggle(mark);
         }
 
         // Attach or clear a tooltip. Passing null clears it, so a value that stops being truncated does
@@ -81,7 +123,7 @@ namespace NGUAdvisor.Managers
         public static void Tip(Control c, string text)
         {
             if (c == null) return;
-            try { _tips.SetToolTip(c, text ?? ""); }
+            try { HelpPopup.Set(c, text); }
             catch { }
         }
 
@@ -105,7 +147,9 @@ namespace NGUAdvisor.Managers
             l.Text = wrapped;
             // Growing is the preferred answer, but past maxLines the last line still ellipsizes — and at
             // that point the same rule as FitInto applies: whatever was cut has to stay reachable.
-            Tip(l, Truncated(wrapped, text) ? text : null);
+            bool cut = Truncated(wrapped, text);
+            Tip(l, cut ? text : null);
+            if (cut) ReportTruncation(l, text, width);
             return l.Bottom;
         }
 
@@ -125,7 +169,9 @@ namespace NGUAdvisor.Managers
             int w = width > 0 ? width : c.Width - UiTheme.S(4);
             string wrapped = WrapText(full, f, w, maxLines);
             if (c.Text != wrapped) c.Text = wrapped;
-            Tip(c, Truncated(wrapped, full) ? full : null);
+            bool cut = Truncated(wrapped, full);
+            Tip(c, cut ? full : null);
+            if (cut) ReportTruncation(c, full, w);
         }
 
         // Wrapping inserts newlines, so "did it lose anything?" is not a string comparison — it is whether

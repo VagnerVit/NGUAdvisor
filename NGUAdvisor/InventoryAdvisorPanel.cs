@@ -99,7 +99,7 @@ namespace NGUAdvisor
                 Location = new Point(UiTheme.S(10), refresh.Bottom + UiTheme.S(8))
             };
             UiLayout.FitOrGrow(_caveat,
-                "KEEP = wins a slot in some optimizer objective, a saved loadout, or is worn. Duplicates of KEEP items are merge fodder — merge them, don't trash them.", 3);
+                "KEEP = wins an optimizer objective, a saved loadout, or is worn. Duplicates of KEEP items are merge fodder, not trash.", 3);
             content.Controls.Add(_caveat);
 
             content.Size = new Size(_hostW - UiTheme.S(20), _caveat.Bottom + UiTheme.S(10));

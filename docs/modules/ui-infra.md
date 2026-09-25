@@ -233,6 +233,12 @@ controls leak.
 A fixed-width label that is never fitted at all is the worst case of the three: it is cut with no
 ellipsis, so nothing on screen even hints that there is more.
 
+**Every ellipsis is a defect to fix (user rule, 2026-09-23).** `FitInto`, `WrapInto` and `FitOrGrow`
+log each visible truncation once per session as `UI TRUNCATED [<Panel>]: w=<px> '<full text>'` — the
+inventory comes from the live UI, so read it after a deploy. Fix by layout (wrap and let the row grow,
+a measured column, the regular weight instead of bold), not by a shorter ellipsis. Route every fitted
+string through these three; a private `FitText` call is invisible to the log.
+
 ### Scrolling: `ScrollPanel`, and ONE scroll owner per screen
 
 Section canvases and sub-pages are `ScrollPanel` (`Managers/ScrollPanel.cs`), not `Panel`. **It does not

@@ -97,15 +97,15 @@ namespace NGUAdvisor.Managers
             switch (mode)
             {
                 case FarmModeKind.Boosts:
-                    return "Advisor farms the best boost zone — and parks in the ITOPOD whenever nothing consumes boosts.";
+                    return "Best boost zone, or ITOPOD when nothing needs boosts.";
                 case FarmModeKind.Gear:
-                    return "Advisor farms the zone that caps the most gear inside its time budget.";
+                    return "Zone that caps the most gear per time budget.";
                 case FarmModeKind.Hunt:
-                    return "Camping your stage for its drops in the Loot Hunter set — pick the stage below.";
+                    return "Your stage's drops, in the Loot Hunter set.";
                 case FarmModeKind.Itopod:
-                    return "Parked in the ITOPOD. Floor, optimisation and combat are on the ITOPOD tab.";
+                    return "Floor and combat are on the ITOPOD tab.";
                 default:
-                    return "Farming the zone you pick below. The advisor does not change it.";
+                    return "Your pick below — advisor stays out of it.";
             }
         }
     }

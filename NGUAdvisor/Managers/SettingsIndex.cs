@@ -402,13 +402,13 @@ namespace NGUAdvisor.Managers
             // same degeneracy the System entries have always refused. Settings enumerate because the result
             // IS the control; References aggregate because the result is a ROUTE.
             e.Add(Ref("Cooking", "Cooking",
-                "Cooking and its gear swap are managed on the Cooking page.",
+                "Cooking and its gear swap.",
                 "ManageCooking ManageCookingLoadouts",
                 "cooking manage cooking cooking loadout swap loadout for cooking cooking gear food",
                 Destinations.Cooking));
 
             e.Add(Ref("Wishes", "Wishes",
-                "Wish spending and priorities are managed on the Wishes page.",
+                "Wish spending and priorities.",
                 "ManageWishes",
                 "wishes manage wishes wish automation wish priority spend",
                 Destinations.Wishes));
@@ -457,7 +457,7 @@ namespace NGUAdvisor.Managers
                 Destinations.AdvancedTraining));
 
             e.Add(Ref("Cards", "Cards",
-                "Automatic card casting is configured on the Cards page.",
+                "Automatic card casting.",
                 "AutoCastCards",
                 "cards cast cards auto cast cards automatic card casting card casting",
                 Destinations.Cards));

@@ -91,7 +91,7 @@ namespace NGUAdvisor.Managers
                 if (rec.Known)
                 {
                     row.Next = rec.Item.Name;
-                    row.Note = $"tier {rec.Item.Tier} · advise-only, never bought automatically";
+                    row.Note = $"tier {rec.Item.Tier} · advise-only";
                 }
                 else row.Note = "no unowned entry resolved";
             }

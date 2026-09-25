@@ -58,9 +58,9 @@ namespace NGUAdvisor
         // ITEM rather than by index after the list is rebuilt.
         private readonly List<int> _prioIds = new List<int>();
 
-        // Layout C (user-approved): two-line cards. Line 1 = full item name + right-aligned toggle
-        // BUTTONS (measured text — never checkboxes: Mono randomly drops checkbox glyphs). Line 2 =
-        // progress bar (nested Panels, proven controls) + "level/100 · next: <name>" detail.
+        // Three-line cards. Line 1 = the full item name across the column (beside the toggles it had
+        // half the width and clipped); line 2 = right-aligned toggle BUTTONS (measured text — never
+        // checkboxes: Mono randomly drops checkbox glyphs); line 3 = progress bar + detail, which wraps.
         private class ChainRow
         {
             public Label Name;
@@ -75,14 +75,17 @@ namespace NGUAdvisor
                 Name.Visible = Climb.Visible = KeepMax.Visible = Filter.Visible = v;
                 BarOuter.Visible = Detail.Visible = v;
             }
-            public void SetY(int y)
+            // Places the card at y with its detail text; returns where the next card starts.
+            public int Layout(int y, string detail)
             {
                 Name.Top = y + UiTheme.S(2);
-                Climb.Top = y + UiTheme.S(2);
-                KeepMax.Top = y + UiTheme.S(2);
-                Filter.Top = y + UiTheme.S(2);
-                BarOuter.Top = y + UiTheme.S(36);
-                Detail.Top = y + UiTheme.S(30);
+                int toggles = Name.Bottom + UiTheme.S(4);
+                Climb.Top = KeepMax.Top = Filter.Top = toggles;
+                int line3 = Climb.Bottom + UiTheme.S(6);
+                BarOuter.Top = line3 + UiTheme.S(6);
+                Detail.Top = line3;
+                int bottom = Math.Max(UiLayout.FitOrGrow(Detail, detail, 3), BarOuter.Bottom);
+                return bottom + UiTheme.S(10);
             }
         }
         // Measured button width (design system: never hardcode text-fitted widths) — renderer-true.
@@ -90,8 +93,6 @@ namespace NGUAdvisor
 
         private readonly List<ChainRow> _chains = new List<ChainRow>();
         private Panel _xformContent;
-        private Label _xformNote1;
-        private Label _xformNote2;
         private Label _xformEmpty;
         private readonly Button[] _boostXform = new Button[5];
         private Label _boostXformNote;
@@ -135,11 +136,11 @@ namespace NGUAdvisor
                 _w - UiTheme.S(34),
                 () => Settings.ManageInventory, v => Settings.ManageInventory = v,
                 () => Settings.AutoBoostPriority, v => Settings.AutoBoostPriority = v,
-                "Inventory automation is on (boosts, merges, filters). The advisor sets boost priority; transforms keep their own rules.",
-                "Inventory automation is on (boosts, merges, filters). Your priority list below drives boosting.",
-                "Inventory automation is off — no boosting, merging, filtering or convertibles.",
+                "Inventory-wide automation; advisor sets boost priority.",
+                "Inventory-wide automation; your list sets boost priority.",
+                "Inventory automation off — boosts, merges, filters and convertibles stop.",
                 null,
-                "Advisor idle — inventory automation is off. Boosts, merges, filters and convertibles are all disabled.");
+                "Advisor idle — automation off: no boosts, merges, filters or convertibles.");
             _controlBar.Changed += SyncFromSettings;
             _controlBar.Location = new Point(UiTheme.S(10), UiTheme.S(10));
             Controls.Add(_controlBar);
@@ -244,6 +245,7 @@ namespace NGUAdvisor
             var refresh = new Button { Text = "↻", Size = new Size(Math.Max(UiTheme.S(36), UiLayout.BtnWidth("↻")), UiTheme.SCtl(24)), Font = UiTheme.Ui };
             UiTheme.StyleFlat(refresh);
             refresh.Click += (s, e) => { if (Settings != null && Settings.AutoBoostPriority) RefreshReadout(recompute: true); else RefreshReadout(); };
+            UiLayout.Tip(refresh, "Recomputes the boost order now (otherwise refreshes every 10 minutes).");
             _boostPage.Controls.Add(refresh);
 
             // Measured row layout — the old hand-placed "Cube" label overlapped its combo by 3px.
@@ -255,13 +257,14 @@ namespace NGUAdvisor
             // button off. Merges, filters and convertibles are untouched by it — see Main.AutomationRoutine.
             _cubeOnly = new ScaledCheckBox
             {
-                Text = "Cube only (skip the priority list)",
+                Text = "Cube only",
                 AutoSize = true,
                 Font = UiTheme.Ui,
                 ForeColor = UiTheme.Ink,
                 BackColor = UiTheme.Ground,
                 Location = new Point(UiTheme.S(10), _cube.Bottom + UiTheme.S(6))
             };
+            UiLayout.Tip(_cubeOnly, "Boosts go to the Infinity Cube instead of the priority list below.");
             _cubeOnly.CheckedChanged += (s, e) =>
             {
                 if (_syncing || Settings == null) return;
@@ -300,27 +303,20 @@ namespace NGUAdvisor
             // ADVISOR view: computed order readout.
             _advisorView = new Panel { Location = new Point(0, viewsY), Size = new Size(_pw - 0, UiTheme.S(268)), BackColor = UiTheme.Ground, Visible = false };
             _boostPage.Controls.Add(_advisorView);
-            _advisorView.Controls.Add(new Label
+            var boostOrderHead = new Label
             {
-                Text = "BOOST ORDER (advisor-written; the blacklist below still wins)",
+                Text = "BOOST ORDER",
                 Location = new Point(UiTheme.S(10), 0),
                 AutoSize = true,
                 Font = UiTheme.ColHeader,
                 ForeColor = UiTheme.Muted,
                 BackColor = UiTheme.Ground
-            });
+            };
+            _advisorView.Controls.Add(boostOrderHead);
+            UiLayout.HelpMark(_advisorView, boostOrderHead, "Advisor-written. The never-boost list below still wins.");
             _readout = new ListBox { Location = new Point(UiTheme.S(10), UiTheme.HeadPitch), Size = new Size(_pw - UiTheme.S(30), UiTheme.ListH(8)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.None };
             UiTheme.StyleList(_readout);
             _advisorView.Controls.Add(_readout);
-            _advisorView.Controls.Add(new Label
-            {
-                Text = "Order refreshes every 10 minutes (or press the refresh button above).",
-                Location = new Point(UiTheme.S(10), _readout.Bottom + UiTheme.S(8)),
-                AutoSize = true,
-                Font = UiTheme.Ui,
-                ForeColor = UiTheme.Muted,
-                BackColor = UiTheme.Ground
-            });
 
             // MANUAL view: the editable priority list IS the boost list (spec 2026-07-28 — equipped/locked
             // are no longer boosted implicitly), minus the blacklist below it, plus a live readout of what
@@ -338,7 +334,9 @@ namespace NGUAdvisor
             int listW = _pw - UiTheme.S(30);
             int y = 0;
 
-            _manualView.Controls.Add(new Label { Text = "PRIORITY BOOSTS (boosted top-down — this list is the only thing boosted)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            var prioHead = new Label { Text = "PRIORITY BOOSTS", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
+            _manualView.Controls.Add(prioHead);
+            UiLayout.HelpMark(_manualView, prioHead, "Boosted top-down. This list is the only thing boosted.");
             y += UiTheme.HeadPitch;
             _prio = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(PrioRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
             UiTheme.StyleList(_prio);
@@ -372,7 +370,9 @@ namespace NGUAdvisor
             _manualView.Controls.Add(new Label { Text = "Alt+↑/↓ moves · Alt+Home/End to the ends · Del removes", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.Chip, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
             y += UiTheme.HeadPitch + UiTheme.S(6);
 
-            _manualView.Controls.Add(new Label { Text = "WILL BOOST NOW (live, in order)", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            var willBoostHead = new Label { Text = "WILL BOOST NOW", Location = new Point(UiTheme.S(10), y), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
+            _manualView.Controls.Add(willBoostHead);
+            UiLayout.HelpMark(_manualView, willBoostHead, "Live, in boost order.");
             y += UiTheme.HeadPitch;
             _manualReadout = new ListBox { Location = new Point(UiTheme.S(10), y), Size = new Size(listW, UiTheme.ListH(ReadoutRows)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.None };
             UiTheme.StyleList(_manualReadout);
@@ -417,7 +417,9 @@ namespace NGUAdvisor
             _boostPage.Controls.Add(_blackView);
 
             int by = 0;
-            _blackView.Controls.Add(new Label { Text = "NEVER BOOST (skipped in both modes, whatever the list says)", Location = new Point(UiTheme.S(10), by), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground });
+            var neverBoostHead = new Label { Text = "NEVER BOOST", Location = new Point(UiTheme.S(10), by), AutoSize = true, Font = UiTheme.ColHeader, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground };
+            _blackView.Controls.Add(neverBoostHead);
+            UiLayout.HelpMark(_blackView, neverBoostHead, "Skipped in both modes, whatever the priority list says.");
             by += UiTheme.HeadPitch;
             _black = new ListBox { Location = new Point(UiTheme.S(10), by), Size = new Size(listW, UiTheme.ListH(4)), Font = UiTheme.Ui, BorderStyle = BorderStyle.FixedSingle, SelectionMode = SelectionMode.MultiExtended };
             UiTheme.StyleList(_black);
@@ -517,6 +519,7 @@ namespace NGUAdvisor
                 _boostXform[m] = MkBoostTransformToggle(modeNames[m], bx, UiTheme.S(6), wm, m);
                 bx += wm + UiTheme.S(6);
             }
+            UiLayout.Tip(_boostXform[0], "Advisor picks the type with the most boost value right now.");
             // Its OWN line, full content width: beside the five buttons this label had ~90px left and
             // FitInto clipped it to "forced...". The TRANSFORMS column is too narrow to hold a label
             // and a five-button strip on one row, and the no-ellipsis rule outranks the compact row.
@@ -540,7 +543,7 @@ namespace NGUAdvisor
             int xFilter = _xformContent.Width - UiTheme.S(4) - wFilter;
             int xKeep = xFilter - UiTheme.S(6) - wKeep;
             int xClimb = xKeep - UiTheme.S(6) - wClimb;
-            int nameW = xClimb - UiTheme.S(18);
+            int nameW = _xformContent.Width - UiTheme.S(20);
 
             for (int i = 0; i < TransformManager.Chains.Length; i++)
             {
@@ -560,8 +563,11 @@ namespace NGUAdvisor
                 _xformContent.Controls.Add(row.Name);
 
                 row.Climb = MkChainToggle("Climb", xClimb, wClimb, idx, () => Settings.TransformAutoClimb, v => Settings.TransformAutoClimb = v);
+                UiLayout.Tip(row.Climb, "Extra copies past a maxed one keep climbing tiers.");
                 row.KeepMax = MkChainToggle("Keep Max", xKeep, wKeep, idx, () => Settings.TransformKeepMax, v => Settings.TransformKeepMax = v);
+                UiLayout.Tip(row.KeepMax, "Keeps one copy maxed while extras climb. A held chain freezes only once it reaches 100 — spares keep merging until then.");
                 row.Filter = MkChainToggle("Not Filtered", xFilter, wFilter, idx, () => Settings.TransformFilter, v => Settings.TransformFilter = v);
+                UiLayout.Tip(row.Filter, "Drops this chain's lower-tier loot instead of keeping it.");
 
                 row.BarOuter = new Panel
                 {
@@ -600,36 +606,6 @@ namespace NGUAdvisor
             };
             _xformContent.Controls.Add(_xformEmpty);
 
-            // WRAP, DON'T CLIP. These two lines were AutoSize, so they simply ran off the right edge of
-            // the content panel and lost their ends ("...spare copies keep mergin"). An AutoSize label
-            // past its parent's edge clips SILENTLY — the documented Adventure-footer failure. Bounded
-            // width + FitOrGrow applies the project's no-ellipsis rule instead: if it doesn't fit on one
-            // line the label grows and word-wraps, so the sentence is always readable in full.
-            int noteW = _xformContent.Width - UiTheme.S(20);
-            _xformNote1 = new Label
-            {
-                Location = new Point(UiTheme.S(10), UiTheme.S(240)),
-                AutoSize = false,
-                Width = noteW,
-                Height = UiTheme.TextH,
-                Font = UiTheme.Ui,
-                ForeColor = UiTheme.Muted,
-                BackColor = UiTheme.Ground
-            };
-            _xformContent.Controls.Add(_xformNote1);
-            UiLayout.FitOrGrow(_xformNote1, "Held chains freeze only at-100 copies — spare copies keep merging.");
-            _xformNote2 = new Label
-            {
-                Location = new Point(UiTheme.S(10), _xformNote1.Bottom + UiTheme.S(2)),
-                AutoSize = false,
-                Width = noteW,
-                Height = UiTheme.TextH,
-                Font = UiTheme.Ui,
-                ForeColor = UiTheme.Muted,
-                BackColor = UiTheme.Ground
-            };
-            _xformContent.Controls.Add(_xformNote2);
-            UiLayout.FitOrGrow(_xformNote2, "Keep Max + Climb keeps one maxed copy; extras climb. Filter drops lower-tier loot.");
         }
 
         private Button MkBoostTransformToggle(string text, int x, int y, int w, int mode)
@@ -1075,7 +1051,7 @@ namespace NGUAdvisor
                     _readout.BeginUpdate();
                     _readout.Items.Clear();
                     _readout.Items.Add("1. equipped gear  (always boosted first)");
-                    _readout.Items.Add("… press the refresh button above to compute the ranked order");
+                    _readout.Items.Add("… press ↻ above to compute the order");
                     _readout.EndUpdate();
                     return;
                 }
@@ -1123,7 +1099,6 @@ namespace NGUAdvisor
                         }
 
                         row.SetVisible(true);
-                        row.SetY(y);
                         UiLayout.FitInto(row.Name, ItemNameNice(s.OwnedId));
 
                         long lvl = Math.Max(0, Math.Min(100, s.Level));
@@ -1135,24 +1110,19 @@ namespace NGUAdvisor
                             detail = $"{s.Level}/100 · top tier — from {ItemNameNice(TransformManager.Chains[i].Tiers[s.OwnedTier - 1])}";
                         else
                             detail = $"{s.Level}/100 · top tier";
-                        UiLayout.FitInto(row.Detail, detail);
+                        y = row.Layout(y, detail);
 
                         StyleOnOff(row.Climb, Flag(Settings.TransformAutoClimb, i));
                         StyleOnOff(row.KeepMax, Flag(Settings.TransformKeepMax, i));
                         bool filtered = Flag(Settings.TransformFilter, i);
                         row.Filter.Text = filtered ? "Filtered" : "Not Filtered";
                         UiTheme.ApplyState(row.Filter, filtered ? UiTheme.Faint : UiTheme.Cap, Color.White);
-
-                        y += UiTheme.S(54);
                     }
                 }
                 _xformEmpty.Visible = y == _xformTop;
-                _xformNote1.Top = Math.Max(y + UiTheme.S(8), UiTheme.S(60));
-                // Both notes may have grown to two lines, so chain off their real bottoms.
-                _xformNote2.Top = _xformNote1.Bottom + UiTheme.S(2);
-                _xformContent.Height = _xformNote2.Bottom + UiTheme.S(10);
                 // GROW, don't scroll: this page has no scrollbar of its own any more, so it takes its
                 // content's height and lets the one scroll owner above it do the scrolling.
+                _xformContent.Height = Math.Max(y, UiTheme.S(60)) + UiTheme.S(10);
                 _xformPage.Height = _xformContent.Height;
                 SyncHeight();
             }
@@ -1179,8 +1149,8 @@ namespace NGUAdvisor
                 ? TransformManager.AdvisedType(Main.Character)
                 : mode == 4 ? BoostSinks.TypeNone : mode;
             UiLayout.FitOrGrow(_boostXformNote, mode == 0
-                ? $"Advisor picks {BoostSinks.TypeName(type)} — most boost value delivered right now."
-                : $"Forced to {BoostSinks.TypeName(type)}; the advisor will not change it.");
+                ? $"Advisor picks {BoostSinks.TypeName(type)}."
+                : $"Forced to {BoostSinks.TypeName(type)}.");
         }
 
         private static void StyleOnOff(Button b, bool on)

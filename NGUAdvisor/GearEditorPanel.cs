@@ -74,7 +74,9 @@ namespace NGUAdvisor
             UiTheme.StyleFlat(addBtn);
             addBtn.Click += (s, e) => AddBreakpoint();
             toolbar.Controls.Add(addBtn);
-            toolbar.Controls.Add(new Label { Text = "Items equip in list order. Paste an ID list from the gear-optimizer into a breakpoint.", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) });
+            var hint = new Label { Text = "Items equip in list order.", AutoSize = true, ForeColor = UiTheme.Muted, Font = UiTheme.Ui, Margin = new Padding(UiTheme.S(10), UiTheme.S(6), 0, 0) };
+            toolbar.Controls.Add(hint);
+            UiLayout.Tip(hint, "Paste an ID list from the gear-optimizer into a breakpoint.");
 
             Controls.Add(_scroll);
             Controls.Add(toolbar);
@@ -664,9 +666,18 @@ namespace NGUAdvisor
                 _source.Enabled = !chained;
 
                 if (obj)
-                    _objInfo.Text = chained
-                        ? "The priority chain below is in charge (remove every step to change this)."
-                        : "Gear is auto-optimized live for \"" + _bp.Objective + "\" while this breakpoint is active.";
+                {
+                    if (chained)
+                    {
+                        _objInfo.Text = "Priority chain below is in charge.";
+                        UiLayout.Tip(_objInfo, "Remove every step to go back to a single objective.");
+                    }
+                    else
+                    {
+                        _objInfo.Text = "Auto-optimized live for \"" + _bp.Objective + "\".";
+                        UiLayout.Tip(_objInfo, null);
+                    }
+                }
                 UpdateInfo();
                 LayoutChain();
                 RecalcHeight();

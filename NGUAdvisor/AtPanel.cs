@@ -59,7 +59,6 @@ namespace NGUAdvisor
         private readonly Label[] _slots;
         private readonly Label[] _goals;
         private readonly Label[] _targets;
-        private readonly Label _goalNote;
         private readonly Label[] _caps;
         private readonly Label _capNote;
         private readonly Label _tmDemand;
@@ -67,7 +66,6 @@ namespace NGUAdvisor
         private readonly Label _tmFreeze;
         private readonly Label _tmEnergy;
         private readonly Label _tmMagic;
-        private readonly Label _tmNote;
 
         public int ContentHeight { get; private set; }
 
@@ -81,6 +79,9 @@ namespace NGUAdvisor
 
             Label head = Header("ADVANCED TRAINING", UiTheme.S(10), UiTheme.S(10));
             Controls.Add(head);
+            UiLayout.HelpMark(this, head,
+                $"Locked below Attack & Defense rank 5 ≥ {BasicTrainingGate}. Wish {BlitzWishId} pins one level "
+                + "per tick regardless of energy. Otherwise energy sets the pace.");
 
             // Two lines reserved: the locked gate and the blitz wish can both be true at once, and the
             // whole point of this line is that neither ever goes unsaid.
@@ -109,6 +110,9 @@ namespace NGUAdvisor
 
             Label goalHead = Header("GOAL & HELD TARGET — POWER / TOUGHNESS", UiTheme.S(10), y + UiTheme.S(6));
             Controls.Add(goalHead);
+            UiLayout.HelpMark(this, goalHead,
+                "The goal level is not a cap: past it, AT still buys a bigger number, just no progress — "
+                + "the next titan stage's stats are already met.");
 
             // Two lines per slot, not one: the goal level and the target the advisor is holding answer
             // different questions ("where does AT stop buying progress" vs "what is being fed towards"),
@@ -125,19 +129,11 @@ namespace NGUAdvisor
                 y = _targets[i].Bottom + UiTheme.S(4);
             }
 
-            _goalNote = new Label
-            {
-                AutoSize = false, Size = new Size(inner, UiTheme.SLines(2)), Font = UiTheme.Chip,
-                ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(10), y - UiTheme.S(2))
-            };
-            Controls.Add(_goalNote);
-            UiLayout.WrapInto(_goalNote,
-                "The goal level is NOT a cap: past it AT still buys a bigger number, just no progress — "
-                + "the next titan stage's stats are already met there.", 2);
-
-            Label capHead = Header("CAP TO BLITZ-BOOST", UiTheme.S(10), _goalNote.Bottom + UiTheme.S(6));
+            Label capHead = Header("CAP TO BLITZ-BOOST", UiTheme.S(10), y + UiTheme.S(2));
             Controls.Add(capHead);
+            UiLayout.HelpMark(this, capHead,
+                "Energy needed to hold each slot's one-level-per-tick ceiling for the whole horizon. Feed "
+                + "less and the ceiling drops before the window is up.");
 
             // Per slot, not per horizon: baseTime is a serialized field on each slot's controller (the
             // sheet hardcodes 1e7 for Power/Toughness and 2e7 for the Wandoos pair), so one shared line
@@ -161,6 +157,11 @@ namespace NGUAdvisor
 
             Label tmHead = Header("TIME MACHINE — NORMAL ONLY", UiTheme.S(10), _capNote.Bottom + UiTheme.S(6));
             Controls.Add(tmHead);
+            UiLayout.HelpMark(this, tmHead,
+                "Gold reaches the titan ladder indirectly: TM raises GPS, GPS buys digger upgrades, digger "
+                + "bonuses feed adventure stats. Only the Normal column is ported (the sheet's Evil column is "
+                + "broken); hack, card and TM-challenge speed bonuses are applied. Level planner targets are "
+                + "frozen or managed only during the NGU MARATHON segment.");
 
             // "Is the TM still worth feeding" DOES have a goal-based answer — TM raises GPS, GPS buys
             // digger upgrades, digger bonuses feed adventure stats, adventure stats kill titans. It is
@@ -184,33 +185,16 @@ namespace NGUAdvisor
             _tmMagic = ValueLine(inner, _tmEnergy.Bottom + UiTheme.S(2));
             Controls.Add(_tmMagic);
 
-            _tmNote = new Label
-            {
-                AutoSize = false, Size = new Size(inner, UiTheme.SLines(4)), Font = UiTheme.Chip,
-                ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(10), _tmMagic.Bottom + UiTheme.S(4))
-            };
-            Controls.Add(_tmNote);
-            // Constant text, so it is set once in the ctor and the height it grows to is part of the
-            // panel's derived height rather than something a later refresh could move.
-            //
-            // NO gold-to-titan-stat threshold and no single "TM worth" number, deliberately: the chain
-            // above is real but its exchange rate is phase-dependent, which is exactly why this repo
-            // refuses a single scalar across gold / boosts / PP / EXP (docs/modules/ItopodFarmAdvisor.md
-            // §Open). The demand flags plus the rate give the same decision without a conversion that
-            // would be wrong for half a run.
-            UiLayout.WrapInto(_tmNote,
-                "Gold reaches the titan ladder only indirectly — TM raises GPS, GPS buys digger upgrades, "
-                + "digger bonuses feed adventure stats — so this section shows gold demand and rate instead "
-                + "of a level threshold. The AT Calculator's Evil column is marked broken by its own author, "
-                + "so only the Normal column is ported. The TM speed bonuses from hacks, cards and the TM "
-                + "challenge ARE applied.", 4);
-
+            // NO gold-to-titan-stat threshold and no single "TM worth" number, deliberately: the chain is
+            // real but its exchange rate is phase-dependent, which is exactly why this repo refuses a
+            // single scalar across gold / boosts / PP / EXP (docs/modules/ItopodFarmAdvisor.md §Open). The
+            // demand flags plus the rate give the same decision without a conversion that would be wrong
+            // for half a run — see the TIME MACHINE heading's tooltip for the full chain.
             Label provenance = new Label
             {
                 AutoSize = false, Size = new Size(inner, UiTheme.TextH), Font = UiTheme.Ui,
                 ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(10), _tmNote.Bottom + UiTheme.S(8))
+                Location = new Point(UiTheme.S(10), _tmMagic.Bottom + UiTheme.S(8))
             };
             Controls.Add(provenance);
             UiLayout.FitOrGrow(provenance, Provenance);
@@ -268,10 +252,9 @@ namespace NGUAdvisor
                     RenderCap(c, id, locked, epow, atSpeed);
                 }
                 RenderGoals(c);
-                UiLayout.WrapInto(_capNote,
-                    $"At one level per tick ({TickSeconds:0.##}s), {HorizonNames[0]} of blitz boost is "
-                    + $"{NumberFormatter.Abbrev(Horizons[0] / TickSeconds)} levels and {HorizonNames[1]} is "
-                    + $"{NumberFormatter.Abbrev(Horizons[1] / TickSeconds)} — the energy above holds the ceiling there.", 1);
+                UiLayout.FitInto(_capNote,
+                    $"{HorizonNames[0]}: {NumberFormatter.Abbrev(Horizons[0] / TickSeconds)} lv"
+                    + $" · {HorizonNames[1]}: {NumberFormatter.Abbrev(Horizons[1] / TickSeconds)} lv");
 
                 RenderTimeMachine(c);
             }
@@ -283,21 +266,17 @@ namespace NGUAdvisor
             if (locked)
             {
                 _state.ForeColor = UiTheme.Danger;
-                UiLayout.WrapInto(_state,
-                    $"AT LOCKED — basic Attack and Defense training rank 5 must both reach {BasicTrainingGate} levels. "
-                    + "Advanced Training does not progress at all below that, so no times are shown.", 2);
+                UiLayout.FitInto(_state, $"AT LOCKED — needs Attack & Defense rank 5 ≥ {BasicTrainingGate}");
                 return;
             }
             if (blitzWish)
             {
                 _state.ForeColor = UiTheme.Cap;
-                UiLayout.WrapInto(_state,
-                    $"WISH {BlitzWishId} IS ACTIVE — every AT slot gains a level every tick regardless of energy, "
-                    + $"so a level costs {TickSeconds:0.##}s and the energy-based ceilings below do not apply.", 2);
+                UiLayout.FitInto(_state, $"WISH {BlitzWishId} ACTIVE — one level per tick");
                 return;
             }
             _state.ForeColor = UiTheme.Ink;
-            UiLayout.WrapInto(_state, "AT is progressing. Levels below are live; targets come from the level planner.", 2);
+            UiLayout.FitInto(_state, "AT progressing — targets from level planner");
         }
 
         private void RenderSlot(Character c, int id, bool locked, bool blitzWish)
@@ -488,7 +467,7 @@ namespace NGUAdvisor
             _tmDemand.ForeColor = diggers || augs ? UiTheme.Cap : UiTheme.Ink;
             UiLayout.FitInto(_tmDemand, $"Gold demand — diggers: {(diggers ? "STARVED" : "funded")}"
                 + $" · augments: {(augs ? "STARVED" : "funded")}"
-                + (diggers || augs ? " · more TM still buys progress" : " · both budgets are covered"));
+                + (diggers || augs ? " · buys progress" : " · funded"));
 
             // Gross and net are different questions: net is what is left after the diggers' own drain.
             double gross = Read(() => c.grossGoldPerSecond(), double.NaN);
@@ -513,16 +492,15 @@ namespace NGUAdvisor
             if (segment != MarathonSegment)
             {
                 _tmFreeze.ForeColor = UiTheme.Muted;
-                UiLayout.WrapInto(_tmFreeze,
-                    $"Level planner: TM targets are not managed in this segment ({(string.IsNullOrEmpty(segment) ? "none" : segment)})"
-                    + $" — the freeze applies only during {MarathonSegment}.", 2);
+                UiLayout.FitInto(_tmFreeze,
+                    $"Level planner: not managing TM ({(string.IsNullOrEmpty(segment) ? "none" : segment)})");
                 return;
             }
             bool frozen = Read(() => LevelPlanner.TmFrozen);
             _tmFreeze.ForeColor = frozen ? UiTheme.Cap : UiTheme.Ink;
-            UiLayout.WrapInto(_tmFreeze, frozen
-                ? "Level planner: TM targets FROZEN — the TM holds gold and augments are affordable, so it is not being fed."
-                : "Level planner: TM targets live — the TM is unfunded or augments are unaffordable, so it is still being fed.", 2);
+            UiLayout.FitInto(_tmFreeze, frozen
+                ? "Level planner: TM targets FROZEN — augments funded"
+                : "Level planner: TM targets live — still feeding");
         }
 
         private void RenderTmRow(Label row, string name, double unitCost, double power, double bonus)
