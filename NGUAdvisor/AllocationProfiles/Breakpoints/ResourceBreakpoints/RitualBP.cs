@@ -6,7 +6,8 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
     {
         protected override bool CorrectResourceType() => Type == ResourceType.Magic;
 
-        protected override bool Unlocked() => Index <= _character.bloodMagicController.ritualsUnlocked() && _character.buttons.bloodMagic.interactable;
+        // ritualsUnlocked() is a COUNT and ritual[] is 0-based; Index -1 is the parser's malformed-token value.
+        protected override bool Unlocked() => Index >= 0 && Index < _character.bloodMagicController.ritualsUnlocked() && _character.buttons.bloodMagic.interactable;
 
         protected override bool TargetMet() => false;
 
