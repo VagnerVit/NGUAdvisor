@@ -374,13 +374,14 @@ namespace NGUAdvisor.Managers
             if (!Quest.inQuest)
             {
                 var startQuest = false;
+                var equipQuestGear = false;
 
                 // If we're allowing major quests and we have a quest available and we should quest
                 if (majorQuests)
                 {
                     _character.settings.useMajorQuests = true;
                     SetIdleMode(false);
-                    EquipQuestingLoadout();
+                    equipQuestGear = true;
                     startQuest = true;
                     // Starting a major was the one quest action that logged nothing, so a major that
                     // never started and a major that started looked identical in the log.
@@ -392,7 +393,7 @@ namespace NGUAdvisor.Managers
                     SetIdleMode(!Settings.ManualMinors);
 
                     if (Settings.ManualMinors && shouldQuest)
-                        EquipQuestingLoadout();
+                        equipQuestGear = true;
                     else if (LockManager.HasQuestLock())
                         LockManager.TryQuestSwap();
 
@@ -403,6 +404,9 @@ namespace NGUAdvisor.Managers
                 {
                     _qc.startQuest();
                     _qc.refreshMenu();
+                    // After startQuest: the quest set is solved for the zone this quest just rolled.
+                    if (equipQuestGear)
+                        EquipQuestingLoadout();
                 }
                 // If we're not questing and we still have the lock, restore gear
                 else if (LockManager.HasQuestLock())
@@ -462,6 +466,10 @@ namespace NGUAdvisor.Managers
             {
                 if (!LockManager.TryQuestSwap())
                     Log("Tried to equip quest loadout but unable to acquire lock");
+            }
+            else
+            {
+                LockManager.RefreshQuestGear();
             }
         }
     }

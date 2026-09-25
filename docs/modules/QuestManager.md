@@ -97,6 +97,29 @@ strategy (idle minors, majors from the bank) resumes. **Gear Hunt still outranks
 imminent bank overflow still forces a major through — the pooled burst too, since that is an explicit
 request to empty the bank.
 
+## Quest gear — the most quest items per second (`GearOptimizer.ResolveQuestGear`)
+
+Switch: `ManageQuestLoadouts` ("Quest Gear", on the Quests panel row visible in both modes — the
+advisor never sets it, so it must not live in the manual-only rulebook). Game truth: every manual kill in the quest zone rolls
+`questDropChance() = 0.05 × (1 + gear QuestDrop) × sigil × ITOPOD` (`[DECOMP] BeastQuestController.cs:865-879`,
+the tail of each `LootDrop.zone<N>Drop`, no early return), and gear Respawn enters `respawnTime()` as
+`max(0.2, 1 − R)` (`[DECOMP] AdventureController.cs:796-814`). So items/s = `(1 + QD) × kills/s`, and
+kills/s is `ZoneCadence.For(zone, QuestCombatMode, projectedAttack, projectedRespawn)`.
+
+The search walks `Adventure(k) > Respawn(r) > Quest Drops(all) > Adventure(all)`, `k` down from all
+accessories, `r` up until an extra slot buys no respawn, and keeps the best rate. **A candidate may
+give up Adventure accessories only while every spawn stays a projected one-shot** — nothing gets a
+turn, so no Toughness model is needed; a zone the full Adventure set does not one-shot keeps it.
+Ties keep the stronger set. Pins and `QuestObjectiveRespawn` apply as everywhere.
+
+The QUEST card still wins where it says something else: objective empty + static list → the list;
+an objective other than `Quest Drops`/`Respawn` (the rate's own two halves) → that plain objective.
+
+The set is solved AFTER `startQuest()` (before it the zone is unknown), and `LockManager.RefreshQuestGear`
+re-solves it when the next quest under the same lock rolls a different zone — the lock is released
+only once the bank is empty. Only one main-slot item carries QuestDrop (weapon 415, A Giant Scythe);
+the Adventure lead owns the main slots and picks it only on Power.
+
 ## Turn-in (`CheckQuestTurnin`)
 
 `readyToHandIn()` → capstone hold check → **one butter attempt per quest** (`_butterAttempted`;

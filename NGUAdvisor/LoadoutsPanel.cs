@@ -33,6 +33,7 @@ namespace NGUAdvisor
             public Func<int[]> GetStatic;
             public Action<int[]> SetStatic;
             public bool GoldDefault;
+            public bool QuestDropRate;   // resolved by GearOptimizer.ResolveQuestGear, as the quest swap does
             public bool LootHunter;   // Gear Hunt pool: IDs = accessory CANDIDATES, preview = resolved hybrid
             public bool StaticOnly;   // a plain item list — no objective, so no ADVISOR/MANUAL choice exists
 
@@ -121,6 +122,7 @@ namespace NGUAdvisor
                 GetObj = () => Settings.QuestObjective, SetObj = v => Settings.QuestObjective = v,
                 GetResp = () => Settings.QuestObjectiveRespawn, SetResp = v => Settings.QuestObjectiveRespawn = v,
                 GetStatic = () => Settings.QuestLoadout, SetStatic = v => Settings.QuestLoadout = v,
+                QuestDropRate = true,
             });
             _modes.Add(new Mode
             {
@@ -548,6 +550,7 @@ namespace NGUAdvisor
 
                 string show = !string.IsNullOrEmpty(obj) ? obj : m.LastObjective;
                 if (string.IsNullOrEmpty(show) && m.GoldDefault) show = "Gold Drops";
+                if (string.IsNullOrEmpty(show) && m.QuestDropRate) show = "Quest Drops";
                 int idx = show != null ? m.Combo.Items.IndexOf(show) : -1;
                 if (idx >= 0) m.Combo.SelectedIndex = idx;
 
@@ -586,6 +589,13 @@ namespace NGUAdvisor
                     // Same resolution the gear-hunt swap uses: pool accessories + best P/T gear.
                     ids = GearHunter.ResolveLoadout(out var what);
                     note = ids.Length > 0 ? what : "add accessory IDs to the pool";
+                }
+                else if (m.QuestDropRate && GearOptimizer.QuestUsesDropRateSet(obj)
+                         && (!string.IsNullOrEmpty(obj) || (m.GetStatic() ?? new int[0]).All(x => x <= 0)))
+                {
+                    int zone = Main.Character.beastQuest.inQuest ? Main.Character.beastQuestController.curQuestZone() : -1;
+                    ids = GearOptimizer.ResolveQuestGear(zone, quiet: true);
+                    note = zone >= 0 ? $"advisor: most quest items/s in zone {zone}" : "advisor: quest drops (zone solved at quest start)";
                 }
                 else if (string.IsNullOrEmpty(obj))
                 {

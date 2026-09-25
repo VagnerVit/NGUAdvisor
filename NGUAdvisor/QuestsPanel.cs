@@ -148,13 +148,11 @@ namespace NGUAdvisor
             _fifty = MkRule("50-Item Minors", () => Settings.FiftyItemMinors = !Settings.FiftyItemMinors);
             _butterMinor = MkRule("Butter Minors", () => Settings.UseButterMinor = !Settings.UseButterMinor);
             _butterMajor = MkRule("Butter Majors", () => Settings.UseButterMajor = !Settings.UseButterMajor);
-            _questGear = MkRule("Quest Gear", () => Settings.ManageQuestLoadouts = !Settings.ManageQuestLoadouts);
             _rules.Controls.Add(_fifty);
             _rules.Controls.Add(_butterMinor);
             _rules.Controls.Add(_butterMajor);
-            _rules.Controls.Add(_questGear);
             int rulesRow2 = UiLayout.WrapRow(UiTheme.S(10), rulesRow1 + UiTheme.S(2), UiTheme.S(8), _rules.Width - UiTheme.S(10), UiTheme.S(30),
-                new Control[] { _fifty, _butterMinor, _butterMajor, _questGear });
+                new Control[] { _fifty, _butterMinor, _butterMajor });
             _rules.Height = rulesRow2 + UiTheme.S(2);
 
             // Re-homed from the retired Old Quests page (Phase B): quest-zone combat style. Sits
@@ -168,15 +166,18 @@ namespace NGUAdvisor
             // Strategy toggles live on the always-visible row (both advisor + manual modes):
             // Pool Majors = bank to cap then burst the whole bank; Hold for Gear = the opt-in
             // capstone hold (default OFF — a held major reads as a hang at the quest ticket).
+            // Quest Gear too: the advisor never sets it, so hiding it in advisor mode left no way to turn it on.
             _poolMajors = MkRule("Pool Majors", () => Settings.PoolMajorQuests = !Settings.PoolMajorQuests);
             _holdGear = MkRule("Hold for Gear", () => Settings.QuestHoldForGear = !Settings.QuestHoldForGear);
+            _questGear = MkRule("Quest Gear", () => Settings.ManageQuestLoadouts = !Settings.ManageQuestLoadouts);
             Controls.Add(cmLbl);
             Controls.Add(_combatMode);
             Controls.Add(_beast);
             Controls.Add(_poolMajors);
             Controls.Add(_holdGear);
+            Controls.Add(_questGear);
             UiLayout.WrapRow(UiTheme.S(10), Math.Max(top + UiTheme.S(182), _rules.Bottom + UiTheme.S(8)), UiTheme.S(8), W - UiTheme.S(20), UiTheme.S(30),
-                new Control[] { cmLbl, _combatMode, _beast, _poolMajors, _holdGear });
+                new Control[] { cmLbl, _combatMode, _beast, _poolMajors, _holdGear, _questGear });
 
             VisibleChanged += (s, e) => { if (Visible) RefreshView(); };
             SyncFromSettings();

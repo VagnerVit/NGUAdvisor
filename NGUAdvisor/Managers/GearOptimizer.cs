@@ -246,6 +246,120 @@ namespace NGUAdvisor.Managers
             return ResolveModeGear(obj, Main.Settings.GoldObjectiveRespawn, fallback);
         }
 
+        // Quest gear: the set with the most quest items per second in the zone this quest rolled. The
+        // user's QUEST card still wins where it asks for something else — a static list with no
+        // objective is worn as-is, and an objective other than the rate's own two halves (Quest Drops,
+        // Respawn) is optimized as that plain objective. questZone < 0 = not known yet.
+        public static int[] ResolveQuestGear(int questZone, bool quiet = false)
+        {
+            var s = Main.Settings;
+            string obj = s.QuestObjective;
+            var fallback = s.QuestLoadout ?? new int[0];
+            if (string.IsNullOrEmpty(obj) && fallback.Any(x => x > 0)) return fallback;
+            if (!QuestUsesDropRateSet(obj)) return ResolveModeGear(obj, s.QuestObjectiveRespawn, fallback, null, quiet);
+
+            var rateSet = QuestDropRateSet(questZone, s.QuestCombatMode, s.QuestObjectiveRespawn, quiet);
+            if (rateSet != null && rateSet.Length > 0) return rateSet;
+            try
+            {
+                var ids = OptimizeIds(GearChain.LootChain(GearObjectives.Stat.QuestDrops), null, s.QuestObjectiveRespawn);
+                if (ids.Length > 0)
+                {
+                    if (!quiet)
+                        Main.Log($"Quest gear: no cadence for zone {questZone} — kill-safe Quest Drops set ({ids.Length} items).");
+                    return ids;
+                }
+            }
+            catch (Exception e) { if (!quiet) Main.LogDebug($"Quest loot chain failed: {e.Message}"); }
+            return fallback;
+        }
+
+        public static bool QuestUsesDropRateSet(string questObjective)
+            => string.IsNullOrEmpty(questObjective)
+            || string.Equals(questObjective, GearObjectives.Stat.QuestDrops, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(questObjective, GearObjectives.Stat.Respawn, StringComparison.OrdinalIgnoreCase);
+
+        // Game truth: every manual kill in the quest zone rolls BeastQuestController.questDropChance()
+        // = 0.05 x (1 + gear QuestDrop) x sigil x ITOPOD (the tail of LootDrop.zone<N>Drop, which has no
+        // early return), and gear Respawn enters AdventureController.respawnTime() as max(0.2, 1 - R).
+        // So items/s = (1 + QD) x kills/s, with kills/s from ZoneCadence under the PROJECTED attack and
+        // respawn. Accessories are traded away from Adventure only while every spawn stays a projected
+        // one-shot — nothing gets a turn, so survival needs no Toughness model. null = no estimate.
+        private static int[] QuestDropRateSet(int zone, int combatMode, bool forceTopRespawn, bool quiet)
+        {
+            try
+            {
+                var adventure = FindObjective("Adventure");
+                var questDrops = FindObjective(GearObjectives.Stat.QuestDrops);
+                var respawn = FindObjective(GearObjectives.Stat.Respawn);
+                var power = FindObjective("Power");
+                if (adventure == null || questDrops == null || respawn == null || power == null) return null;
+                if (zone < 0 || ZoneCadence.Facts(zone) == null) return null;
+
+                double curP = CurrentScore(power), curQD = CurrentScore(questDrops);
+                if (curP <= 0 || curQD <= 0) return null;
+                double atk = Main.Character.totalAdvAttack();
+                // ScoreOf clamps Respawn at the game's 80 % floor, so dividing the worn gear's factor out
+                // of the live respawn time leaves exactly what gear does not touch.
+                double respawnWithoutGear = CombatHelpers.BaseRespawnTime() / (1.0 - CurrentScore(respawn));
+
+                ZoneCadence.Estimate Project(Result r) => ZoneCadence.For(zone, combatMode,
+                    atk * ScoreOf(r, power) / curP, respawnWithoutGear * (1.0 - ScoreOf(r, respawn)));
+                double Rate(Result r, ZoneCadence.Estimate e) => ScoreOf(r, questDrops) * e.KillsPerSecond;
+
+                var full = OptimizeCore(new[] { new GearPriority { Objective = adventure, MaxAccessorySlots = GearChain.Unlimited } },
+                                        null, forceTopRespawn);
+                var fullEst = Project(full);
+                if (!fullEst.Known) return null;
+
+                var best = full;
+                var bestEst = fullEst;
+                double fullRate = Rate(full, fullEst), bestRate = fullRate;
+                string shape = "Adventure(all)";
+                if (fullEst.Killable && fullEst.OneShotsEverySpawn)
+                {
+                    int slots = full.Accessories.Count;
+                    for (int keep = slots - 1; keep >= 0; keep--)
+                    {
+                        bool anyOneShot = false;
+                        double lastRespawn = -1;
+                        for (int resp = 0; resp <= slots - keep; resp++)
+                        {
+                            var run = OptimizeCore(new[]
+                            {
+                                new GearPriority { Objective = adventure, MaxAccessorySlots = keep },
+                                new GearPriority { Objective = respawn, MaxAccessorySlots = resp },
+                                new GearPriority { Objective = questDrops, MaxAccessorySlots = GearChain.Unlimited },
+                                new GearPriority { Objective = adventure, MaxAccessorySlots = GearChain.Unlimited },
+                            }, null, forceTopRespawn);
+                            double runRespawn = ScoreOf(run, respawn);
+                            if (resp > 0 && runRespawn <= lastRespawn) break;   // capped, or no respawn item left
+                            lastRespawn = runRespawn;
+
+                            var e = Project(run);
+                            if (!e.Known || !e.Killable || !e.OneShotsEverySpawn) continue;
+                            anyOneShot = true;
+                            double rate = Rate(run, e);
+                            if (rate <= bestRate * (1.0 + 1e-9)) continue;   // ties keep the stronger set
+                            best = run;
+                            bestEst = e;
+                            bestRate = rate;
+                            shape = $"Adventure({keep}) > Respawn({resp}) > Quest Drops(all)";
+                        }
+                        if (!anyOneShot) break;   // fewer Adventure accessories only lose more attack
+                    }
+                }
+
+                double perHour = Main.Character.beastQuestController.questDropChance() / curQD * 3600.0;
+                if (!quiet)
+                    Main.Log($"Quest gear for zone {zone}: {shape} — quest drops x{ScoreOf(best, questDrops):0.##}, "
+                           + $"{bestEst.KillsPerSecond * 3600.0:0} kills/h, ~{bestRate * perHour:0} items/h "
+                           + $"(Adventure set ~{fullRate * perHour:0}/h{(fullEst.OneShotsEverySpawn ? "" : ", zone not one-shot: kill set kept")}).");
+                return best.AllIds().Where(x => x > 0).Distinct().ToArray();
+            }
+            catch (Exception e) { Main.LogDebug($"Quest drop-rate set failed: {e.Message}"); return null; }
+        }
+
         // Optimize and equip live. MUST be called on the main thread (equipping touches the game/UI).
         public static void OptimizeAndEquip(GearObjectives.Objective obj, bool forceTopRespawn = false)
         {

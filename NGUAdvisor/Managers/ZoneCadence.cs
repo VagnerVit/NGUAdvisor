@@ -51,6 +51,7 @@ namespace NGUAdvisor.Managers
             public double SecondsPerSpawn;         // averaged over the whole uniform spawn table
             public double NormalKillsPerSecond;
             public double BossKillsPerSecond;
+            public double KillsPerSecond;          // every fought spawn, whatever its type
         }
 
         private static readonly Dictionary<int, ZoneFacts> _facts = new Dictionary<int, ZoneFacts>();
@@ -279,6 +280,17 @@ namespace NGUAdvisor.Managers
 
         public static Estimate For(int zone, int combatMode)
         {
+            try
+            {
+                return For(zone, combatMode, Main.Character.totalAdvAttack(), CombatHelpers.BaseRespawnTime());
+            }
+            catch (Exception e) { Main.LogDebug($"ZoneCadence.For({zone}): {e.Message}"); return new Estimate(); }
+        }
+
+        // The same estimate for a loadout that is not worn yet: the caller projects the attack and the
+        // respawn time that loadout would give (GearOptimizer.ResolveQuestGear).
+        public static Estimate For(int zone, int combatMode, double attack, double respawn)
+        {
             Estimate est = new Estimate();
             try
             {
@@ -287,14 +299,13 @@ namespace NGUAdvisor.Managers
 
                 bool idle = IsIdle(combatMode);
                 double swing = SwingSeconds(combatMode);
-                double respawn = CombatHelpers.BaseRespawnTime();
                 if (respawn <= 0.0) respawn = 0.0;
-                double attack = Main.Character.totalAdvAttack();
                 double multiplier = AttackMultiplier(combatMode);
 
                 double totalCycle = 0.0;
                 int normalCount = 0;
                 int bossCount = 0;
+                int foughtCount = 0;
                 double worstNormalHits = 0.0;
                 bool oneShotsEveryNormal = true;
                 bool oneShotsEverySpawn = true;
@@ -344,6 +355,7 @@ namespace NGUAdvisor.Managers
                     if (e.Paralyzes && enemySwings >= 2.0) cycle += 2.0;
 
                     totalCycle += cycle;
+                    foughtCount++;
                     // Keyed off the GUARANTEED one-shot, never off `hits`: the sustained rotation can
                     // average out to one swing while the regular attack still needs a lucky roll, and
                     // the entry-HP relaxation downstream must not rest on luck.
@@ -369,6 +381,7 @@ namespace NGUAdvisor.Managers
                 {
                     est.NormalKillsPerSecond = (double)normalCount / facts.Count / est.SecondsPerSpawn;
                     est.BossKillsPerSecond = (double)bossCount / facts.Count / est.SecondsPerSpawn;
+                    est.KillsPerSecond = (double)foughtCount / facts.Count / est.SecondsPerSpawn;
                 }
             }
             catch (Exception e) { Main.LogDebug($"ZoneCadence.For({zone}): {e.Message}"); }

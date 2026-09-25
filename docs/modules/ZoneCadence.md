@@ -90,6 +90,10 @@ zone ≥ 1000), so routing there is the correct answer while that toggle is on.
 attack rate. A kill that ends inside that window pays nothing — which is why one-shot farming never
 sees a paralyzer.
 
+`For(zone, mode, attack, respawn)` is the same estimate for a loadout that is not worn yet — the caller
+projects attack and respawn (quest gear does). `KillsPerSecond` counts every fought spawn: quest items
+roll on any kill type, unlike boosts.
+
 ## Enemy facts are readable, not guessable
 
 `AdventureController.createEnemyTable()` builds `enemyList` in **code**, not serialized scene data, and

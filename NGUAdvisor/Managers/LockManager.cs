@@ -109,8 +109,8 @@ namespace NGUAdvisor.Managers
                         ReleaseLock();
                 }
 
-                if (backToQuest && (Settings.QuestLoadout.Length > 0 || !string.IsNullOrEmpty(Settings.QuestObjective)))
-                    LoadoutManager.ChangeGear(GearOptimizer.ResolveModeGear(Settings.QuestObjective, Settings.QuestObjectiveRespawn, Settings.QuestLoadout));
+                if (backToQuest && Settings.ManageQuestLoadouts)
+                    EquipQuestGear();
             }
             finally
             {
@@ -360,7 +360,7 @@ namespace NGUAdvisor.Managers
                     if (Settings.ManageQuestLoadouts)
                     {
                         Log("Switching to Quest configuration");
-                        LoadoutManager.ChangeGear(GearOptimizer.ResolveModeGear(Settings.QuestObjective, Settings.QuestObjectiveRespawn, Settings.QuestLoadout));
+                        EquipQuestGear();
                     }
 
                     return true;
@@ -376,6 +376,31 @@ namespace NGUAdvisor.Managers
                 RestoreConfiguration();
             }
             return false;
+        }
+
+        private static int _questGearZone = -1;
+
+        private static int CurrentQuestZone()
+        {
+            var quest = Main.Character.beastQuest;
+            return quest.inQuest ? Main.Character.beastQuestController.curQuestZone() : -1;
+        }
+
+        private static void EquipQuestGear()
+        {
+            _questGearZone = CurrentQuestZone();
+            LoadoutManager.ChangeGear(GearOptimizer.ResolveQuestGear(_questGearZone));
+        }
+
+        // The quest lock outlives a single quest (it is released only once the bank is empty), and every
+        // quest rolls its own zone — so the set solved for the previous zone is re-solved for this one.
+        public static void RefreshQuestGear()
+        {
+            if (!HasQuestLock() || !Settings.ManageQuestLoadouts) return;
+            int zone = CurrentQuestZone();
+            if (zone < 0 || zone == _questGearZone) return;
+            Log($"Quest zone is now {zone} — re-solving the quest gear");
+            EquipQuestGear();
         }
 
         public static bool TryCookingSwap()
