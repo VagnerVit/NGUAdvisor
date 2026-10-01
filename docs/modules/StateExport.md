@@ -66,6 +66,16 @@ Field names above were each verified against the decompiled `Assembly-CSharp.dll
 guessed `Beard.level`, `GoldDigger.level`, `Adventure.highestBoss` and `Magic.totalCapMagic()`, and
 all four were wrong.
 
+- **Numbers are culture-invariant.** `Build()` swaps `CurrentThread.CurrentCulture` to Invariant for the
+  duration (main thread, restored in a `finally`) so the file never reads `1553879,38` / `1,735E+011`.
+- **GEAR section**: the gear chain and last `[GearDbg]` verdict AdvisorApply settled on
+  (`AdvisorApply.LastGearChain` / `LastGearVerdict`, read-only; empty until the first pass after a
+  load), the routing venue (`Main.ResolveIntentZone` + `FarmMode`), cube raw/softcap, and every worn item
+  with level and boosts still needed to green.
+- **Drop-chance saturation line** follows the routed zone (`Main.ResolveIntentZone`), not
+  `SnipeZone`. For the pod it prints that boost rolls are a flat 14 % and drop chance does not apply
+  (`ItopodRewards.BoostDropChance`, ItopodFarmAdvisor.md).
+
 ## Fields that exist because they were once invisible
 
 - **`titans beaten`** — T5..T12 with the highest VERSION beaten for the versioned ones ("T6 v1" means

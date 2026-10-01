@@ -17,6 +17,9 @@ group + aliases) matches by SUBSTRING; raw field identifiers (`Ids`) match EXACT
 the developer escape hatch leak into ordinary search — "managed" hit Diggers because the field name
 `ManageDiggers` contains it. Identifiers are addresses, not words.
 
+Every surface `BasicSettingsPanel` registers needs a catalogue row (and the reverse); the startup audit
+logs `surface X has no catalogue entry` / `catalogue setting X has no registered surface` to debug.log.
+
 Two counting rules that are NOT the same: **one entry per SYSTEM** (Blood matching five terms must
 produce ONE row — terms are how you find an entry, not entries themselves) and **one entry per
 SETTINGS ROW** (a settings row has its own control, so it can't be aggregated).

@@ -101,7 +101,8 @@ early IS the redirect: `UpdateMaxAllocation` re-reads the live idle pool per tok
 leaves behind is what the tokens after it pick up. `Allocate()` still reports **true** — a BB-capped
 lane has succeeded, and a `false` re-runs the whole pass hunting a fix that does not exist.
 
-`[WandoosDbg]` logs both outcomes (`STOOD DOWN` / `RUNNING`, deduped per resource AND verdict, 5 min)
+`[WandoosDbg]` logs both outcomes (`STOOD DOWN` / `RUNNING`, deduped per resource AND verdict, 5 min,
+and silent while verdict + OS level are unchanged — `ceiling`/`bb`/`held` drift)
 — without the RUNNING line an empty log cannot be told apart from a lane that never ran, and
 `bb` vs `held` answers "how far from the cap am I". Measured on the ch.3 Normal NOAUG save this was
 built against: `bb=102 533 204` for BOTH resources (`baseEnergyTime` = `baseMagicTime` = 1e9),

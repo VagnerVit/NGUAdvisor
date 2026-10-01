@@ -655,10 +655,12 @@ namespace NGUAdvisor.Managers
             try
             {
                 var plan = MoneyPitManager.AdvisorPlan();
+                MoneyPitManager.LogPlanChange(plan);
                 if (plan.Throw)
                 {
-                    Main.Log($"Advisor: money pit -> {plan.Verdict} (predicted: {MoneyPitManager.PredictNext()})");
-                    MoneyPitManager.AdvisorThrow();
+                    Main.Log($"Advisor: money pit -> {plan.Verdict} with {Main.Character.realGold.ToString("0.###e0", System.Globalization.CultureInfo.InvariantCulture)} gold"
+                           + $" (predicted: {MoneyPitManager.PredictNext()})");
+                    MoneyPitManager.AdvisorThrow("advisor " + plan.Verdict);
                 }
             }
             catch (Exception ex) { OnStepFailed("Pit", ex); return; }
@@ -1138,6 +1140,9 @@ namespace NGUAdvisor.Managers
         // load therefore equips the objective's best set UNCONDITIONALLY, re-asserting known-good
         // gear; the anti-churn thresholds apply from then on.
         private static bool _gearAsserted;
+
+        public static string LastGearChain => _lastGearObjective;
+        public static string LastGearVerdict => _lastGearDbg;
 
         // Called by LockManager when a mode lock restores its saved gear: that gear is whatever was
         // worn at ACQUISITION — stale if the segment/objective moved while the lock was held

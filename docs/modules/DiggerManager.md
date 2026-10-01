@@ -78,4 +78,6 @@ set, mirroring how they were handed out. It exists for double-summation drift, n
 
 `UpgradeCheapestDigger` (gated on `Settings.UpgradeDiggers`): buys max-level upgrades for the
 globally cheapest digger while `cost + MoneyPitThreshold <= realGold`, recursing to the next
-cheapest. `[DiggerDbg]` recap diagnostics go to debug.log, throttled 60 s.
+cheapest. `[DiggerDbg]` recap diagnostics go to debug.log, throttled 60 s and written only when the
+decision changes (src, order, per-digger level/max); gross/budget/drain magnitudes are printed but
+are not part of the change key.

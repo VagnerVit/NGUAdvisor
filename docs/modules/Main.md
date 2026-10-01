@@ -44,7 +44,11 @@ lookups.**
    advisor that grow without a ceiling; reading them was already bounded (`LogTail` seeks a window
    from EOF), the file itself was not. The rest truncate. A `debug.log writer alive (vX build Y)`
    probe line is written immediately — if debug.log is empty even of that, the writer itself is
-   broken and every "Advisor … failed" message has been invisible.
+   broken and every "Advisor … failed" message has been invisible. advisor.log gets a
+   `[SESSION] advisor loaded vX build Y` line right after it, because that file appends across
+   injects and a re-inject otherwise reads as the advisor flip-flopping. Every log line is stamped
+   `<short date>-HH:mm (Ns)`; the time is 24 h and zero-padded, the date follows the player's locale.
+   Nothing in the repo parses the stamp.
 4. `PresetInstaller.InstallMissing` before profiles are listed; legacy `allocation.json` →
    `profiles/default.json`.
 5. Settings load (falling back to defaults via `MassUpdate`), SettingsForm, allocation load,

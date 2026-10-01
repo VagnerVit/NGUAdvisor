@@ -33,14 +33,23 @@ namespace NGUAdvisor.Managers
         // within hours either way.
         private static readonly TimeSpan SpawnInterval = TimeSpan.FromHours(6);
 
+        // A failed check writes no checkedUtc, so the script's own throttle lets a retry straight through;
+        // without this the next attempt after a DNS miss (PC just woken) is a full SpawnInterval away.
+        private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(60);
+
         private static DateTime _lastSpawn = DateTime.MinValue;
         private static DateTime _lastStateStamp = DateTime.MinValue;
+        private static DateTime _retryAt = DateTime.MinValue;
+        private static bool _retryUsed;
         private static bool _installWarned;
 
         // Null until a check has actually reported something newer.
         public static string LatestVersion { get; private set; }
 
         public static bool Available => !string.IsNullOrEmpty(LatestVersion);
+
+        // True while the last check the script ran failed (update.state carries failedUtc until a check succeeds).
+        public static bool CheckFailing { get; private set; }
 
         private static string DataDir => Main.GetSettingsDir() ?? ".";
 
@@ -72,6 +81,8 @@ namespace NGUAdvisor.Managers
 
             string latest = null;
             bool available = false;
+            bool failed = false;
+            bool networkFailure = false;
             foreach (var line in File.ReadAllLines(path))
             {
                 int i = line.IndexOf('=');
@@ -80,17 +91,32 @@ namespace NGUAdvisor.Managers
                 var value = line.Substring(i + 1).Trim();
                 if (key == "latest") latest = value;
                 else if (key == "available") available = value == "1";
+                else if (key == "failedUtc") failed = value.Length > 0;
+                else if (key == "failedKind") networkFailure = value == "network";
             }
 
             var wasAvailable = Available;
             LatestVersion = available ? latest : null;
+            CheckFailing = failed;
             if (Available && !wasAvailable)
                 Main.Log($"Update available: v{LatestVersion} — it installs the next time you run the launcher");
+
+            if (failed && networkFailure && !_retryUsed)
+            {
+                _retryUsed = true;
+                _retryAt = DateTime.UtcNow + RetryDelay;
+                Main.LogDebug($"Update check hit a network failure; retrying once in {RetryDelay.TotalSeconds:0}s");
+            }
         }
 
         private static void Spawn()
         {
-            if (DateTime.UtcNow - _lastSpawn < SpawnInterval) return;
+            bool retryDue = _retryAt != DateTime.MinValue && DateTime.UtcNow >= _retryAt;
+            if (!retryDue && DateTime.UtcNow - _lastSpawn < SpawnInterval) return;
+            _retryAt = DateTime.MinValue;
+            // The retry budget is per scheduled check: only a scheduled spawn re-arms it, so a retry that
+            // fails again waits out the interval instead of looping.
+            if (!retryDue) _retryUsed = false;
             _lastSpawn = DateTime.UtcNow;
 
             var script = ScriptPath();

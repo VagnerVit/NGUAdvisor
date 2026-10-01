@@ -100,17 +100,23 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         //
         // Deduped per resource AND per verdict — each is a STATE that would otherwise print every pass for
         // the rest of the run; keying on the verdict too means the transition into BB-capped prints at once
-        // instead of waiting out the running line's throttle.
+        // instead of waiting out the running line's throttle. A repeat of the same verdict and OS level is
+        // silent: ceiling, bb and the held amounts drift and are not the decision.
         private static readonly Dictionary<string, DateTime> _lastDbgLog = new Dictionary<string, DateTime>();
+        private static readonly Dictionary<string, string> _lastDbgState = new Dictionary<string, string>();
 
         private void LogWandoosDbg(string what, string verdict, long bb, long added)
         {
             try
             {
                 string key = what + "|" + verdict;
+                string state = verdict + "|" + _character.wandoos98.os;
+                if (_lastDbgState.TryGetValue(what, out string lastState) && lastState == state)
+                    return;
                 if (_lastDbgLog.TryGetValue(key, out DateTime at) && (DateTime.UtcNow - at).TotalSeconds < 300)
                     return;
                 _lastDbgLog[key] = DateTime.UtcNow;
+                _lastDbgState[what] = state;
                 bool isEnergy = Type == ResourceType.Energy;
                 long held = isEnergy ? _character.wandoos98.wandoosEnergy : _character.wandoos98.wandoosMagic;
                 long idle = isEnergy ? _character.idleEnergy : _character.magic.idleMagic;

@@ -70,7 +70,10 @@ time long after the restore, and clearing would delete a live setting.
   high-level copy into several drops), `updateInventory()` only when something moved, and a backwards
   walk because the game's forward walk deletes as it goes and skips the item after each consumed one.
 - `ManageConvertibles`, `ManageBoostConversion`, `ShowBoostProgress` — boost conversion + the
-  progress readout (F-key / panel). **`ManageBoostConversion` no longer picks the auto-transform
+  progress readout (F-key / panel). The cube's per-minute average is fed on every change, but the
+  `Cube Progress` / `Cube Power` pair in inject.log is written only after the cube moved 0.5 % of
+  power+toughness since the last line, or after 15 min (`CubeLogMinMoveFraction`, `CubeLogTimeFloor`);
+  the reported gain is since the last line. **`ManageBoostConversion` no longer picks the auto-transform
   type.** It used to — locked boost, then `BoostPriority` against the gear's need, then `CubePriority`,
   all through the game's `selectAuto*Transform()` setters — and that made it a second, unnamed owner
   of `settings.autoTransform`. When `TransformManager` gained the user-facing P/T/S/X control the two

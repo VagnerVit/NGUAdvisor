@@ -100,6 +100,28 @@ function Get-InstalledVersion([hashtable]$state) {
     return $null
 }
 
+# A failed check leaves checkedUtc alone (so the throttle does not hide the next attempt) but is recorded
+# in update.state, which is how the advisor learns to retry a DNS/connection miss and to say so in the UI.
+# ProtocolError is the server answering (rate limit, 404): retrying in a minute would not change it.
+function Test-NetworkFailure($ex) {
+    while ($ex) {
+        if ($ex -is [System.Net.WebException] -and $ex.Status -ne [System.Net.WebExceptionStatus]::ProtocolError) { return $true }
+        $ex = $ex.InnerException
+    }
+    return $false
+}
+
+function Write-CheckFailure($ex) {
+    try {
+        $state = Read-State
+        if ($CurrentVersion) { $state['installed'] = $CurrentVersion.Trim() }
+        $state['failedUtc']  = (Get-Date).ToUniversalTime().ToString('o')
+        $state['failedKind'] = if (Test-NetworkFailure $ex) { 'network' } else { 'other' }
+        $state['error']      = ($ex.Message -replace '[\r\n]+', ' ')
+        Write-State $state
+    } catch { }
+}
+
 function Get-LatestRelease {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     # -UseBasicParsing: the IE engine is not available on a machine that never launched IE.
@@ -133,6 +155,7 @@ try {
         $state['latest']     = if ($latest) { $latest.ToString() } else { '' }
         $state['url']        = if ($asset) { $asset.browser_download_url } else { '' }
         $state['available']  = if ($newer) { '1' } else { '0' }
+        foreach ($k in 'failedUtc', 'failedKind', 'error') { $state.Remove($k) }
         Write-State $state
         Write-Log "checked: installed=$installed latest=$latest available=$($state['available'])"
     }
@@ -198,6 +221,7 @@ try {
     }
 } catch {
     Write-Log "failed: $($_.Exception.Message)"
+    Write-CheckFailure $_.Exception
 }
 
 # ALWAYS 0. An update problem must never be the reason the game does not get its advisor.

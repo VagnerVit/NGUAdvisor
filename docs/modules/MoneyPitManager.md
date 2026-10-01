@@ -64,4 +64,13 @@ modulo stays meaningful only while gold is small enough for sub-window double re
 these tiers).
 
 `DoDailySpin()` — `startNoBullshitSpin()` once `spinTime >= targetSpinTime()`; result logged to
-pitspin.log.
+pitspin.log. The state is logged on CHANGE (`Daily Spin WAITING|READY: spinTime Xs of Ys`), so a
+missed spin is a `READY` line with no `Daily Spin Reward` after it.
+
+## pitspin.log
+
+- `Money Pit Reward: <game text> (thrown <gold> gold, via <source>)` — source is `advisor <verdict>`,
+  `Throw Now` (PitPanel) or `standard auto` (`CheckMoneyPit()` from Main).
+- `Pit plan: <verdict> — <detail> (gold ...)` once per CHANGE of `PitPlan.Key` (the verdict without its
+  countdown numbers), logged by `AdvisorApply.ApplyPit` via `LogPlanChange`. A throw logs the plan
+  key only, so the next COOLDOWN line follows it.

@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace NGUAdvisor.Managers
 {
@@ -74,6 +76,16 @@ namespace NGUAdvisor.Managers
         // everything else — the whole point is to have the numbers in hand.
         public static string Build()
         {
+            // The dump is diffed and read by scripts, so it must not follow the player's locale
+            // ("1553879,38", "1,735E+011"). Main thread only, restored on the way out.
+            CultureInfo previous = Thread.CurrentThread.CurrentCulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            try { return BuildInvariant(); }
+            finally { Thread.CurrentThread.CurrentCulture = previous; }
+        }
+
+        private static string BuildInvariant()
+        {
             var sb = new StringBuilder();
             var c = Main.Character;
 
@@ -94,6 +106,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "AUGMENTS", () => Augments(sb, c));
             Section(sb, "BLOOD BUDGET", () => BloodBudget(sb, c));
             Section(sb, "DROP CHANCE — WHERE IT COMES FROM", () => DropChanceBreakdown(sb, c));
+            Section(sb, "GEAR", () => Gear(sb, c));
             Section(sb, "DIGGERS", () => Diggers(sb, c));
             Section(sb, "BEARDS", () => Beards(sb, c));
             Section(sb, "ITOPOD PERKS (owned)", () => Perks(sb, c));
@@ -241,7 +254,9 @@ namespace NGUAdvisor.Managers
         {
             try
             {
-                int zone = Main.Settings != null ? Main.Settings.SnipeZone : 1000;
+                int zone = Main.Settings != null ? Main.ResolveIntentZone(out _) : QuestStandDown.ItopodZone;
+                if (zone >= QuestStandDown.ItopodZone)
+                    return " · farming ITOPOD: boost rolls are a flat 14 %, drop chance does not apply there";
                 var h = BoostFarmAdvisor.DcFor(zone);
                 if (!h.Known) return "";
                 string where = $" in {(ZoneHelpers.ZoneList.TryGetValue(zone, out var n) ? n : $"zone {zone}")}";
@@ -258,6 +273,53 @@ namespace NGUAdvisor.Managers
                     : $" · {h.HaveFactor * 100:#,0}% of {h.NeedFactor * 100:#,0}% to cap the boost rolls{where}{gear}";
             }
             catch { return ""; }
+        }
+
+        // What the gear pass last settled on and what is actually worn, so "why is this on my back"
+        // is answerable without replaying debug.log. The chain and verdict are AdvisorApply's own
+        // last values (empty until the first pass after a load); the items are read live.
+        private static void Gear(StringBuilder sb, Character c)
+        {
+            string chain = AdvisorApply.LastGearChain;
+            sb.AppendLine($"  chain         {(string.IsNullOrEmpty(chain) ? "(none applied since load)" : chain)}");
+            string verdict = AdvisorApply.LastGearVerdict;
+            if (!string.IsNullOrEmpty(verdict))
+                sb.AppendLine($"  last verdict  {verdict}");
+
+            string setBy;
+            int zone = Main.ResolveIntentZone(out setBy);
+            string venue = zone >= QuestStandDown.ItopodZone ? "ITOPOD"
+                : ZoneHelpers.ZoneList.TryGetValue(zone, out var zoneName) ? zoneName : $"zone {zone}";
+            sb.AppendLine($"  venue         {venue} · {(setBy != null ? "set by " + setBy : "SnipeZone")}"
+                        + $" · farm mode {FarmMode.Caption(FarmMode.Current())} · standing in zone {c.adventure.zone}");
+
+            var ic = c.inventoryController;
+            sb.AppendLine($"  cube          Power {c.inventory.cubePower:0.##} / softcap {ic.cubePowerSoftcap():0.##}"
+                        + $" · Toughness {c.inventory.cubeToughness:0.##} / softcap {ic.cubeToughnessSoftcap():0.##}");
+
+            foreach (ih item in c.inventory.GetConvertedEquips())
+            {
+                BoostsNeeded need = item.equipment.GetNeededBoosts();
+                string fill = need.Total() <= 0f
+                    ? "boosts full"
+                    : $"boosts to green: P {need.power:0.##} T {need.toughness:0.##} S {need.special:0.##}";
+                sb.AppendLine($"  {GearSlotName(item.slot),-10} {Main.ItemNameNice(item.id)} (#{item.id}) L{item.level} · {fill}");
+            }
+        }
+
+        // Negative slots are the fixed equipment slots (Extensions.GetConvertedEquips); 10000+ are accessories.
+        private static string GearSlotName(int slot)
+        {
+            switch (slot)
+            {
+                case -1: return "head";
+                case -2: return "chest";
+                case -3: return "legs";
+                case -4: return "boots";
+                case -5: return "weapon";
+                case -6: return "weapon 2";
+                default: return "accessory";
+            }
         }
 
         // Levels come through NGUAdvisors' track rule, so an Evil run reports the levels it is actually

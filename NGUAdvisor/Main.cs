@@ -186,7 +186,8 @@ namespace NGUAdvisor
 
         private static void WriterLog(StreamWriter writer, string msg)
         {
-            var formattedDate = $"{DateTime.Now.ToShortDateString()}-{DateTime.Now.ToShortTimeString()} ({Math.Floor(Character.rebirthTime.totalseconds)}s)";
+            var now = DateTime.Now;
+            var formattedDate = $"{now.ToShortDateString()}-{now:HH:mm} ({Math.Floor(Character.rebirthTime.totalseconds)}s)";
             writer.WriteLine($"{formattedDate}: {msg}");
         }
 
@@ -349,6 +350,7 @@ namespace NGUAdvisor
                 // Health probe: if debug.log stays empty even of this line, the writer itself is broken
                 // and every "Advisor ... failed" message has been invisible.
                 LogDebug($"debug.log writer alive (v{Version} build {BuildTag})");
+                LogAdvisor($"[SESSION] advisor loaded v{Version} build {BuildTag}");
 
                 _profilesDir = Path.Combine(_dir, "profiles");
                 if (!Directory.Exists(_profilesDir))
@@ -961,7 +963,7 @@ namespace NGUAdvisor
             // Cube Power
             Log($"Cube Power: {CubePower()}");
             // Cube Toughness
-            Log($"Cube Power: {CubeToughness()}");
+            Log($"Cube Toughness: {CubeToughness()}");
             // Nude Energy Cap
             Log($"Nude Energy Cap: {TotalNudeEnergyCap()}");
             // Nude Magic Cap

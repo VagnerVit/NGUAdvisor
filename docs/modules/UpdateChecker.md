@@ -60,6 +60,18 @@ The advisor polls its mtime inside `Main.Update()`'s existing once-a-second budg
 notice a release) and announces a new version in the rail footer, where the running version already
 is.
 
+## Failed checks
+
+A failed check writes no `checkedUtc` (so the script's throttle never hides the next attempt) but sets
+`failedUtc`, `failedKind` (`network` = WebException other than a server answer; `other`) and `error` in
+`update.state`; the next successful check removes all three. The advisor reads them:
+
+- `UpdateChecker.CheckFailing` adds an `update check failing` line to the rail footer (no new control).
+- On `failedKind=network` it retries ONCE after 60 s (`RetryDelay`). The budget is per scheduled check
+  (`_retryUsed`, re-armed only by a scheduled spawn), so a failing retry waits out the 6 h interval.
+  Cause seen in update.log: DNS not yet up right after the PC wakes (two
+  `The remote name could not be resolved` 4 s apart, then nothing for 6 h).
+
 ## Rules the script obeys
 
 - **Always `exit 0`.** An update problem must never be the reason the game does not get its advisor.

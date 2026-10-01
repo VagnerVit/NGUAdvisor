@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using static NGUAdvisor.Main;
 using Random = UnityEngine.Random;
@@ -268,6 +269,9 @@ namespace NGUAdvisor.Managers
             public bool Throw;
             public string Verdict;
             public string Detail;
+            // The verdict without its moving numbers (minutes left, tier name), so a change log can tell a new
+            // decision from the same one counting down.
+            public string Key;
         }
 
         public static PitPlan AdvisorPlan()
@@ -283,24 +287,28 @@ namespace NGUAdvisor.Managers
                     float t = TimeUntilReady();
                     p.Verdict = t > 3600 ? $"COOLDOWN {t / 3600:0.#}h" : $"COOLDOWN {t / 60:0}m";
                     p.Detail = "";
+                    p.Key = "COOLDOWN";
                     return p;
                 }
                 if (c.machine.realBaseGold <= 0.0)
                 {
                     p.Verdict = "HOLD";
                     p.Detail = "TM UNFUNDED";
+                    p.Key = "HOLD TM UNFUNDED";
                     return p;
                 }
                 if (OptimizationAdvisor.GoldStarvedForAugs(c, 1.0))
                 {
                     p.Verdict = "HOLD";
                     p.Detail = "PROTECTS AUG SPENDING";
+                    p.Key = "HOLD PROTECTS AUG SPENDING";
                     return p;
                 }
                 if (gold < 1e13)
                 {
                     p.Verdict = "WAIT — below 1e13";
                     p.Detail = "";
+                    p.Key = "WAIT below 1e13";
                     return p;
                 }
 
@@ -320,6 +328,7 @@ namespace NGUAdvisor.Managers
                     {
                         p.Verdict = $"WAIT — {TierName(nextTier)} in ~{Math.Max(1, eta / 60):0}m";
                         p.Detail = "TIER UP: REWARDS JUMP";
+                        p.Key = $"WAIT {TierName(nextTier)}";
                         return p;
                     }
                 }
@@ -327,9 +336,10 @@ namespace NGUAdvisor.Managers
                 p.Throw = true;
                 p.Verdict = $"THROW at {TierName(curTier)}";
                 p.Detail = "PREDICT + PREP READY";
+                p.Key = "THROW";
                 return p;
             }
-            catch { p.Verdict = "…"; p.Detail = ""; return p; }
+            catch { p.Verdict = "…"; p.Detail = ""; p.Key = "ERROR"; return p; }
         }
 
         public static string TierName(double t)
@@ -351,7 +361,31 @@ namespace NGUAdvisor.Managers
         // "Saving Settings" lines and four form refreshes, IgnoreNextChange is a single bool and could only
         // swallow one of the four watcher events, and a crash inside the window left 1e5 permanently written
         // over the user's real threshold. Configuration is not a scratch variable. Nothing to restore now.
-        public static void AdvisorThrow() => CheckMoneyPit(1e5, true);
+        public static void AdvisorThrow(string source = "Throw Now")
+        {
+            _throwSource = source;
+            try { CheckMoneyPit(1e5, true); }
+            finally { _throwSource = StandardThrowSource; }
+        }
+
+        // Who asked for the throw currently executing, for the pitspin.log reward line.
+        private const string StandardThrowSource = "standard auto";
+        private static string _throwSource = StandardThrowSource;
+
+        // One pitspin.log line per CHANGE of the advisor's verdict (ApplyPit re-asks every minute and the
+        // cooldown counts down), so a pit that is not being thrown says why and since when.
+        private static string _lastPlanKey;
+
+        public static void LogPlanChange(PitPlan plan)
+        {
+            if (plan.Key == null || plan.Key == _lastPlanKey) return;
+            _lastPlanKey = plan.Key;
+            if (plan.Throw) return;   // the throw itself is logged with its gold and reward
+            LogPitSpin($"Pit plan: {plan.Verdict}{(string.IsNullOrEmpty(plan.Detail) ? "" : " — " + plan.Detail)}"
+                     + $" (gold {FormatGold(_character.realGold)})");
+        }
+
+        private static string FormatGold(double gold) => gold.ToString("0.###e0", CultureInfo.InvariantCulture);
 
         private static Outcomes PredictMoneyPit(double gold = -1.0)
         {
@@ -390,14 +424,28 @@ namespace NGUAdvisor.Managers
 
         private static void DoMoneyPit()
         {
+            double gold = _character.realGold;
             _character.pitController.CallMethod("engage");
-            LogPitSpin($"Money Pit Reward: {_character.pitController.pitText.text}");
+            LogPitSpin($"Money Pit Reward: {_character.pitController.pitText.text} (thrown {FormatGold(gold)} gold, via {_throwSource})");
         }
+
+        // Logged on a change of state (waiting -> ready -> waiting), never per tick, so a missed spin shows
+        // up as a ready line with no reward line after it.
+        private static string _lastSpinState;
 
         public static void DoDailySpin()
         {
             var controller = _character.dailyController;
-            if (_character.daily.spinTime.totalseconds < controller.targetSpinTime())
+            double spinTime = _character.daily.spinTime.totalseconds;
+            double target = controller.targetSpinTime();
+            string state = spinTime >= target ? "READY" : "WAITING";
+            if (state != _lastSpinState)
+            {
+                _lastSpinState = state;
+                LogPitSpin($"Daily Spin {state}: spinTime {spinTime.ToString("0", CultureInfo.InvariantCulture)}s"
+                         + $" of {target.ToString("0", CultureInfo.InvariantCulture)}s");
+            }
+            if (state == "WAITING")
                 return;
 
             controller.startNoBullshitSpin();

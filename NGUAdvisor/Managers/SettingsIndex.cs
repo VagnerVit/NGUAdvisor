@@ -355,7 +355,7 @@ namespace NGUAdvisor.Managers
             e.Add(Set("SwapTitanDiggers", "Titan digger swap", gSwap, "Swap diggers for titan kills.", "SwapTitanDiggers", ""));
             e.Add(Set("SwapTitanBeards", "Titan beard swap", gSwap, "Swap beards for titan kills.", "SwapTitanBeards", ""));
 
-            // ---- MISC (5) ----
+            // ---- MISC (6) ----
             // SnipeBossOnly and BeastMode are long gone — folded into the Adventure system entry, which is
             // where their controls live. Setting.AutoMoneyPit likewise: PitPanel owns it as AUTO THROW.
             //
@@ -363,6 +363,7 @@ namespace NGUAdvisor.Managers
             // describes. The old "This install" group put the word on the daily save and the overlay toggle
             // too, which is precisely the indiscriminate inheritance this reconciliation exists to end.
             e.Add(Set("DisableOverlay", "Disable overlay", gMisc, "Hide the in-game overlay.", "DisableOverlay", ""));
+            e.Add(Set("DisableUpdateCheck", "No update check", gMisc, "Do not check GitHub for a newer release.", "DisableUpdateCheck", "updates version release github"));
             e.Add(Set("DiggerCap", "Digger cap", gMisc, "The share of gross gold/sec that digger upkeep may spend.", "DiggerCap", "digger cap % cap percent budget"));
             e.Add(Set("SettingsFolder", "Settings folder", gMisc, "Open the settings and profiles folder.", "", "folder profiles logs install installation config configuration"));
             // The three ACTIONS stay Setting-kind, because Settings genuinely owns them. A button is not an

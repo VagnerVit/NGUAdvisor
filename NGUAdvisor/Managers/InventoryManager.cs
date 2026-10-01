@@ -58,6 +58,11 @@ namespace NGUAdvisor.Managers
         private static readonly int[] _filterExcludes = { 119, 129, 162, 171, 195, 196, 212, 293, 297, 344, 390 }; // Lemmi and Hearts
         private static BoostsNeeded _previousBoostsNeeded;
         private static readonly Cube _cube = new Cube { Power = Inventory.cubePower, Toughness = Inventory.cubeToughness };
+        // The cube moves every minute; the log line is written after a move this share of power+toughness, or after the time floor.
+        private const float CubeLogMinMoveFraction = 0.005f;
+        private static readonly TimeSpan CubeLogTimeFloor = TimeSpan.FromMinutes(15);
+        private static readonly Cube _cubeLogged = new Cube { Power = Inventory.cubePower, Toughness = Inventory.cubeToughness };
+        private static DateTime _cubeLoggedAt = DateTime.UtcNow;
         private static readonly FixedSizedQueue _invBoostAvg = new FixedSizedQueue(60);
         private static readonly FixedSizedQueue _cubeBoostAvg = new FixedSizedQueue(60);
         private static int[] _savedMacguffins = null;
@@ -471,20 +476,28 @@ namespace NGUAdvisor.Managers
 
             if (_cube.Changed(power, toughness))
             {
-                var output = "Cube Progress:";
-                float toughnessDiff = toughness - _cube.Toughness;
-                float powerDiff = power - _cube.Power;
-
-                output = toughnessDiff > 0 ? $"{output} {toughnessDiff} Toughness." : output;
-                output = powerDiff > 0 ? $"{output} {powerDiff} Power." : output;
-
-                _cubeBoostAvg.Enqueue(toughnessDiff + powerDiff);
-                output = $"{output} Average Per Minute: {_cubeBoostAvg.Avg():0}";
-                Log(output);
-                Log($"Cube Power: {power} ({_ic.cubePowerSoftcap()} softcap). Cube Toughness: {toughness} ({_ic.cubeToughnessSoftcap()} softcap)");
-
+                _cubeBoostAvg.Enqueue(toughness - _cube.Toughness + power - _cube.Power);
                 _cube.Power = power;
                 _cube.Toughness = toughness;
+
+                float movedSinceLog = Math.Abs(power - _cubeLogged.Power) + Math.Abs(toughness - _cubeLogged.Toughness);
+                bool meaningful = movedSinceLog >= (_cubeLogged.Power + _cubeLogged.Toughness) * CubeLogMinMoveFraction;
+                if (meaningful || DateTime.UtcNow - _cubeLoggedAt >= CubeLogTimeFloor)
+                {
+                    var output = "Cube Progress:";
+                    float toughnessDiff = toughness - _cubeLogged.Toughness;
+                    float powerDiff = power - _cubeLogged.Power;
+
+                    output = toughnessDiff > 0 ? $"{output} {toughnessDiff} Toughness." : output;
+                    output = powerDiff > 0 ? $"{output} {powerDiff} Power." : output;
+                    output = $"{output} Average Per Minute: {_cubeBoostAvg.Avg():0}";
+                    Log(output);
+                    Log($"Cube Power: {power} ({_ic.cubePowerSoftcap()} softcap). Cube Toughness: {toughness} ({_ic.cubeToughnessSoftcap()} softcap)");
+
+                    _cubeLogged.Power = power;
+                    _cubeLogged.Toughness = toughness;
+                    _cubeLoggedAt = DateTime.UtcNow;
+                }
             }
         }
 

@@ -1075,10 +1075,18 @@ namespace NGUAdvisor
         // Master button reflects the global kill-switch (F1 flips it too — same setting).
         // The version line is where someone already looks to answer "what am I running", so a waiting
         // release is announced there rather than in a popup the advisor has no business showing.
-        private static string RailFootText() =>
-            Managers.UpdateChecker.Available
-                ? $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}\nv{Managers.UpdateChecker.LatestVersion} READY — RELAUNCH"
-                : $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}";
+        private static string RailFootText()
+        {
+            string basis = $"F2 PAUSE · F9 EDITOR\nv{Main.Version} · {Main.BuildTag}";
+            if (Managers.UpdateChecker.Available)
+                return $"{basis}\nv{Managers.UpdateChecker.LatestVersion} READY — RELAUNCH";
+            return Managers.UpdateChecker.CheckFailing ? $"{basis}\nupdate check failing" : basis;
+        }
+
+        private static System.Drawing.Color RailFootColor() =>
+            Managers.UpdateChecker.Available ? UiTheme.Cap
+            : Managers.UpdateChecker.CheckFailing ? UiTheme.Muted
+            : UiTheme.Faint;
 
         private void TickRail()
         {
@@ -1095,7 +1103,7 @@ namespace NGUAdvisor
                     if (_railFoot.Text != foot)
                     {
                         _railFoot.Text = foot;
-                        _railFoot.ForeColor = Managers.UpdateChecker.Available ? UiTheme.Cap : UiTheme.Faint;
+                        _railFoot.ForeColor = RailFootColor();
                     }
                 }
             }

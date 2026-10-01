@@ -337,8 +337,10 @@ namespace NGUAdvisor.Managers
         // and the SPENT total — the one number that shows whether the budget was actually usable, since
         // buying by marginal cost deliberately leaves the remainder unspent when the cheapest remaining
         // level costs more than what is left.
-        // Debug-channel and throttled — the advisor recaps every ~30s and this must not spam.
+        // Debug-channel, throttled to 60 s and logged only when the decision (src, order, levels) changes —
+        // the printed gross/budget/drain magnitudes drift every pass and are not part of the key.
         private static DateTime _lastRecapDbg = DateTime.MinValue;
+        private static string _lastRecapKey;
 
         private static void LogRecap(int[] ordered, double budget)
         {
@@ -365,6 +367,10 @@ namespace NGUAdvisor.Managers
                     spent += _dc.drain(d, 0, true);
                     levels += Diggers[d].curLevel;
                 }
+                string key = src + "|" + string.Join(" ", ordered.Select(d => $"{d}:{Diggers[d].curLevel}/{Diggers[d].maxLevel}").ToArray());
+                if (key == _lastRecapKey)
+                    return;
+                _lastRecapKey = key;
                 Main.LogDebug($"[DiggerDbg] src={src} gross={_character.grossGoldPerSecond():0.##e0} budget={budget:0.##e0} "
                             + $"spent={spent:0.##e0} levels={levels} "
                             + $"order=[{string.Join(" ", ordered.Select(d => d.ToString()).ToArray())}] -> {string.Join(", ", parts)}");

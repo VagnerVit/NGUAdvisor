@@ -316,10 +316,11 @@ namespace NGUAdvisor.Managers
             return locked != BoostSinks.TypeNone ? locked : BoostSinks.BestType(BoostSinks.Current());
         }
 
-        // Why the advisor picked what it picked. Throttled to once a minute: the pick is re-evaluated
-        // every 5s, but the inputs move slowly and this line exists to answer "why T when my gear
-        // clearly wants S", not to narrate.
+        // Why the advisor picked what it picked. Throttled to once a minute and logged only when the
+        // decision (mode, pick, lock, cube usable) changes: the scores drift, this line exists to
+        // answer "why T when my gear clearly wants S", not to narrate.
         private static DateTime _lastTypeDbg = DateTime.MinValue;
+        private static string _lastTypeKey;
 
         private static void LogTypeDbg(Character c, SavedSettings st, int want)
         {
@@ -331,6 +332,9 @@ namespace NGUAdvisor.Managers
                 var gear = BoostSinks.GearScores(sinks);
                 var score = BoostSinks.TypeScores(sinks);
                 int locked = LockedBoostType(c);
+                string key = $"{st.BoostTransformMode}|{want}|{locked}|{sinks.CubeUsable}";
+                if (key == _lastTypeKey) return;
+                _lastTypeKey = key;
                 Main.LogDebug($"[BoostTypeDbg] mode={st.BoostTransformMode} pick={BoostSinks.TypeName(want)}"
                     + $" locked={BoostSinks.TypeName(locked)}"
                     + $" gearScores P={gear[0]:0.##} T={gear[1]:0.##} S={gear[2]:0.##}"

@@ -66,7 +66,8 @@ next one that does.
 `StatusPanel` (the eight status cells) and the activity ribbon. The rail's bottom label
 (`_railFoot`, repainted by `TickRail`) is the hotkey + version line, and a waiting release is
 announced there — someone already reads that line to answer "what am I running", so the update
-needs no popup of its own (UpdateChecker.md). Retired pages are kept out of the
+needs no popup of its own (UpdateChecker.md). A failing check adds `update check failing` to the
+same label (muted colour, no new control). Retired pages are kept out of the
 control collection deliberately (the tab strip is hidden but the collection stays clean).
 `BasicSettingsPanel` does not scroll itself — it is nested in a scrolling host and **grows to its
 content** (the one-scroll-owner-per-screen rule, same as `_xformPage` and `AdventurePanel`). So its
