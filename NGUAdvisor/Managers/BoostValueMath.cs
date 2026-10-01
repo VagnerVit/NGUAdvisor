@@ -80,26 +80,6 @@ namespace NGUAdvisor.Managers
             return total;
         }
 
-        public enum ShortStat { None, Attack, Defense }
-
-        // Which stat is further below a requirement. Attack and defense live on different scales, so
-        // the gap is compared as requirement / stat. None when nothing is below its requirement, no
-        // requirement is known, or both gaps are equal.
-        public static ShortStat ShorterStat(double reqAttack, double reqDefense, double attack, double defense)
-        {
-            double attackGap = Gap(reqAttack, attack);
-            double defenseGap = Gap(reqDefense, defense);
-            if (attackGap <= 1.0 && defenseGap <= 1.0) return ShortStat.None;
-            if (attackGap == defenseGap) return ShortStat.None;
-            return defenseGap > attackGap ? ShortStat.Defense : ShortStat.Attack;
-        }
-
-        private static double Gap(double requirement, double stat)
-        {
-            if (requirement <= 0.0) return 0.0;
-            return stat <= 0.0 ? double.PositiveInfinity : requirement / stat;
-        }
-
         // Kill-cycle length in seconds for one enemy, given how many hits it takes.
         //
         //  - Idle (AdventureController: idleAttackTimer = 0f on spawn, and the timer only advances

@@ -105,8 +105,10 @@ every channel's headroom delivers its full value whatever its type, so lower tie
 and the pick would be arbitrary. Only overflow — which the game DESTROYS — reveals which sink still
 has room. `TypeNone` therefore comes back only when nothing can absorb a boost at all; the cube is a
 soft sink that never saturates, so while it is usable Power or Toughness always beats None.
-Because the cube prices P and T identically below its softcap, an exact P/T tie is broken by the stat
-further below the next titan objective (ZoneCadence.md, "`BestType` P/T tie-break"), not by branch order.
+**An exact P/T tie goes to Power — user rule 2026-10-01.** Below its softcap the cube prices P and T
+identically. Breaking that tie toward the stat further below the next titan bar (1.8) sent the cube to
+Toughness while the titan it was "short" for died in 19 s; kill rate is linear in Power, Toughness only
+has to clear survival. Do not reintroduce an objective-driven tie-break.
 
 Written at most every 5 s from `Tick()`, and only when the value actually differs, followed by
 `updateTransformToggles()` so the game's own buttons match.

@@ -192,18 +192,6 @@ A flat "tier value" over-priced high tiers badly. `Equipment.boostEquip` decides
 Drop type is uniform 1/3 over Power / Toughness / Special (`Random.Range(1, 4)` over the three item ids
 of the tier), so `ValueOfDrop` averages the three channel prices.
 
-**`BestType` P/T tie-break.** Below its softcap the cube takes every boost at full value, so Power and
-Toughness price EXACTLY equal and the old `cubeToughness > cubePower ? T : P` handed every tie to Power.
-Live case (2026-10-01, 17 `[BoostTypeDbg]` lines): cube P 413K → 4.7M while cube T sat at 46.7K, and
-Toughness was the stat short of the titan kill bar (bar 100B / 70B, projected 150B / 50.1B). An exact
-P/T tie — in the gear branch or the cube branch — now goes to the stat further below
-`OptimizationAdvisor.NextObjective()`'s staged requirement, measured as `req / live stat`
-(`BoostValueMath.ShorterStat`; attack and defense are on different scales, so the gap is a ratio).
-Live stats, not `ProjectedBestStats`, because the Boosts panel reads `AdvisedType` from the WinForms
-thread, where an optimizer refresh must not run. No objective, nothing below its requirement, or an
-equal gap → Power, as before. A real price difference still decides on its own; only ties consult the
-objective — the cube still cannot tell P from T.
-
 ## Boost ladder (verified, no longer reconstructed)
 
 `ItemNameDesc.itemName[]`: id 1 = "Power Boost 1" … id 13 = "Power Boost 10K", id 14 = "Toughness

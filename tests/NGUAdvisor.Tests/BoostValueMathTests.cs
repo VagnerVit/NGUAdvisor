@@ -253,29 +253,5 @@ namespace NGUAdvisor.Tests
             double damage = (needForNormal - 7 / 2.0) * 0.8;
             Assert.Equal(1, BoostValueMath.HitsToKill(55, damage, 0, 1.0), 10);
         }
-
-        [Fact]
-        public void ShorterStatIsTheLargerRatioNotTheLargerAbsoluteGap()
-        {
-            // Live case 2026-10-01: bar 100B / 70B, projected 150B / 50.1B -> defense is short.
-            Assert.Equal(BoostValueMath.ShortStat.Defense, BoostValueMath.ShorterStat(100e9, 70e9, 150e9, 50.1e9));
-            // Attack 2x short beats defense 1.5x short even though defense's absolute gap is larger.
-            Assert.Equal(BoostValueMath.ShortStat.Attack, BoostValueMath.ShorterStat(20, 3000, 10, 2000));
-        }
-
-        [Fact]
-        public void ShorterStatHasNoOpinionWhenNothingIsShort()
-        {
-            Assert.Equal(BoostValueMath.ShortStat.None, BoostValueMath.ShorterStat(100, 70, 150, 80));
-            Assert.Equal(BoostValueMath.ShortStat.None, BoostValueMath.ShorterStat(0, 0, 10, 10));
-            Assert.Equal(BoostValueMath.ShortStat.None, BoostValueMath.ShorterStat(200, 140, 100, 70));
-        }
-
-        [Fact]
-        public void ShorterStatTreatsAZeroStatAsTheShortOne()
-        {
-            Assert.Equal(BoostValueMath.ShortStat.Defense, BoostValueMath.ShorterStat(100, 10, 50, 0));
-            Assert.Equal(BoostValueMath.ShortStat.Attack, BoostValueMath.ShorterStat(100, 0, 50, 0));
-        }
     }
 }
