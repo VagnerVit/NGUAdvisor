@@ -9,6 +9,13 @@ KEEP/TRASH verdicts for owned equipment, plus the advisor's boost-priority list.
 optimizer passes, hence the cached `Last`), OR appears in a configured static loadout
 (Titan/Gold/Quest/Ygg/Cooking), OR is currently worn.
 
+**Locked systems earn nothing (2026-10-01).** The objective sweep skips Hacks, Wishes, Cooking, Quest
+Drops, Yggdrasil and Beards while the game's own button for that system is not interactable
+(`SystemUnlocked`; for these six `ButtonShower` sets it straight from the save's unlock flag). User
+report: 175 No Pants was KEEP only for "Hacks" before T7. Augments, Advanced Training, Time Machine and
+Blood Magic are deliberately NOT gated — Evil re-locks them every rebirth (NGU-KNOWLEDGE.md checklist
+§2), so gating would flip verdicts each run. Unlisted objectives have no clear unlock signal and stay.
+
 **TRASH** = owned equipment that wins nothing anywhere at max level (this is the one caller that
 passes `maxed: true` to `GearOptimizer.OptimizeIds` — see GameGearAdapter.md; scoring verdicts at the
 items' current boost fill would trash exactly the items `AutoBoostPriority` exists to fill) — with two user-rule

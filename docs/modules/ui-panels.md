@@ -156,7 +156,7 @@ setting the flag on the one it resolved — `chain` is either the profile's own 
 readonly` preset, and mutating either would leak the pin into every other breakpoint that resolves the
 same name. Because `GearChain.Describe` renders the pin, gaining or losing it changes the chain's
 identity, which is what makes `AdvisorApply`'s refresh treat it as an objective switch instead of
-hiding it under the 5 % bar.
+hiding it under the re-equip bar.
 
 ### `Slots`: 0 is unlimited, −1 is none, and the editor must not "tidy" either
 

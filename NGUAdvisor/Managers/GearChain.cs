@@ -161,6 +161,39 @@ namespace NGUAdvisor.Managers
                 : new List<GearPriority> { new GearPriority { Objective = objective, MaxAccessorySlots = Unlimited } };
         }
 
+        // The chain's objectives in step order, through the same Take(MaxPriorities) + non-null filter
+        // GearOptimizer applies when it builds its step list -- so "step k" means the same entry everywhere.
+        public static List<GearObjectives.Objective> StepObjectives(IReadOnlyList<GearPriority> chain)
+            => chain == null
+                ? new List<GearObjectives.Objective>()
+                : chain.Take(MaxPriorities)
+                       .Where(p => p != null && p.Objective != null)
+                       .Select(p => p.Objective)
+                       .ToList();
+
+        // Lexicographic over the steps, like the chain itself: the first step whose best/worn ratio
+        // leaves [1/bar, bar] decides -- above it the best set improves, below it the worn set is
+        // better. -1 = every step inside the bar. A worn score of 0 under a positive best (a base-0 stat
+        // like Respawn that nothing worn carries) is an improvement, not a division by zero.
+        public static int DecidingStep(IReadOnlyList<double> worn, IReadOnlyList<double> best, double bar,
+                                       out bool improves)
+        {
+            improves = false;
+            int steps = Math.Min(worn.Count, best.Count);
+            for (int k = 0; k < steps; k++)
+            {
+                if (worn[k] <= 0)
+                {
+                    if (best[k] <= 0) continue;
+                    improves = true;
+                    return k;
+                }
+                if (best[k] >= worn[k] * bar) { improves = true; return k; }
+                if (best[k] * bar <= worn[k]) return k;
+            }
+            return -1;
+        }
+
         // "Adventure(3) > Respawn(1) > Adventure(all)" -- the DECLARED per-step budget, never a computed
         // one. Two reasons it is declared and not planned: a planned figure ignores pinned accessories
         // (counting them needs the optimizer's item pools) and would print numbers debug.log's reader can

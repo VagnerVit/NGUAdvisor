@@ -45,6 +45,9 @@ maxed one — **and equipped it**, dropping the character's live stats. User-rep
 Anything new that **wears** gear takes `false`; anything that decides what to **keep, boost or hunt**
 takes `true`.
 
+`BuildItemAtLevel(equip, isWeapon, level)` is the `maxed: true` valuation at a hypothetical level — the
+diagnostic's level-debt column only. Nothing that decides gear may call it.
+
 ## Fixed pseudo-items (present in every loadout)
 
 - **`BuildCubeItem`** — Infinity Cube: Power/Toughness from `cubePower()/cubeToughness()`;

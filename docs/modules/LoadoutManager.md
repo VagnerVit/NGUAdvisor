@@ -7,7 +7,8 @@ The equip executor: turns a list of item IDs into actual gear swaps via the game
 ## Equip mechanics (`ChangeGear`)
 
 - **No-op guard**: if the requested id set equals the currently equipped set (order-insensitive,
-  distinct, >0), nothing happens — prevents needless resource drops and log spam.
+  distinct, >0) **and every wanted id is worn as its best copy** (`HasStrongerCopyToSwapIn` false),
+  nothing happens — prevents needless resource drops and log spam. `shockwave` keeps the plain id test.
 - **Resource drop before swapping**: `removeMostEnergy/removeMostMagic/removeAllRes3` — the game
   requires unallocated resources for cap-changing swaps; `UpdateResources()` at the end clamps
   cur back to the (possibly lower) new totals.
@@ -19,6 +20,24 @@ The equip executor: turns a list of item IDs into actual gear swaps via the game
   (`InventoryManager.MoveFromDaycareToInventory`); failure (full inventory) skips the item.
 - Missing ids are logged and skipped — the call never fails as a whole.
 - Ends with `updateBonuses() + updateInventory()` — required, bonuses are cached by the game.
+
+## Worn as the best copy (2026-10-01)
+
+The optimizer's pools score the **best copy** of each id (`GearOptimizer.BuildPools`, the `MaxItem()`
+rank `FindItemSlot` uses), so a weaker worn copy of a picked id is not the set the optimizer chose. The
+id-only guard used to no-op on exactly that case and the stronger copy was never worn (user-reported).
+
+Game truth decides how the swap must be done (decomp `InventoryController`):
+- dropping an item onto a slot that holds the **same id merges** them (`mergeable` → `mergeItem`,
+  inventory copy deleted, may transform) — an equip must never do that, merges belong to
+  `InventoryManager.MergeInventory` and its guards;
+- a second worn copy of a weapon or accessory is refused (`alreadyEquipped`).
+
+So `SwapInStrongerCopies` (non-shockwave only) moves the worn copy to a free inventory slot, then swaps
+the stronger copy into the same slot, before the normal pass. No free inventory slot → the worn copy
+stays, the main pass equips the WORN copy instead of the inventory one (no merge), and
+`HasStrongerCopyToSwapIn` reports false so the guard still no-ops (no 120 s churn).
+`HasStrongerCopyToSwapIn` is also AdvisorApply's membership test.
 
 ## Item resolution (`FindItemSlot`)
 

@@ -13,6 +13,13 @@ Validation tool for the native gear optimizer. `Run()` writes `logs/gearopt-diag
    exactly what is missing — and reading them off an arbitrary copy would answer a different
    question than the optimizer asked.
 
+4. **`Level:` per objective** (2026-10-01) — every pick's level and `@100 xN`: the objective's score of
+   that pick set at cap with ONLY that item raised to level 100, over the same set at cap as it is
+   (`GameGearAdapter.BuildItemAtLevel`, existing scorer). Level debt is invisible otherwise: caps scale
+   `cap × (1 + level/100)` and boosts never raise level. Diagnostic only — nothing reads it back.
+
+Every number in the log is formatted with `CultureInfo.InvariantCulture`.
+
 ## Triggering it
 
 Two ways, and the disk one exists because the question is asked from outside the game:

@@ -29,12 +29,19 @@ namespace NGUAdvisor.Managers
         private static float CalcCap(float cap, int level) => Mathf.Floor(cap * (1f + level / 100f));
 
         public static GearScorer.Item BuildItem(Equipment equip, bool isWeapon, bool maxed)
+            => Build(equip, isWeapon, maxed, equip?.level ?? 0);
+
+        // Boosted to cap as if the item were at `level` -- what further merging/daycare would buy.
+        // GearOptimizerDiagnostic's level-debt column only; nothing that decides gear may read it.
+        public static GearScorer.Item BuildItemAtLevel(Equipment equip, bool isWeapon, int level)
+            => Build(equip, isWeapon, true, level);
+
+        private static GearScorer.Item Build(Equipment equip, bool isWeapon, bool maxed, int level)
         {
             var item = new GearScorer.Item { IsWeapon = isWeapon };
             if (equip == null || equip.id == 0)
                 return item;
 
-            int level = equip.level;
             var ic = Main.InventoryController;
 
             // Power/Toughness: raw attack/defense (base-0 stats; scale-invariant for ranking).

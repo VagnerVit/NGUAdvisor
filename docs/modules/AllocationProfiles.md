@@ -195,7 +195,7 @@ purpose — those are exactly the Wandoos-is-the-power-source cases.
     names as editor warnings.
   - `ApplyGearRefresh`'s changed-objective bypass compares the RENDERED chain
     (`GearChain.Describe`), not `chain[0].Objective.Name` — otherwise swapping only a chain's tail
-    would never clear the 5 % re-equip bar. Both sides of that bar go through the chain overloads
+    would never clear the re-equip bar. Both sides of that bar go through the chain overloads
     (`CurrentScore(chain)` vs `Optimize(chain, …).Score`) so "priority 0" means the same entry on
     both sides. The rendered chain carries the DECLARED budget (`Adventure(3) > Respawn(1) >
     Adventure(all)`) — no live slot read, so it cannot drift and cannot contradict the optimizer.

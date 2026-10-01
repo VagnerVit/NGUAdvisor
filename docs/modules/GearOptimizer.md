@@ -77,11 +77,16 @@ objective (`GearOptimizer.cs:600-603`). `CurrentScore(chain)` scores the *same* 
 through the *same* filter (`LeadObjective`: `Take(MaxPriorities)` then first non-null objective, the
 identical filter `Optimize` uses to build `steps`).
 
-Both sides must agree because `AdvisorApply.ApplyGearRefresh` compares them behind a **5 %
-re-equip bar** (`AdvisorApply.cs:954-965`): `CurrentScore(chain)` vs `Optimize(chain, …).Score`. If
+Both sides must agree because `AdvisorApply.ApplyGearRefresh` compares them behind a **2 %
+re-equip bar** (`AdvisorApply.GearReequipBar`): `CurrentScore(chain)` vs `Optimize(chain, …).Score`. If
 one side measured the whole chain and the other the lead, the bar would be comparing two different
-quantities and would fire (or never fire) at random. The 5 % bar is bypassed on an objective switch,
+quantities and would fire (or never fire) at random. The bar is bypassed on an objective switch,
 detected via `GearChain.Describe` — see GearChain.md §Describe.
+
+The bar is judged **per step** (2026-10-01, AdvisorApply.md rule 2): for every later step k the two
+sides are `CurrentScore(objective_k)` (worn copies) and `ScoreOf(best, objective_k)` (the pools' copies)
+— one scorer, one objective, one quantity on each side. The step list is `GearChain.StepObjectives`,
+the same filter `LeadObjective` and `OptimizeCore`'s `steps` use.
 
 ## Pins — `ActivePins()` and `PlacePins`
 
@@ -142,14 +147,23 @@ Slimy Chest to `[178] The Stealthiest Armour`. Writing `NGUs(-1) > Respawn(2) > 
 is no longer necessary (it still works, and remains the right shape when the *accessory* step should
 also be denied a main-slot claim it could win).
 
-### The Power floor, for a chain that wants them nowhere
+### The Power floor — every main slot the chain left empty (2026-10-01)
 
-If no step claims the main slots — a chain of nothing but loot/support objectives —
-`FillEmptyMainSlotsByPower()` fills what is still 0 with the highest raw Power item in each pool, the
-same measure `PinTopPowerWeapon` uses, so "which item when nothing has an opinion" has one answer in
-this file. Empty is never right: main-slot items carry Power/Toughness and no item in NGU has a
-negative stat. It cannot fire once any step has claimed the slots, and what it fills scores 0 on every
-objective in the chain, so set valuations are untouched.
+After the chain, `FillEmptyMainSlotsByPower()` fills **every** main slot still 0 (and not pinned) with
+the highest raw Power item in its pool — the same measure `PinTopPowerWeapon` uses, so "which item
+when nothing has an opinion" has one answer in this file. It runs whether or not a step claimed the
+main slots.
+
+It used to run only when no step claimed them, which left an owner's unwanted slots empty: the owner
+keeps just the slots its stats fill, so a Gold Drops set came out `W:- H:[164] C:- L:- B:-` and a
+Yggdrasil set `W:- H:[164] C:- L:- B:[158]`. `ChangeGear` never touches a slot it is not handed, so
+those slots kept whatever happened to be worn — history-dependent, and able to cost Power/Toughness
+(user-reported 2026-10-01).
+
+**It cannot lower any step's score.** Stats are non-negative and every exponent is positive, so adding
+an item never decreases a product objective; and the owner's `PickSlot` keeps a candidate only on a
+strict improvement, so a slot it left at 0 is one where no candidate moved its score. A later
+accessory-only step can only gain from a filled main slot. Empty is never right.
 
 ## TopRespawn pin (`forceTopRespawn`)
 
@@ -195,6 +209,10 @@ reference has no equivalent feature.
   Drop Chance — **only while the titan's own need (`BoostFarmAdvisor.TitanGearLootFor`) is above the
   full kill set's drop chance**; a titan with nothing wanted behind an uncapped roll keeps every
   accessory on Adventure. Full Adventure short of the bar → full Adventure, unchanged.
+  The `Titan kill set:` log names which of the four outcomes ran: accessories handed to Drop Chance,
+  `bar NOT cleared by full Adventure (Toughness -28%)` (per-stat shortfall), "this titan needs no more
+  drop chance", or "one fewer misses the bar". It says "Drop Chance the rest" only when Drop Chance got
+  a slot.
   The AK loot chain is trimmed against the same titan need (`Optimize(…, lootNeed)`), never against
   the farm zone's.
   AK-trivial spawns honor the configured loot objective *and* the global pins — but they get it as
@@ -221,6 +239,10 @@ and under a pure `Drop Chance(all)` chain the maxed one was never worn — the d
 holding the weak copy.
 
 Daycare is deliberately NOT a source: those items are not available to equip.
+
+The equipper honours the same copy when the id is already worn: a worn weaker copy is swapped for the
+pooled one (2026-10-01, LoadoutManager.md §"Worn as the best copy"), so a set that scores the strong
+copy is the set that ends up worn.
 
 ### The pools are CACHED on an inventory fingerprint (2026-09-20)
 

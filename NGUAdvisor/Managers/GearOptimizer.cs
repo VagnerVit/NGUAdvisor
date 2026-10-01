@@ -212,7 +212,8 @@ namespace NGUAdvisor.Managers
                 // Drop chance takes a freed slot only while this titan still has a wanted item behind an
                 // uncapped roll; otherwise the kill keeps every accessory.
                 bool dcPays = lootNeed.Known && lootNeed.Target > ScoreOf(full, dropChance);
-                if (dcPays && Clears(full))
+                bool fullClears = Clears(full);
+                if (dcPays && fullClears)
                 {
                     for (int slots = full.Accessories.Count - 1; slots >= 0; slots--)
                     {
@@ -226,9 +227,21 @@ namespace NGUAdvisor.Managers
                         kept = slots;
                     }
                 }
-                Main.Log($"Titan kill set: Adventure keeps {kept}/{full.Accessories.Count} accessories, Drop Chance the rest "
+                double projA = atk * ScoreOf(best, power) / curP, projD = def * ScoreOf(best, toughness) / curT;
+                string Shortfall(string stat, double projected, double bar) => projected >= bar
+                    ? ""
+                    : $" {stat} {((projected / bar - 1) * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture)}%";
+                string verdict = kept < full.Accessories.Count
+                    ? $"Adventure keeps {kept}/{full.Accessories.Count} accessories, Drop Chance the rest"
+                    : !fullClears
+                        ? $"Adventure keeps all {kept} accessories, bar NOT cleared by full Adventure"
+                          + $" ({(Shortfall("Power", projA, barA) + Shortfall("Toughness", projD, barD)).Trim()})"
+                        : !dcPays
+                            ? $"Adventure keeps all {kept} accessories, this titan needs no more drop chance"
+                            : $"Adventure keeps all {kept} accessories, one fewer misses the bar";
+                Main.Log($"Titan kill set: {verdict} "
                        + $"(bar {NumberFormatter.Abbrev(barA)} / {NumberFormatter.Abbrev(barD)}, "
-                       + $"projected {NumberFormatter.Abbrev(atk * ScoreOf(best, power) / curP)} / {NumberFormatter.Abbrev(def * ScoreOf(best, toughness) / curT)})");
+                       + $"projected {NumberFormatter.Abbrev(projA)} / {NumberFormatter.Abbrev(projD)})");
                 return best.AllIds().Where(x => x > 0).Distinct().ToArray();
             }
             catch (Exception e) { Main.LogDebug($"Titan kill set failed: {e.Message}"); return null; }
@@ -434,12 +447,7 @@ namespace NGUAdvisor.Managers
         // The objective Result.Score is measured on: the first usable entry of the chain, matching the
         // filter Optimize applies when it builds its step list.
         private static GearObjectives.Objective LeadObjective(IReadOnlyList<GearPriority> chain)
-            => chain == null
-                ? null
-                : chain.Take(GearChain.MaxPriorities)
-                       .Where(p => p != null && p.Objective != null)
-                       .Select(p => p.Objective)
-                       .FirstOrDefault();
+            => GearChain.StepObjectives(chain).FirstOrDefault();
 
         // Per-objective scoring state. Previously these were closures over Optimize's single objective;
         // a priority chain needs one of these per priority over the SAME candidate pools.
@@ -787,8 +795,8 @@ namespace NGUAdvisor.Managers
                 return pick;
             }
 
-            // Last-resort fill for main slots no priority in the chain had an opinion about (RunChain).
-            // Only ever touches a slot still at 0, and never a pinned one.
+            // Last-resort fill for main slots the chain left empty (RunChain). Only ever touches a slot
+            // still at 0, and never a pinned one.
             void FillEmptyMainSlotsByPower()
             {
                 if (!mainWeaponPinned && r.MainWeapon == 0)
@@ -1054,14 +1062,12 @@ namespace NGUAdvisor.Managers
                     frozenAccCount = r.Accessories.Count;
                 }
 
-                // No step wanted the main slots at all (a chain of nothing but loot/support objectives).
-                // Empty is still never right — main-slot items carry Power/Toughness and no item in this
-                // game has a negative stat — so the slots fall back to raw Power, the same measure the
-                // PinTopPowerWeapon pin uses. This is a floor under a chain that says nothing about them,
-                // NOT a substitute for a step that does: the branch cannot fire once any step has claimed
-                // them, and what it fills scores 0 on every objective in the chain, so set valuations are
-                // untouched.
-                if (!mainSlotsOwned) FillEmptyMainSlotsByPower();
+                // Every main slot still empty falls back to raw Power, whether or not a step claimed the
+                // main slots: an owner keeps only the slots its stats fill (a Gold Drops set is one helmet),
+                // and ChangeGear leaves an unlisted slot as it was worn. It cannot lower any step's score —
+                // stats are non-negative and the owner's PickSlot left the slot empty only because no
+                // candidate strictly improved it.
+                FillEmptyMainSlotsByPower();
 
                 // A chain has no single score, so Result.Score is priority 0's -- the same quantity
                 // CurrentScore(chain) reports, so AdvisorApply's re-equip bar compares like with like.

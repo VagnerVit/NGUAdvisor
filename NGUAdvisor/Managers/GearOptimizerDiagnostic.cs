@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -44,6 +45,41 @@ namespace NGUAdvisor.Managers
 
         private static string Name(int id) => id == 0 ? "-" : $"[{id}]{Main.ItemName(id)}";
 
+        private static string Num(double v, string format) => v.ToString(format, CultureInfo.InvariantCulture);
+
+        // Gear stops gaining levels here (Equipment.levelUp / mergeItem clamp; MacGuffins are not gear).
+        private const int MaxGearLevel = 100;
+
+        // Level debt of one pick set: per item, its level and the objective's score of the set at cap with
+        // only that item raised to MaxGearLevel, over the same set at cap as it is. At cap on both sides
+        // because a level raises the cap, never the current fill. Diagnostic only.
+        private static string LevelDebt(GearOptimizer.Result best, GearObjectives.Objective obj,
+                                        GearScorer.Item cube, GearScorer.Item nude, double offhand)
+        {
+            // AllIds() lists the main hand first: ScoreRaw discounts the SECOND weapon it sees.
+            var copies = best.AllIds().Where(id => id > 0).Select(id => GearOptimizer.BestCopy(id)).Where(e => e != null).ToList();
+            if (copies.Count == 0) return "(no picks)";
+            var atCap = copies.Select(e => GameGearAdapter.BuildItem(e, e.type == part.Weapon, true)).ToList();
+            double Score(List<GearScorer.Item> set)
+                => GearScorer.ScoreRaw(new List<GearScorer.Item>(set) { cube, nude }, obj.Stats, obj.Exponents, offhand);
+            double baseline = Score(atCap);
+
+            var parts = new List<string>(copies.Count);
+            for (int i = 0; i < copies.Count; i++)
+            {
+                var e = copies[i];
+                string entry = $"[{e.id}] lvl {e.level}";
+                if (e.level < MaxGearLevel && baseline > 0)
+                {
+                    var raised = new List<GearScorer.Item>(atCap);
+                    raised[i] = GameGearAdapter.BuildItemAtLevel(e, e.type == part.Weapon, MaxGearLevel);
+                    entry += $" @{MaxGearLevel} x{Num(Score(raised) / baseline, "0.###")}";
+                }
+                parts.Add(entry);
+            }
+            return string.Join(", ", parts.ToArray());
+        }
+
         public static void Run()
         {
             try
@@ -79,7 +115,7 @@ namespace NGUAdvisor.Managers
                 lines.Add("");
                 string Fmt(GearScorer.Item it) => it.Stats.Count == 0
                     ? "(no scored stats)"
-                    : string.Join(", ", it.Stats.OrderBy(s => s.Key).Select(s => $"{s.Key}={s.Value:0.##}"));
+                    : string.Join(", ", it.Stats.OrderBy(s => s.Key).Select(s => $"{s.Key}={Num(s.Value, "0.##")}"));
                 for (int i = 0; i < labels.Count; i++)
                 {
                     lines.Add($"  {labels[i]}");
@@ -116,10 +152,11 @@ namespace NGUAdvisor.Managers
                         // the user's pin list cannot show whether a refactor changed the optimizer.
                         var best = GearOptimizer.Optimize(obj, false, new int[0], asMaxed);
                         double gain = curScore > 0 ? best.Score / curScore : 0;
-                        lines.Add($"  {obj.Name}:  current={curScore:E4}  optimized={best.Score:E4}  (x{gain:0.###})");
+                        lines.Add($"  {obj.Name}:  current={Num(curScore, "E4")}  optimized={Num(best.Score, "E4")}  (x{Num(gain, "0.###")})");
                         lines.Add("      W:" + Name(best.MainWeapon) + (best.OffWeapon != 0 ? " / " + Name(best.OffWeapon) : "")
                             + "  H:" + Name(best.Head) + "  C:" + Name(best.Chest) + "  L:" + Name(best.Legs) + "  B:" + Name(best.Boots));
                         lines.Add("      Acc: " + (best.Accessories.Count == 0 ? "(none)" : string.Join(", ", best.Accessories.Select(Name))));
+                        lines.Add("      Level: " + LevelDebt(best, obj, cube, nude, offhand));
                         foreach (var id in best.AllIds())
                             if (id > 0 && !wornIds.Contains(id)) challengers.Add(id);
                     }
@@ -146,8 +183,10 @@ namespace NGUAdvisor.Managers
 
                 lines.Add("");
                 lines.Add("NOTE: spec %s match the site; no gear SETS in NGU; cube + nude base included; hard caps");
-                lines.Add($"deferred (rarely bind). offhand = live weapon2Factor ({offhand:0.#}%). Compare the MAXED");
+                lines.Add($"deferred (rarely bind). offhand = live weapon2Factor ({Num(offhand, "0.#")}%). Compare the MAXED");
                 lines.Add("block's picks to the site; the NOW block is what the advisor actually equips.");
+                lines.Add("Level: each pick's level, and xN = the objective's score of that pick set at cap with ONLY");
+                lines.Add($"that item raised to level {MaxGearLevel} (level debt; boosts never raise level, merges do).");
                 lines.Add("=== end ===");
 
                 var path = Path.Combine(Main.GetSettingsDir(), "logs", "gearopt-diagnostic.log");

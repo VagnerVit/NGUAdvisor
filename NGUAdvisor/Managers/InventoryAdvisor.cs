@@ -31,6 +31,25 @@ namespace NGUAdvisor.Managers
         // exception: without it, "did the guide hold anything" is only answerable by opening a panel.
         private static string _lastGuideDbg;
 
+        // An objective whose system is still locked earns no KEEP. Only systems with a permanent unlock
+        // flag are gated, via the game's own button state, which for these six follows the save's unlock
+        // flag (ButtonShower). Augments, AT, the Time Machine and Blood Magic re-lock every Evil rebirth,
+        // so gating them would flip verdicts each run.
+        private static bool SystemUnlocked(Character c, string objective)
+        {
+            var b = c.buttons;
+            switch (objective)
+            {
+                case "Hacks": return b.hacks.interactable;
+                case "Wishes": return b.wishes.interactable;
+                case "Cooking": return b.cooking.interactable;
+                case "Quest Drops": return b.beast.interactable;
+                case "Yggdrasil": return b.yggdrasil.interactable;
+                case "Beards": return b.beards.interactable;
+                default: return true;
+            }
+        }
+
         public static Verdict Compute()
         {
             var v = new Verdict();
@@ -68,6 +87,7 @@ namespace NGUAdvisor.Managers
             {
                 try
                 {
+                    if (!SystemUnlocked(c, obj.Name)) continue;
                     var seen = new HashSet<int>();
                     foreach (var id in GearOptimizer.OptimizeIds(obj, false, new int[0], true) ?? new int[0]) { keep.Add(id); seen.Add(id); }
                     foreach (var id in GearOptimizer.OptimizeIds(obj, true, new int[0], true) ?? new int[0]) { keep.Add(id); seen.Add(id); }

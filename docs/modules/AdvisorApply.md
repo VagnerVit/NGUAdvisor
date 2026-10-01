@@ -63,15 +63,30 @@ not a framework:
   "Adventure + Respawn" chain. Three anti-churn rules, each from a real bug:
   1. `_gearAsserted=false` on every payload load → first pass equips UNCONDITIONALLY (a reload
      can leave a lock's TEMP loadout worn with the restore set lost — statics wipe).
-  2. Objective CHANGES bypass the 5 % improvement bar ("wrong gear within 5 % on the new
-     objective is still wrong gear" — TM HOUR wearing the push loadout).
+  2. Objective CHANGES bypass the 2 % improvement bar (`GearReequipBar`; "wrong gear within the bar
+     on the new objective is still wrong gear" — TM HOUR wearing the push loadout). Lowered from 5 %
+     on user request 2026-10-01; no flip-flop is possible at any bar, because the optimizer is
+     independent of what is worn (pools = worn ∪ inventory, ascent from an empty set) and both sides
+     of the bar use one scorer.
+     **On the same objective the bar is judged per chain step** (`GearChain.DecidingStep`, 2026-10-01):
+     lexicographic like the chain itself — the first step whose best/worn ratio leaves `[1/bar, bar]`
+     decides (above → equip, below → hold); every step inside → hold. Per step the worn side is
+     `GearOptimizer.CurrentScore(objective_k)` and the best side `ScoreOf(best, objective_k)`. The lead
+     alone used to decide, so under `Respawn(3)+PowerWeapon > NGUs(all)` the capped Respawn lead read
+     x1 forever and a +57 % NGU accessory set was never equipped (user-reported 2026-10-01).
   3. `_lastGearObjective` commits ONLY when the switch actually resolves (equip or verified
      optimal) — a fizzled pass must not consume the bypass (segment flipped during a titan lock;
-     stale AT gear then sat inside the 5 % bar forever). "Verified" on a switch is SET MEMBERSHIP
+     stale AT gear then sat inside the bar forever). "Verified" on a switch is SET MEMBERSHIP
      (every id of the best set already worn), never `best.Score <= cur`: the score is the chain's
      lead objective only, and a chain whose later steps take accessories from the lead (ITOPOD
      Push) always scores below a set built for the lead alone — the old test declared the profile's
      pure-NGU set "optimal" and the push set was never equipped (2026-09-22).
+  4. The membership test also runs AFTER the bar clears on the same objective. "Worn" means worn AS
+     the best copy: ids all worn **and** `!LoadoutManager.HasStrongerCopyToSwapIn(ids)`. A stronger
+     duplicate of a worn id is therefore not worn, and `ChangeGear` now swaps it (LoadoutManager.md);
+     without a free inventory slot it cannot, both sides report "nothing to swap", and the pass holds
+     instead of re-announcing "+x % from new drops" every 120 s. The LOOT HUNTER membership test uses
+     the same copy check.
   `GearRestored()` clears both the marker and the throttle. Called by LockManager after a restore
   and by `GearBreakpoints.PerformSwap` after the profile swaps gear — a breakpoint re-applied on
   rebirth/reload otherwise overwrote an override set (ITOPOD Push) while the marker still claimed it.
@@ -179,15 +194,22 @@ escape into the step it observes. Observation only: none of them changes a decis
   was not re-equipped.** Verdict is `EQUIP` / `HELD` / `OFF`, then the active objective, the rendered
   chain (`GearChain.Describe` — the same key `_lastGearObjective` commits), `switch=` (objective/chain
   change, which BYPASSES the bar), `asserted=` (the post-load unconditional assert), `cur=` vs
-  `best=` and their `ratio=` against `bar=x1.05`, and `why=`. Only equips were ever announced, so the
-  common outcome — the 5 % bar holding the worn set — left no trace, and neither did the two scores it
+  `best=` and their `ratio=` (the lead step), `steps=[<objective> x<ratio> | …]` (every step's
+  best/worn ratio, `new` = the worn set scores 0 there), `decided=<k>:<objective>` (or `none`), against
+  `bar=x1.02`, and `why=`. Only equips were ever announced, so the
+  common outcome — the bar holding the worn set — left no trace, and neither did the two scores it
   was measured on. The LOOT HUNTER path logs its membership test instead of a score (it has no single
   objective score). No extra optimizer work: the renderer reads the scores the decision already
   computed. The 120 s throttle covers the score path; the cap covers the exits in front of it.
 
   ```
-  [GearDbg] HELD obj='NGU MARATHON' chain='Energy NGU>Respawn' switch=False asserted=True cur=4.512e6 best=4.663e6 ratio=1.033 bar=x1.05 why=same objective and inside the 5% re-equip bar
+  [GearDbg] HELD obj='NGU MARATHON' chain='Energy NGU(all) > Respawn(1)' switch=False asserted=True cur=4.512e6 best=4.581e6 ratio=1.015 steps=[Energy NGU x1.015 | Respawn x1] decided=none bar=x1.02 why=same objective and every step inside the re-equip bar
   ```
+
+`AdvisorApply.LastGearChain` / `LastGearVerdict` expose the last applied chain key and `[GearDbg]` line
+read-only (StateExport's GEAR section). `ApplyPit` logs the gold with each throw, passes the plan
+verdict to `MoneyPitManager.AdvisorThrow(source)` and reports verdict changes via
+`MoneyPitManager.LogPlanChange` (MoneyPitManager.md).
 
 `[TitanGoldDbg]` (`LogTitanGoldState`) is documented in GoldDropAdvisor.md §Diagnostics;
 `[DiggerDbg]` lives in DiggerManager. `[CapDbg]` is in LevelPlanner.md.

@@ -29,7 +29,8 @@ namespace NGUAdvisor.Managers
             if (gearIds?.Length > 0 == false)
                 return;
 
-            if (GetCurrentGear().Where(x => x > 0).Distinct().OrderBy(x => x).SequenceEqual(gearIds.Where(x => x > 0).Distinct().OrderBy(x => x)))
+            if (GetCurrentGear().Where(x => x > 0).Distinct().OrderBy(x => x).SequenceEqual(gearIds.Where(x => x > 0).Distinct().OrderBy(x => x))
+                && (shockwave || !HasStrongerCopyToSwapIn(gearIds)))
                 return;
 
             Log($"Received New Gear for {LockManager.GetLockTypeName()}: {string.Join(", ", gearIds)}");
@@ -46,9 +47,17 @@ namespace NGUAdvisor.Managers
 
             try
             {
+                if (!shockwave)
+                    SwapInStrongerCopies(gearIds);
+
                 foreach (var itemId in gearIds)
                 {
                     var equip = FindItemSlot(itemId, shockwave);
+
+                    // Still worn as the weaker copy (no free slot to swap through): handing the game the
+                    // inventory copy would MERGE it into the worn one, so the worn copy stands.
+                    if (!shockwave && equip != null && !IsWornSlot(equip.slot))
+                        equip = WornCopy(itemId) ?? equip;
 
                     if (equip == null)
                     {
@@ -145,6 +154,71 @@ namespace NGUAdvisor.Managers
             UpdateResources();
 
             Log("Finished equipping gear");
+        }
+
+        // Equipped slot codes are -1..-6 (main slots) and 10000+ (accessories); the inventory is 0..,
+        // daycare 100000+.
+        private static bool IsWornSlot(int slot) => slot < 0 || (slot >= 10000 && slot < 100000);
+
+        private static ih WornCopy(int id) => Inventory.GetConvertedEquips().FirstOrDefault(x => x.id == id);
+
+        // A wanted id is worn as a weaker copy than the one FindItemSlot picks (the copy the optimizer's
+        // pools score) and a free inventory slot exists to swap it through -- i.e. ChangeGear would act.
+        public static bool HasStrongerCopyToSwapIn(IEnumerable<int> gearIds)
+        {
+            if (gearIds == null || !Inventory.inventory.Exists(x => x.id == 0)) return false;
+            foreach (var id in gearIds.Where(x => x > 0).Distinct())
+            {
+                if (WornCopy(id) == null) continue;
+                var best = FindItemSlot(id);
+                if (best != null && !IsWornSlot(best.slot)) return true;
+            }
+            return false;
+        }
+
+        // The game MERGES an item dropped onto a slot holding the same id (InventoryController.mergeable)
+        // and refuses a second worn copy of a weapon or accessory (alreadyEquipped). So a stronger copy
+        // replaces the worn one in two swaps: the worn copy out to a free inventory slot, the stronger in.
+        private static void SwapInStrongerCopies(int[] gearIds)
+        {
+            foreach (var id in gearIds.Where(x => x > 0).Distinct())
+            {
+                var worn = WornCopy(id);
+                if (worn == null) continue;
+                var best = FindItemSlot(id);
+                if (best == null || IsWornSlot(best.slot)) continue;
+                var free = Inventory.inventory.FindIndex(x => x.id == 0);
+                if (free < 0)
+                {
+                    Log($"No free inventory slot to swap in the stronger copy of {Main.ItemName(id)} ({id})");
+                    continue;
+                }
+
+                Inventory.item1 = worn.slot;
+                Inventory.item2 = free;
+                SwapWornSlot(worn.slot);
+                if (Inventory.inventory[free].id != id)
+                    continue;   // the game refused the swap, nothing moved
+
+                Inventory.item1 = worn.slot;
+                Inventory.item2 = best.slot;
+                SwapWornSlot(worn.slot);
+                Log($"Swapped in the stronger copy of {Main.ItemName(id)} ({id}): lvl {best.level} for lvl {worn.level}");
+            }
+        }
+
+        private static void SwapWornSlot(int slot)
+        {
+            switch (slot)
+            {
+                case -1: _ic.swapHead(); break;
+                case -2: _ic.swapChest(); break;
+                case -3: _ic.swapLegs(); break;
+                case -4: _ic.swapBoots(); break;
+                case -5: _ic.swapWeapon(); break;
+                case -6: _ic.swapWeapon2(); break;
+                default: _ic.swapAcc(); break;
+            }
         }
 
         public static void FillDaycare()

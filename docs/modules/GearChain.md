@@ -24,7 +24,7 @@ priority — is what produces mixed accessory sets.
   without bound. Every consumer truncates with the **same** `Take(MaxPriorities)`:
   `GearBreakpoints.ParseSpec` (before filtering unresolved steps, so the validator's "only the first
   5 are used" message describes what actually happens), `GearOptimizer.Optimize`,
-  `GearOptimizer.LeadObjective`, and the editor (`GearEditorPanel` disables **+ Add step** at 5, so
+  `GearChain.StepObjectives` (behind `GearOptimizer.LeadObjective` and AdvisorApply's per-step bar), and the editor (`GearEditorPanel` disables **+ Add step** at 5, so
   a sixth row is never offered rather than silently dropped).
 
 ## The budget rule (never precompute it)
@@ -146,7 +146,7 @@ two. Consequences:
 nothing else, and that is load-bearing in two directions:
 
 1. **`AdvisorApply.ApplyGearRefresh` uses the rendered string as the chain's identity**
-   (`AdvisorApply.cs:951`): a changed chain is an objective switch and bypasses the 5 % re-equip bar.
+   (`AdvisorApply.cs:951`): a changed chain is an objective switch and bypasses the re-equip bar.
    If the string ever embedded a live game read — an accessory-slot count, a pinned-item count —
    every pass could look like a switch and the advisor would re-equip constantly. It must change
    when a step changes (including the tail, which `chain[0].Objective.Name` would miss) and **never**
@@ -156,6 +156,13 @@ nothing else, and that is load-bearing in two directions:
    every later step's real share. `GearEditorPanel.UpdateChainSummary` therefore prints `Describe`
    and never a computed split — and being game-read-free also keeps that label off the Unity thread
    on every keystroke of a slot numeric.
+
+## `DecidingStep` — the re-equip verdict, per step
+
+`DecidingStep(worn, best, bar, out improves)`: lexicographic over the steps, the first step whose
+best/worn ratio leaves `[1/bar, bar]` decides; `-1` = every step inside the bar. A worn 0 under a
+positive best (a base-0 stat nothing worn carries) is an improvement. AdvisorApply feeds it one score
+pair per `StepObjectives` entry (AdvisorApply.md rule 2). Tested in `GearChainTests`.
 
 ## Unity-free — keep it that way
 

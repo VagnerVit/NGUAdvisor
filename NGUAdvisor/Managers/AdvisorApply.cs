@@ -1123,7 +1123,8 @@ namespace NGUAdvisor.Managers
 
         // Phase C: gear auto-refresh. When the active gear breakpoint is objective-driven, periodically
         // re-optimize the same objective and re-equip if a new drop/merge made a meaningfully better
-        // loadout available (>= 5%). Optimize is heavy, so this is throttled well beyond the 30s tick.
+        // loadout available. Optimize is heavy, so this is throttled well beyond the 30s tick.
+        private const double GearReequipBar = 1.02;
         private static DateTime _lastGearCheck = DateTime.MinValue;
         private static string _lastGearOverride;
         // What the last resolved pass equipped for: the rendered chain (GearChain.Describe) on the
@@ -1149,7 +1150,7 @@ namespace NGUAdvisor.Managers
         }
 
         // WHY gear was or was not re-equipped. The user-facing lines only ever announce an equip, so the far
-        // more common outcome — the 5% bar held the current loadout — left no trace at all, and neither did
+        // more common outcome — the re-equip bar held the current loadout — left no trace at all, and neither did
         // the two scores it was measured on. Both sides of the bar and the switch bypass go on one line.
         //
         // Same discipline as [TitanGoldDbg]: cadence cap before the render, then emit only on CHANGE. The
@@ -1262,11 +1263,12 @@ namespace NGUAdvisor.Managers
                 }
                 bool huntChanged = objName != _lastGearObjective;
                 var worn = new HashSet<int>(LoadoutManager.CurrentGearIds());
-                if (_gearAsserted && !huntChanged && huntIds.All(worn.Contains))
+                if (_gearAsserted && !huntChanged && huntIds.All(worn.Contains)
+                    && !LoadoutManager.HasStrongerCopyToSwapIn(huntIds))
                 {
                     _lastGearObjective = objName;
                     LogGearDbg("HELD", () => $"obj='LOOT HUNTER' set='{what}' switch=false"
-                                           + " why=resolved hunt set already worn (membership test, no 5% bar)");
+                                           + " why=resolved hunt set already worn (membership test, no re-equip bar)");
                     return;
                 }
                 bool firstHunt = !_gearAsserted;
@@ -1276,7 +1278,7 @@ namespace NGUAdvisor.Managers
                 Main.InventoryController.assignCurrentEquipToLoadout(0);
                 Main.Log($"Advisor: gear hunt loadout equipped — {what}{(firstHunt ? " (startup/reload assert)" : "")}");
                 LogGearDbg("EQUIP", () => $"obj='LOOT HUNTER' set='{what}' switch={huntChanged}"
-                                        + $" assert={firstHunt} why=hunt set not worn (membership test, no 5% bar)");
+                                        + $" assert={firstHunt} why=hunt set not worn (membership test, no re-equip bar)");
                 return;
             }
 
@@ -1294,21 +1296,21 @@ namespace NGUAdvisor.Managers
                 LogGearDbg("HELD", () => $"obj='{objName}' why=name resolved to no chain (refused, not guessed)");
                 return;
             }
-            // Objective switches (segment/rotation changes) bypass the 5% bar: "wrong gear that's
-            // within 5% on the NEW objective" is still wrong gear (user-reported: TM HOUR wearing
+            // Objective switches (segment/rotation changes) bypass the re-equip bar: "wrong gear that's
+            // within the bar on the NEW objective" is still wrong gear (user-reported: TM HOUR wearing
             // the push loadout). The threshold only applies to same-objective drop improvements.
             // _lastGearObjective commits ONLY when a pass actually resolves the switch (equip, or
             // verified already-optimal) — a no-op pass must NOT consume the bypass (user-reported:
             // segment flipped during a titan lock; the first post-release pass fizzled and the
-            // stale AT gear then sat inside the 5% bar forever).
+            // stale AT gear then sat inside the bar forever).
             //
             // A CHAIN switch is an objective switch, so the marker is the rendered chain, not
             // chain[0].Objective.Name: swapping only the tail of a chain leaves the lead objective
-            // unchanged and would otherwise never clear the 5% bar. (The hunt path above stores the bare
+            // unchanged and would otherwise never clear the bar. (The hunt path above stores the bare
             // "LOOT HUNTER" instead, which no rendered chain can equal — so hunt<->chain always counts.)
             string chainKey = GearChain.Describe(chain);
             bool objectiveChanged = chainKey != _lastGearObjective;
-            // Both sides of the bar measure the same thing: the chain's own lead objective.
+            // Lead-step scores, as before: the chain's own lead objective on both sides.
             double cur = GearOptimizer.CurrentScore(chain);
             var best = GearOptimizer.Optimize(chain, null, AllocationProfiles.Breakpoints.GearBreakpoints.ActiveForceRespawn);
             if (best == null)
@@ -1317,6 +1319,20 @@ namespace NGUAdvisor.Managers
                                        + " why=optimizer returned no loadout");
                 return;
             }
+            // The bar is judged per chain step, lexicographically: a capped lead (Respawn) reads x1 forever
+            // and must not hide the gains of the later steps. Each step's worn and best score go through
+            // one scorer on that step's objective; step 0 is cur/best.Score themselves.
+            var stepObjectives = GearChain.StepObjectives(chain);
+            var wornScores = new List<double>(stepObjectives.Count);
+            var bestScores = new List<double>(stepObjectives.Count);
+            for (int k = 0; k < stepObjectives.Count; k++)
+            {
+                wornScores.Add(k == 0 ? cur : GearOptimizer.CurrentScore(stepObjectives[k]));
+                bestScores.Add(k == 0 ? best.Score : GearOptimizer.ScoreOf(best, stepObjectives[k]));
+            }
+            int decidingStep = GearChain.DecidingStep(wornScores, bestScores, GearReequipBar, out bool stepImproves);
+            string decidingName = decidingStep >= 0 ? stepObjectives[decidingStep].Name : null;
+
             // One renderer for every outcome of the bar, so a single line carries both scores it was
             // measured on, their ratio, the bar itself, and whether this pass was a SWITCH (which bypasses
             // the bar). Reads only locals already computed above — no second optimizer run.
@@ -1325,25 +1341,31 @@ namespace NGUAdvisor.Managers
             Func<string, string> gearLine = why =>
                 $"obj='{objName}' chain='{chainKey}' switch={objectiveChanged} asserted={wasAsserted}"
               + $" cur={cur:0.###e0} best={best.Score:0.###e0}"
-              + $" ratio={(cur > 0 ? (best.Score / cur).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "n/a")}"
-              + $" bar=x1.05 why={why}";
+              + $" ratio={StepRatio(cur, best.Score)}"
+              + $" steps=[{string.Join(" | ", stepObjectives.Select((o, k) => $"{o.Name} x{StepRatio(wornScores[k], bestScores[k])}").ToArray())}]"
+              + $" decided={(decidingStep >= 0 ? $"{decidingStep}:{decidingName}" : "none")}"
+              + $" bar=x{GearReequipBar.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} why={why}";
             if (_gearAsserted)
             {
-                if (!objectiveChanged && (cur <= 0 || best.Score < cur * 1.05))
+                if (!objectiveChanged && !(decidingStep >= 0 && stepImproves))
                 {
-                    LogGearDbg("HELD", () => gearLine(cur <= 0
-                        ? "no score for the worn set"
-                        : "same objective and inside the 5% re-equip bar"));
+                    LogGearDbg("HELD", () => gearLine(decidingStep < 0
+                        ? "same objective and every step inside the re-equip bar"
+                        : $"same objective, the worn set beats the best set on step {decidingStep} ({decidingName})"));
                     return;
                 }
                 // Set membership, not the lead score: a chain whose later steps take accessories from
                 // the lead (ITOPOD Push gives two to Respawn/Move Cooldown) always scores its lead lower
                 // than a set built for the lead alone, so the score would call the old set "optimal".
+                // "Worn" means worn AS the copy ChangeGear would equip: a weaker duplicate of a best id
+                // still counts as not worn, and ChangeGear swaps it.
                 var wornIds = new HashSet<int>(LoadoutManager.CurrentGearIds());
-                if (objectiveChanged && ids.Length > 0 && ids.All(wornIds.Contains))
+                if (ids.Length > 0 && ids.All(wornIds.Contains) && !LoadoutManager.HasStrongerCopyToSwapIn(ids))
                 {
-                    _lastGearObjective = chainKey;   // verified: equipped gear IS optimal for the new objective
-                    LogGearDbg("HELD", () => gearLine("objective switch, but every item of its best set is already worn"));
+                    _lastGearObjective = chainKey;   // verified: equipped gear IS the best set
+                    LogGearDbg("HELD", () => gearLine(objectiveChanged
+                        ? "objective switch, but every item of its best set is already worn"
+                        : "cleared the bar, but ChangeGear has nothing to swap (every id worn; a stronger copy needs a free inventory slot)"));
                     return;
                 }
             }
@@ -1363,13 +1385,24 @@ namespace NGUAdvisor.Managers
                 ? $"Advisor: gear asserted for '{label}' (startup/reload — known-good loadout re-equipped)"
                 : objectiveChanged
                     ? $"Advisor: gear switched to '{label}' loadout (objective change)"
-                    : $"Advisor: re-optimized gear for '{label}' (+{(best.Score / cur - 1) * 100:0.#}% from new drops)");
+                    : $"Advisor: re-optimized gear for '{label}' ({StepGain(wornScores[decidingStep], bestScores[decidingStep])} {decidingName} from new drops)");
             LogGearDbg("EQUIP", () => gearLine(firstAssert
                 ? "startup/reload assert — bar not applied"
                 : objectiveChanged
                     ? "objective/chain switch — bar bypassed"
-                    : "cleared the 5% bar on the same objective"));
+                    : $"step {decidingStep} ({decidingName}) cleared the re-equip bar on the same objective"));
         }
+
+        // best/worn for the [GearDbg] line; "new" = the worn set scores nothing on that step.
+        private static string StepRatio(double worn, double best)
+            => worn > 0
+                ? (best / worn).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)
+                : best > 0 ? "new" : "n/a";
+
+        private static string StepGain(double worn, double best)
+            => worn > 0
+                ? "+" + ((best / worn - 1) * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%"
+                : "new";
 
         private static void ApplyWandoosOs(Character c)
         {

@@ -82,7 +82,7 @@ namespace NGUAdvisor.Tests
         }
 
         // Two different presets must not collapse onto the same key, or swapping between them would never
-        // clear AdvisorApply's 5% bar.
+        // clear AdvisorApply's re-equip bar.
         [Fact]
         public void Describe_GivesEveryPresetItsOwnKey()
         {
@@ -191,6 +191,47 @@ namespace NGUAdvisor.Tests
                          GearChain.Describe(GearChain.LootChain("Drop Chance")));
             Assert.Equal("Adventure(3) > Respawn(1) > Adventure(all)",
                          GearChain.Describe(GearChain.FindPreset("Adventure + Respawn").Priorities));
+        }
+
+        [Fact]
+        public void StepObjectives_SkipsUnresolvedStepsAndHonoursTheLengthCap()
+        {
+            var chain = new List<GearPriority> { Step("Respawn", 3), new GearPriority(), Step("NGUs", GearChain.Unlimited) };
+            Assert.Equal(new[] { "Respawn", "NGUs" }, GearChain.StepObjectives(chain).Select(o => o.Name));
+
+            var longChain = Enumerable.Range(0, GearChain.MaxPriorities + 2).Select(_ => Step("Power", 1)).ToList();
+            Assert.Equal(GearChain.MaxPriorities, GearChain.StepObjectives(longChain).Count);
+            Assert.Empty(GearChain.StepObjectives(null));
+        }
+
+        // User-reported 2026-10-01: under Respawn(3) > NGUs(all) the capped Respawn lead read x1 forever,
+        // so a +57 % NGU set was never equipped.
+        [Fact]
+        public void DecidingStep_ACappedLeadPassesTheVerdictToTheNextStep()
+        {
+            int step = GearChain.DecidingStep(new[] { 0.8, 1.0e6 }, new[] { 0.8, 1.57e6 }, 1.02, out bool improves);
+            Assert.Equal(1, step);
+            Assert.True(improves);
+        }
+
+        [Fact]
+        public void DecidingStep_TheFirstStepOutsideTheBarDecidesEitherWay()
+        {
+            Assert.Equal(0, GearChain.DecidingStep(new[] { 1.0, 1.0 }, new[] { 1.05, 0.5 }, 1.02, out bool leadImproves));
+            Assert.True(leadImproves);
+
+            Assert.Equal(1, GearChain.DecidingStep(new[] { 1.0, 1.0 }, new[] { 1.01, 0.9 }, 1.02, out bool tailImproves));
+            Assert.False(tailImproves);
+
+            Assert.Equal(-1, GearChain.DecidingStep(new[] { 1.0, 1.0 }, new[] { 1.019, 0.99 }, 1.02, out _));
+        }
+
+        [Fact]
+        public void DecidingStep_AStatNothingWornCarriesIsAnImprovementNotAZeroDivision()
+        {
+            Assert.Equal(1, GearChain.DecidingStep(new[] { 0.0, 0.0 }, new[] { 0.0, 0.3 }, 1.02, out bool improves));
+            Assert.True(improves);
+            Assert.Equal(-1, GearChain.DecidingStep(new[] { 0.0 }, new[] { 0.0 }, 1.02, out _));
         }
 
     }
