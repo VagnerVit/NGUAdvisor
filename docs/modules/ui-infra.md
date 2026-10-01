@@ -183,6 +183,10 @@ all 22 standing NumericUpDown findings at once. Deliberately probed rather than 
 same game-truth move as the chrome probe beside it. **`Num` is measured, so it follows the display** — do
 not replace it with a hardcoded point size.
 
+**A single-line `TextBox` has the identical clamp** (`TextBoxBase.PreferredHeight => Font.Height + 7`,
+forced by `SetBoundsCore` whenever it is not multiline), so `Height = SCtl(..)` on one is a no-op and the
+fix is the same font: `Font = UiTheme.Num` (BasicSettingsPanel `MkDouble`, audited `h=23 < 25` 2026-10-01).
+
 Known consequence of the font route: **bigger digits are WIDER** (`"9999"` 31px → 41px). Use
 `UiTheme.NumWidthFor(widest)` to size a spinner — it measures the string in `Num` and adds the exact
 `NumSideChrome` (the docked 16px spin button plus both borders, probed off the inner edit box, 20px

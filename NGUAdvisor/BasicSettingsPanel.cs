@@ -848,7 +848,9 @@ namespace NGUAdvisor
         {
             var l = new Label { Text = label, AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(x, y + UiTheme.S(4)) };
             Controls.Add(l);
-            var t = new TextBox { Width = UiTheme.S(90), Font = UiTheme.Ui, Location = new Point(x + UiTheme.S(104), y) };
+            // Mono pins a single-line TextBox to Font.Height + 7 (TextBoxBase.SetBoundsCore drops any Height),
+            // the spinner's clamp exactly, so the spinner font is what reaches the line height.
+            var t = new TextBox { Width = UiTheme.S(90), Font = UiTheme.Num, Location = new Point(x + UiTheme.S(104), y) };
             Reg(id, group, l, t);
             t.Leave += (s, e) =>
             {
