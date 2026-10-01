@@ -4,6 +4,14 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-10-01
+
+### Fixed
+
+- **Boost transform feeds Power again when the cube can't tell the stats apart.** 1.8 sent such
+  ties to Toughness whenever defense was further below the next titan bar, and the cube stopped
+  growing Power.
+
 ## [1.8] - 2026-10-01
 
 ### Added
