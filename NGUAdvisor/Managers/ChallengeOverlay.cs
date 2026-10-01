@@ -298,11 +298,16 @@ namespace NGUAdvisor.Managers
                     if (sword.Count > 0 && !_lscSwordOn)
                     {
                         _lscSwordOn = true;
-                        Record("Energy → laser sword first", "LSC: sword + upgrade to target, then the normal timeline");
+                        Record("Energy → laser sword after setup caps", "LSC: BT/TM/Wandoos caps first, then sword + upgrade to target, then the rest");
                     }
                     else if (sword.Count == 0) _lscSwordOn = false;
-                    var merged = new List<ResourceBreakpoint>(sword);
-                    foreach (var bp in baseList) if (!merged.Contains(bp)) merged.Add(bp);
+                    // User rule: LSC is a normal run — the base list's leading setup caps fill before the
+                    // sword; only what follows them (augs, AT, NGUs) waits for the sword to reach target.
+                    int setup = 0;
+                    while (setup < baseList.Count && IsLscSetupCap(baseList[setup])) setup++;
+                    var merged = new List<ResourceBreakpoint>(baseList.Take(setup));
+                    merged.AddRange(sword);
+                    foreach (var bp in baseList.Skip(setup)) if (!merged.Contains(bp)) merged.Add(bp);
                     return merged;
                 }
 
@@ -361,6 +366,9 @@ namespace NGUAdvisor.Managers
                 return valid;
             }
         }
+
+        private static bool IsLscSetupCap(ResourceBreakpoint bp) =>
+            bp is BasicTrainingBP || bp is TimeMachineBP || bp is WandoosBP;
 
         private static List<ResourceBreakpoint> ParsedList(string key, string[] tokens, ResourceType type)
         {
@@ -622,6 +630,9 @@ namespace NGUAdvisor.Managers
             var list = new List<string>();
             string seg = string.IsNullOrEmpty(Segment) ? "NGU MARATHON" : Segment;
 
+            // CAPALLBT leads every energy list: BT caps are fixed within a run (decomp Training — they
+            // only shrink at rebirth), but tiers unlock mid-run (previous tier at 5000×id) and a short
+            // hour-0 pool leaves partial caps. A segment without the token never tops either up.
             switch (seg)
             {
                 case "EVIL CLIMB":
@@ -645,7 +656,7 @@ namespace NGUAdvisor.Managers
                 case "TM HOUR":
                     // The guide's hour-0 shape (24hr profiles): cap the cheap BTs, fund TM, wandoos,
                     // rest to augs. NO AT here (user-reported: CAPALLAT was draining the TM hour) —
-                    // AT has its own hour, and BT energy persists once capped.
+                    // AT has its own hour.
                     if (e) list.Add("CAPALLBT");
                     list.Add("CAPTM:30");
                     list.Add("CAPWAN:30");
@@ -660,13 +671,14 @@ namespace NGUAdvisor.Managers
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;
                 case "AT HOUR":
-                    if (e) { list.Add("CAPALLAT"); list.Add("CAPWAN:30"); list.Add("BESTAUG"); }
+                    if (e) { list.Add("CAPALLBT"); list.Add("CAPALLAT"); list.Add("CAPWAN:30"); list.Add("BESTAUG"); }
                     else { list.Add("CAPTM:5"); list.Add("CAPWAN:30"); }
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;
                 default:
                     // NGU MARATHON — hot NGU lanes get their full equal shares (the old plain
                     // BESTAUG/CAPALLAT here stole equal shares from them; augs/AT have their hours).
+                    if (e) list.Add("CAPALLBT");
                     list.Add("CAPTM:5");
                     list.Add("CAPWAN:30");
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);

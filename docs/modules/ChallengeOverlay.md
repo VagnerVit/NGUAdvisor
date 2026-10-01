@@ -49,6 +49,12 @@ retires its own lane now (`WandoosAdvisor.DumpWorthwhile`), so `:30` is a ceilin
 `Templates` (NONGU/NOTM/NOAUG) and `Fallback` lists deliberately KEEP their original `:40`/`:60` —
 those are the cases where Wandoos genuinely is the power source.
 
+**`CAPALLBT` leads the energy list in EVERY segment** (user-reported 2026-09-29: the auto profile
+neglected Basic Training). BT caps are fixed within a run (decomp `Training` — they only shrink at
+rebirth), so the old "BT energy persists once capped" held for tiers capped at hour 0, but tiers that
+unlock later (previous tier at 5000×id) and caps left partial by a short hour-0 pool were never
+topped up once AT HOUR / NGU MARATHON took over.
+
 ## NGU candidates (D2)
 
 `ChapterNguIds`: ch.1 none (pre-NGU), ch.2 E{0,1}/M{0,3}, ch.3 E{4,6}/M{0}, **ch.4+ EVERY NGU**
@@ -88,7 +94,9 @@ overrule what a profile says. Two gates enforce it, and both are the fix for one
 - **LSC**: `SetLscAugTargets`/`RestoreLscAugTargets` inject sword-first aug targets; the target
   comes from the CONTROLLER's `laserSwordTarget()`, never
   `challenges.laserSwordChallenge.curCompletions + 2` (that field is the normal-difficulty
-  counter — same trap documented in LscAdvisor.md).
+  counter — same trap documented in LscAdvisor.md). **The sword goes AFTER the base list's leading
+  setup caps** (BT / TM / Wandoos, `IsLscSetupCap`), not at the head: LSC disables nothing, so it is a
+  normal run first (user rule 2026-09-29); only augs, AT and NGUs wait for the sword to reach target.
 - `Block()` reads completions from `Character.allChallenges` CONTROLLERS, never the serialized
   `Character.challenges` objects (`maxCompletions` there is `[NonSerialized]` and never assigned).
 
