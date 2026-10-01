@@ -4,6 +4,53 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8] - 2026-10-01
+
+### Added
+
+- **Reminder to harvest before a manual rebirth.** With auto rebirth off, the Yggdrasil panel
+  names the fruits that still hold unharvested tiers, which a rebirth would wipe. It turns red once
+  the profile's rebirth time is reached. It never harvests on its own.
+- **Gear section in the state export:** the active gear chain and its last verdict, every worn item
+  with level and remaining boosts, the cube, and where the advisor is farming.
+- The gear diagnostic shows each pick's level and what it would score at level 100.
+
+### Changed
+
+- **Gear is re-equipped when any step of its chain improves.** Before, only the first step
+  counted. With a capped Respawn lead, a better NGU accessory never went on until the chain
+  changed. The re-equip bar is also lower: 2 % instead of 5 %.
+- **Yggdrasil harvests fruits that mature together in one pass.** A due pass waits up to two
+  minutes for fruits that max inside that window, instead of paying a full gear, beard and digger
+  swap for each fruit separately.
+- **Yggdrasil swaps gear only when it raises the payout.** Each pass compares the game's own
+  payouts in the worn gear and in the Yggdrasil set.
+- **A manual profile that lists beards decides the beard set**, in its own order.
+- **Basic Training is capped in every auto-profile segment.** Tiers that unlock mid-run, and caps
+  the hour-0 pool left short, are now topped up.
+- **The LSC laser sword waits for the setup caps:** BT, TM and Wandoos fill first.
+- Debug channels log when a decision changes, not every minute. advisor.log marks each load with a
+  `[SESSION]` line. The money pit and daily spin log their verdict and state.
+
+### Fixed
+
+- **Empty main slots.** A set that picked only a helmet or boots (gold, Yggdrasil) left the other
+  main slots as they were. They now take the strongest Power item.
+- **A stronger copy of an item you are wearing is now put on.** The equipper only compared item
+  ids, so it never noticed the better copy.
+- **The NGU plan no longer flips during gold, titan or Yggdrasil swaps.** It used to re-solve on the
+  temporary gear, and the auto profile reallocated with every swap.
+- **Boost transform no longer always picks Power on a tie.** It now feeds the stat that is further
+  below what the next fight needs.
+- **Gold drop prediction after a gear restore.** It was 4× too low, which could make the advisor
+  skip a gold snipe that would have paid.
+- **Yggdrasil tiers include the tier-time quirk.** Before, MacGuffin β and QP fruit decisions could
+  read a tier too low.
+- A failed update check (no network at login) retries after a minute instead of six hours. The
+  rail says when checks keep failing.
+- The digger-cap field in Settings is tall enough for its text.
+- The titan gold message no longer claims a swap that cannot beat the banked gold re-banks it.
+
 ## [1.7] - 2026-09-25
 
 ### Added
