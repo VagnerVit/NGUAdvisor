@@ -79,7 +79,10 @@ order:
   one-shot at rebirth hit 0 gold and never retried — user-caught in a BASIC challenge on the
   Evil climb); with a manual profile, challenge mode returns null (profile owns the set).
 - `NGU MARATHON` segment gets a growth-multiplier-first order {4,5,11,6,7,8,1,0}.
-- Beards: one set for every mode — `{1 Drops, 5 Adv, 3 NGU, 0 Stats}`. Leftover slots are filled
+- Beards: **a manual profile that names beards owns the set** (`BeardBreakpoints.ActiveProfileBeards`,
+  profile order, Golden-gated, truncated to `capBeards`; user rule 2026-09-29 — ADVISOR had replaced
+  a 6-beard profile list with its 4). The Beards rec grades against the same `CurrentBeardSet`.
+  Without a profile list (or under AutoProfile): one set for every mode — `{1 Drops, 5 Adv, 3 NGU, 0 Stats}`. Leftover slots are filled
   ONLY into a resource pool the set does not use yet: `beardCountDivider()` divides growth by the
   count of active beards sharing a pool (`usesEnergy[]`), so only 0 → 1 in an EMPTY pool is free.
   The old "beards cost nothing, fill every slot" rule ignored the divider. Golden (6) needs Troll ≥ 7.

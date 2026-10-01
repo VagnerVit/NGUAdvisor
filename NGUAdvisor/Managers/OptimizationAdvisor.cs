@@ -239,7 +239,7 @@ namespace NGUAdvisor.Managers
             {
                 var active = ToIntList(c.beards.activeBeards);
                 int slots = Math.Max(1, c.allBeards.capBeards());
-                var recommended = RecommendedBeards().Where(b => b != 6 || GoldenUnlocked()).Take(slots).ToList();
+                var recommended = (CurrentBeardSet() ?? RecommendedBeards().Where(b => b != 6 || GoldenUnlocked()).Take(slots).ToArray()).ToList();
                 if (mode == "challenge")
                     list.Add(new Rec { System = "Beards", AutoKey = "beards", Text = "Set by the challenge block", Optimal = true });
                 else
@@ -1079,11 +1079,24 @@ namespace NGUAdvisor.Managers
             {
                 var c = Main.Character;
                 if (c == null) return null;
+                int slots = Math.Max(1, c.allBeards.capBeards());
+
+                // User rule (2026-09-29): a MANUAL profile that names beards owns the set, in its order.
+                // Same !AutoProfile guard as the digger pool, so a stale profile can't leak into AutoProfile.
+                int[] profileBeards = null;
+                if (Main.Settings != null && !Main.Settings.AutoProfile)
+                    profileBeards = AllocationProfiles.Breakpoints.BeardBreakpoints.ActiveProfileBeards();
+                if (profileBeards != null && profileBeards.Length > 0)
+                    return profileBeards
+                        .Where(b => b >= 0 && b <= Consts.MAX_BEARD_ID && (b != Consts.MAX_BEARD_ID || GoldenUnlocked()))
+                        .Distinct()
+                        .Take(slots)
+                        .ToArray();
+
                 string mode = Mode(ProgressionAnalyzer.Detect());
                 // Same as diggers: AutoProfile has no challenge-tagged beard breakpoints, so drive beards in
                 // challenges too (they cost nothing) rather than leaving the set to the profile's one-shot.
                 if (mode == "challenge" && !Main.Settings.AutoProfile) return null;
-                int slots = Math.Max(1, c.allBeards.capBeards());
                 var set = RecommendedBeards()
                     .Where(b => b != Consts.MAX_BEARD_ID || GoldenUnlocked())
                     .Take(slots)

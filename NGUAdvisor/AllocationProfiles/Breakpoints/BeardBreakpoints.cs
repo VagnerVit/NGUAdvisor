@@ -9,15 +9,28 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
     {
         private readonly DiggerBreakpoints diggerbp;
 
+        // The loaded profile's beard timeline, same contract as DiggerBreakpoints.Current.
+        public static BeardBreakpoints Current { get; private set; }
+
         public BeardBreakpoints(DiggerBreakpoints diggerbp) : base()
         {
             this.diggerbp = diggerbp;
+            Current = this;
         }
 
         public BeardBreakpoints(JSONNode bps, DiggerBreakpoints diggerbp) :
             base(bps, (bp) => bp["List"].AsArray.Children.Select(x => x.AsInt).Where(x => x <= 6).ToArray())
         {
             this.diggerbp = diggerbp;
+            Current = this;
+        }
+
+        // The profile's beard list for the current rebirth time / active challenge, or null when the
+        // profile names no beards — in which case the advisor generates its own set.
+        public static int[] ActiveProfileBeards()
+        {
+            try { return Current?.GetCurrentBreakpoint()?.priorities; }
+            catch { return null; }
         }
 
         protected override bool PerformSwap(Breakpoint bp)
