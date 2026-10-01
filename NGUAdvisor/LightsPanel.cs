@@ -166,10 +166,10 @@ namespace NGUAdvisor
                 var plan = NGUAdvisors.Compute(
                     ChallengeOverlay.ChapterNguIds(ResourceType.Energy),
                     ChallengeOverlay.ChapterNguIds(ResourceType.Magic));
-                // "Hot" = a RUNNING lane clears 1.05x/hr at its actual share (non-target entries
-                // carry the full-pool rating, which would read hot always).
-                bool hot = plan.Energy.Where(x => plan.EnergyTargets.Contains(x.Id)).Any(x => x.Ratio >= 1.05)
-                        || plan.Magic.Where(x => plan.MagicTargets.Contains(x.Id)).Any(x => x.Ratio >= 1.05);
+                // "Hot" = a RUNNING lane still clears the plan's exit ratio at its actual share (non-target
+                // entries carry the full-pool rating, which would read hot always).
+                bool hot = plan.Energy.Where(x => plan.EnergyTargets.Contains(x.Id)).Any(x => x.Ratio >= NGUAdvisors.HotExitRatio)
+                        || plan.Magic.Where(x => plan.MagicTargets.Contains(x.Id)).Any(x => x.Ratio >= NGUAdvisors.HotExitRatio);
                 Set(3, plan.Known ? (hot ? G : Y) : N,
                     plan.Known ? $"{plan.EnergyTargets.Length}E/{plan.MagicTargets.Length}M {(hot ? "hot" : "deep")}" : "—");
             }

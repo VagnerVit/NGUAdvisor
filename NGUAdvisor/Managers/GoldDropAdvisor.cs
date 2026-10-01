@@ -31,19 +31,25 @@ namespace NGUAdvisor.Managers
         // an auto-kill happens either way, so its gear swap is free.
         public const double RebankMargin = 1.25;
 
+        private const double GearFactorTtlSeconds = 120;
         private static double _gearFactor = 1.0;
         private static DateTime _gearFactorAt = DateTime.MinValue;
+        private static string _gearFactorWorn;
 
         // What swapping to the gold set does to the drop. `totalGoldbonus()` multiplies exactly one
         // gear-dependent factor — (1 + bonuses[GoldDropAmount] + bonuses[GoldDrop2] + cubeGoldBonus())
         // (decomp Character.totalGoldbonus) — and a single-stat "Gold Drops" score IS that factor
         // (rawTotal/100, cube included), so the ratio of the optimizer's best score to the worn one is
         // the multiplier the swap will apply. Cached: Optimize walks the whole inventory.
+        // Keyed on the worn set: callers multiply it by the WORN totalGoldbonus(), so a factor measured
+        // in the gold set (1.0) and applied after the restore under-predicts by the whole swap.
         public static double GoldGearFactor()
         {
-            if ((DateTime.UtcNow - _gearFactorAt).TotalSeconds < 120)
+            string wornSet = string.Join(",", LoadoutManager.CurrentGearIds());
+            if (wornSet == _gearFactorWorn && (DateTime.UtcNow - _gearFactorAt).TotalSeconds < GearFactorTtlSeconds)
                 return _gearFactor;
             _gearFactorAt = DateTime.UtcNow;
+            _gearFactorWorn = wornSet;
 
             try
             {

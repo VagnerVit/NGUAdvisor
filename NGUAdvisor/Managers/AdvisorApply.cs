@@ -496,7 +496,8 @@ namespace NGUAdvisor.Managers
                 var banked = Main.Settings.TitanGoldVersionBanked;
                 if (banked != null && best < banked.Length) akVer = banked[best];
                 string why = akVer > 0 && akVer < ver ? $"AK version rose to v{ver}" : "the kill is free";
-                Main.Log($"Advisor: re-banking gold on the next Titan {best + 1} kill ({why}; ~{NumberFormatter.Abbrev(predicted)} vs {NumberFormatter.Abbrev(bank)} banked)");
+                string versusBank = predicted > bank ? "would beat" : "cannot beat";
+                Main.Log($"Advisor: swapping gold gear for the next Titan {best + 1} kill ({why}; ~{NumberFormatter.Abbrev(predicted)} {versusBank} {NumberFormatter.Abbrev(bank)} banked)");
             }
 
             var targets = new bool[ZoneHelpers.TitanZones.Length];

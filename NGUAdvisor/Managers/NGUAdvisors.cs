@@ -18,7 +18,8 @@ namespace NGUAdvisor.Managers
     //               drops out at the floor.
     //
     // Selection: iterative equal-share prune. Split the pool over the kept set, drop NGUs whose
-    // ratio at their ACTUAL share is under 1.05x/hr, re-split (survivors' shares grow), repeat.
+    // ratio at their ACTUAL share is under 1.05x/hr (1.04 for a lane already in the plan),
+    // re-split (survivors' shares grow), repeat.
     // The survivors are the lanes worth running; nothing hot -> deepen the top two by rating.
     public static class NGUAdvisors
     {
@@ -60,8 +61,25 @@ namespace NGUAdvisor.Managers
         public static readonly string[] ENames = { "Augs", "Wandoos", "Respawn", "Gold", "Adv-α", "Power-α", "DropCh", "Magic", "PP" };
         public static readonly string[] MNames = { "Ygg", "EXP", "Power-β", "Number", "TM", "Energy", "Adv-β" };
 
+        private const double CacheSeconds = 30;
         private static Plan _cache;
         private static DateTime _cacheAt = DateTime.MinValue;
+        private static bool _cacheOnTempGear;
+
+        // The last plan solved on the gear the run KEEPS. Every input here (cap pool, energy/magic
+        // power) moves with the worn set, so a plan solved inside a gold/titan/quest swap describes
+        // gear that comes off in a minute — and its lanes flipped with every swap.
+        private static Plan _keptPlan;
+        private static double _keptRunSeconds;
+        private static DateTime _keptAt = DateTime.MinValue;
+        // Gold/titan/Ygg swaps last a minute; a manual quest lock can hold its gear for hours, and a
+        // plan frozen that long stops tracking the run's growth.
+        private const double KeptPlanMaxAgeSeconds = 600;
+
+        // A lane joins the hot set at HotEnterRatio but leaves only below HotExitRatio — it must lose a
+        // fifth of its growth, not a rounding error, so a wobbling pool does not flip it between calls.
+        private const double HotEnterRatio = 1.05;
+        internal const double HotExitRatio = 1.04;
 
         private static double Mul(Func<double> f)
         {
@@ -175,7 +193,14 @@ namespace NGUAdvisor.Managers
 
         public static Plan Compute(int[] energyCandidates, int[] magicCandidates)
         {
-            if (_cache != null && (DateTime.UtcNow - _cacheAt).TotalSeconds < 30) return _cache;
+            bool tempGear = LevelPlanner.TempLoadoutWorn();
+            double runSeconds = RunSeconds();
+            // A rebirth resets the levels the kept plan was ranked on.
+            Plan prev = runSeconds >= _keptRunSeconds ? _keptPlan : null;
+            if (tempGear && prev != null && (DateTime.UtcNow - _keptAt).TotalSeconds < KeptPlanMaxAgeSeconds) return prev;
+            if (_cache != null && _cacheOnTempGear == tempGear && (DateTime.UtcNow - _cacheAt).TotalSeconds < CacheSeconds)
+                return _cache;
+            if (prev == null) prev = _cache;
             var p = new Plan();
             try
             {
@@ -196,8 +221,8 @@ namespace NGUAdvisor.Managers
                 Build(c, energyCandidates, false, ePool, p.Energy);
                 Build(c, magicCandidates, true, mPool, p.Magic);
 
-                p.EnergyTargets = Pick(c, p.Energy, false, ePool);
-                p.MagicTargets = Pick(c, p.Magic, true, mPool);
+                p.EnergyTargets = Pick(c, p.Energy, false, ePool, prev?.EnergyTargets);
+                p.MagicTargets = Pick(c, p.Magic, true, mPool, prev?.MagicTargets);
                 p.EnergySurplus = Surplus(p.Energy, p.EnergyTargets);
                 p.MagicSurplus = Surplus(p.Magic, p.MagicTargets);
 
@@ -212,7 +237,20 @@ namespace NGUAdvisor.Managers
             catch (Exception e) { Main.LogDebug($"NGUAdvisors: {e.Message}"); }
             _cache = p;
             _cacheAt = DateTime.UtcNow;
+            _cacheOnTempGear = tempGear;
+            if (!tempGear && p.Known)
+            {
+                _keptPlan = p;
+                _keptRunSeconds = runSeconds;
+                _keptAt = DateTime.UtcNow;
+            }
             return p;
+        }
+
+        private static double RunSeconds()
+        {
+            try { return Main.Character.rebirthTime.totalseconds; }
+            catch { return 0; }
         }
 
         private static void Build(Character c, int[] cands, bool magic, double pool, List<Entry> into)
@@ -254,11 +292,13 @@ namespace NGUAdvisor.Managers
                 .OrderByDescending(x => x.Rating).Select(x => x.Id).ToArray();
 
         // Equal-share prune to a stable hot set: each pass splits the pool over the keepers and
-        // drops anyone under 1.05x/hr AT THAT SHARE — survivors' shares grow, so the loop is
+        // drops anyone under its threshold AT THAT SHARE — survivors' shares grow, so the loop is
         // monotone and terminates. Prune-only by design (re-admitting on the larger share would
-        // oscillate). Nothing hot: deepen the top two by rating.
-        private static int[] Pick(Character c, List<Entry> list, bool magic, double pool)
+        // oscillate). Nothing hot: deepen the top two by rating. `incumbents` = the previous plan's
+        // lanes, which get the lower exit threshold.
+        private static int[] Pick(Character c, List<Entry> list, bool magic, double pool, int[] incumbents)
         {
+            double Threshold(Entry e) => incumbents != null && incumbents.Contains(e.Id) ? HotExitRatio : HotEnterRatio;
             if (list.Count == 0) return new int[0];
             var keep = new List<Entry>(list);
             for (int iter = 0; iter < 12 && keep.Count > 0; iter++)
@@ -269,7 +309,7 @@ namespace NGUAdvisor.Managers
                     e.Lph = e.LphPerUnit * share;
                     e.Ratio = ValueRatio(c, magic, e.Id, e.Level, e.Lph);
                 }
-                var hot = keep.Where(x => x.Ratio >= 1.05).ToList();
+                var hot = keep.Where(x => x.Ratio >= Threshold(x)).ToList();
                 if (hot.Count == keep.Count) break;
                 if (hot.Count == 0)
                 {

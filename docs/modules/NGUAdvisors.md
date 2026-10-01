@@ -34,11 +34,29 @@ The gap between this plan and the profile is REPORTED instead (`Diagnose` → Gr
 Closing it for real needs a value-per-unit arbiter across sinks, which the advisor does not have.
 
 Split the pool equally over the kept set; drop lanes whose ratio at their ACTUAL share is under
-**1.05×/hr**; re-split (survivors' shares grow); repeat (≤ 12 iters, monotone → terminates).
+their threshold; re-split (survivors' shares grow); repeat (≤ 12 iters, monotone → terminates).
 Prune-only BY DESIGN — re-admitting on the larger share would oscillate. Nothing hot → deepen the
 top two by rating. `Surplus` = positive-value lanes (> 1.0001) outside the hot set — the game
 hard-caps every NGU at ONE level per tick, so a hot lane can't absorb extra pool; leftovers
 belong in MORE lanes, not deeper ones.
+
+**Thresholds have hysteresis across calls**: a lane enters at `HotEnterRatio = 1.05×/hr` and a lane
+already in the previous plan leaves only below `HotExitRatio = 1.04×/hr` (it must lose a fifth of its
+growth, not a rounding error). Within one call each lane's threshold is fixed, so the prune stays
+monotone; across calls the band is what keeps "no oscillation" true when the pool wobbles. The
+incumbents are the last kept-loadout plan of this run, else the last cached plan.
+
+**Held while a temp loadout is worn** (`LevelPlanner.TempLoadoutWorn()` — `!CanSwap() || HasQuestLock()`,
+the same gate LevelPlanner uses for the Wandoos stop). The pool (`curEnergy`/`curMagic`) and
+`totalEnergyPower()`/`totalMagicPower()` all move with the worn set, so a plan solved inside a
+gold/titan/quest swap describes gear that comes off in a minute. Reported 2026-10-01: `[ProfileDbg]`
+flipped 4/6 ↔ 2/4 lanes exactly while gold/titan swaps were worn. While one is worn `Compute` returns
+the last plan solved on the kept loadout, regardless of the 30 s TTL; a plan from before the current
+rebirth (`rebirthTime.totalseconds` went backwards) is not served, nor one older than
+`KeptPlanMaxAgeSeconds` (10 min) — a manual quest lock can hold its gear for hours, and a plan frozen
+that long stops tracking growth. `LightsPanel`'s "hot" light reads `HotExitRatio`, the bar a running
+lane is actually held to. With no kept plan yet it computes
+as before, and a cache built on temp gear is never served once the kept gear is back.
 
 Cached 30 s. Candidates come from `ChallengeOverlay.ChapterNguIds(resource)`. Consumers:
 allocation (auto profile NGU targets), OptimizationAdvisor's NGUs row, GrowthPanel (Lph = the

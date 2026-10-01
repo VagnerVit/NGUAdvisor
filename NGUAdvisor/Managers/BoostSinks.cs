@@ -178,8 +178,7 @@ namespace NGUAdvisor.Managers
             if (best > 0.0)
             {
                 if (best == gear[2]) return TypeSpecial;
-                if (best == gear[0]) return TypePower;
-                return TypeToughness;
+                return PowerOrToughness(gear[0], gear[1]);
             }
 
             // Gear is saturated: the cube is the only sink left, and it takes just P and T.
@@ -188,7 +187,35 @@ namespace NGUAdvisor.Managers
             double cubePower = BoostValueMath.CubeGain(s.CubePowerRaw, s.CubePowerSoftcap, top);
             double cubeToughness = BoostValueMath.CubeGain(s.CubeToughnessRaw, s.CubeToughnessSoftcap, top);
             if (cubePower <= 0.0 && cubeToughness <= 0.0) return TypeNone;
-            return cubeToughness > cubePower ? TypeToughness : TypePower;
+            return PowerOrToughness(cubePower, cubeToughness);
+        }
+
+        // Below its softcap the cube takes every boost at full value, so P and T price EXACTLY equal
+        // and the sinks have no opinion. The stat further below the next titan objective does: live
+        // case (2026-10-01) cube P grew 413K -> 4.7M while T sat at 46.7K and Toughness was the stat
+        // short of the kill bar. Only an exact tie is broken; a real price difference still decides.
+        private static int PowerOrToughness(double power, double toughness)
+        {
+            if (power != toughness) return toughness > power ? TypeToughness : TypePower;
+            return ObjectiveShortStat() == BoostValueMath.ShortStat.Defense ? TypeToughness : TypePower;
+        }
+
+        // Live stats, not the projected best set: this is also read from the WinForms thread (Boosts
+        // panel), where an optimizer refresh must not run.
+        private static BoostValueMath.ShortStat ObjectiveShortStat()
+        {
+            try
+            {
+                OptimizationAdvisor.TitanObjective o = OptimizationAdvisor.NextObjective();
+                if (!o.Known) return BoostValueMath.ShortStat.None;
+                Character c = Main.Character;
+                return BoostValueMath.ShorterStat(o.ReqAttack, o.ReqDefense, c.totalAdvAttack(), c.totalAdvDefense());
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"BoostSinks objective: {e.Message}");
+                return BoostValueMath.ShortStat.None;
+            }
         }
 
         // Boost items are ids 1-39: 13 value tiers per type, Power then Toughness then Special

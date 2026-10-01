@@ -719,15 +719,36 @@ namespace NGUAdvisor.Managers
             var tokens = AutoTokens(type);
             if (tokens.Length == 0) return new List<ResourceBreakpoint>();
             // The NGU picks vary with live value math — the token list itself is the cache key.
-            string key = $"auto|{Segment}|{Chapter()}|{type}|{string.Join(",", tokens)}";
+            string context = $"auto|{Segment}|{Chapter()}|{type}|";
+            string key = context + string.Join(",", tokens);
             if (_templateParsed.Count > 64) _templateParsed.Clear();   // bound the variant cache
             var list = ParsedList(key, tokens, type);
             if (list.Count > 0 && (!_lastGenKey.TryGetValue(type, out var last) || last != key))
             {
                 _lastGenKey[type] = key;
-                Record($"{type} → auto profile", AutoStatus());
+                // Same segment and chapter: only the lanes moved, so say WHICH. A reorder with the same
+                // set is a rating wobble, not news — it re-logged the whole status once a minute.
+                if (last != null && last.StartsWith(context, StringComparison.Ordinal)
+                    && _lastGenTokens.TryGetValue(type, out var before))
+                {
+                    string diff = TokenDiff(before, tokens);
+                    if (diff.Length > 0) Record($"{type} → auto profile", diff);
+                }
+                else
+                    Record($"{type} → auto profile", AutoStatus());
+                _lastGenTokens[type] = tokens;
             }
             return list;
+        }
+
+        private static readonly Dictionary<ResourceType, string[]> _lastGenTokens = new Dictionary<ResourceType, string[]>();
+
+        // "+NGU-4, −NGU-1": what joined and what left, ignoring order.
+        private static string TokenDiff(string[] before, string[] after)
+        {
+            var parts = after.Where(t => !before.Contains(t)).Select(t => "+" + t)
+                .Concat(before.Where(t => !after.Contains(t)).Select(t => "−" + t));
+            return string.Join(", ", parts.ToArray());
         }
 
         // ---- Block model: every challenge with live completions, in game-menu order. ----

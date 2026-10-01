@@ -273,7 +273,7 @@ namespace NGUAdvisor.Managers
         // quest gear IS equipped then (AdvisorApply.ApplyGearRefresh says the same), so both terms are
         // needed. Only the gear-dependent solves care: Block's stop is a pure game-formula solve on
         // block.levelFactor and reads no gear at all, so it keeps running through locks.
-        private static bool TempLoadoutWorn() => !LockManager.CanSwap() || LockManager.HasQuestLock();
+        internal static bool TempLoadoutWorn() => !LockManager.CanSwap() || LockManager.HasQuestLock();
 
         private static void ApplyPurpose(long[] targets, int slot, long stop)
         {

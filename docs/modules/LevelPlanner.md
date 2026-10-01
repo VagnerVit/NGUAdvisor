@@ -24,7 +24,8 @@ snapshotted targets.
   (`long.MinValue`) — and `[CapDbg]` reports `wanCaps=held (<lock> loadout worn)` with
   `stop=tempgear` rather than printing a number solved from gear we are not keeping. Do not "restore"
   the ungated calls: they look harmless because they self-correct next tick, but only *after* the
-  restore, and the marathon spends AT against them meanwhile. **Segment-gated**: NGU MARATHON +
+  restore, and the marathon spends AT against them meanwhile. `TempLoadoutWorn()` is `internal`
+  because `NGUAdvisors.Compute` holds its lane plan on the same gate. **Segment-gated**: NGU MARATHON +
   (Evil) EVIL CLIMB / AUGMENTATION — NOT AT HOUR (its weaker caps inflate targets and steal AT
   from P/T — user-caught). Extending to the Evil climb fixed a stale −1: the marathon never runs
   during the climb, so Wandoos ATs kept the Normal-era pause and never boosted E/M Wandoos

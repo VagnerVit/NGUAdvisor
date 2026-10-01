@@ -42,6 +42,12 @@ titan zones and the titan-beats-zone ordering.
   `Optimize("Gold Drops").Score / CurrentScore("Gold Drops")` is the multiplier. Cached 120 s
   (`Optimize` walks the inventory); it falls back to 1.0 on any failure, which UNDER-states the drop
   and can only leave a snipe armed.
+- **The cache is keyed on the worn set** (`LoadoutManager.CurrentGearIds()` in slot order) as well as
+  the TTL. The factor is a best/WORN ratio and `PredictedDrop` multiplies it by the WORN
+  `totalGoldbonus()`, so both halves must describe the same set. Live case (2026-10-01): measured while
+  the gold set was worn (factor 1) and applied after the restore, it predicted 633B instead of 2.69T —
+  exactly the 4.25× the swap is worth (`[TitanGoldDbg] … pred=633B … gearx=1 … lock=Default`,
+  `[GoldSnipeDbg] SKIP zone=20 pred=569B vsBank=-95.5%`). Any swap or restore now re-measures.
 
 ## Decisions
 
@@ -63,6 +69,10 @@ produce false negatives, and it did: a titan that had already banked once stayed
 rest of the run. The `TitanMoneyDone` latch therefore no longer gates targeting either — it records
 that a bank was collected (for `ZoneHelpers`' kill detection) and `ApplyTitanGold` re-arms it for the
 next spawn. Every AK cycle is another shot at a bigger drop as the gold bonus grows.
+
+The re-arm line says which case it is — "~2.69T would beat 12.7T banked" vs "cannot beat" — because
+the old "re-banking gold … (~633B vs 12.7T banked)" read as a promise to raise a bank the drop could
+not reach. The swap happens either way; only the wording follows the prediction.
 
 ## Ranking, not height (`AdvisorApply.BestGoldTitan`)
 

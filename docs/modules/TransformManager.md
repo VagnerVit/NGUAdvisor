@@ -105,9 +105,14 @@ every channel's headroom delivers its full value whatever its type, so lower tie
 and the pick would be arbitrary. Only overflow — which the game DESTROYS — reveals which sink still
 has room. `TypeNone` therefore comes back only when nothing can absorb a boost at all; the cube is a
 soft sink that never saturates, so while it is usable Power or Toughness always beats None.
+Because the cube prices P and T identically below its softcap, an exact P/T tie is broken by the stat
+further below the next titan objective (ZoneCadence.md, "`BestType` P/T tie-break"), not by branch order.
 
 Written at most every 5 s from `Tick()`, and only when the value actually differs, followed by
 `updateTransformToggles()` so the game's own buttons match.
+
+`[BoostTypeDbg]` (debug.log) is throttled to 60 s and written only when mode, pick, locked type or
+cube-usable changes; the scores, headroom and raw cube values on the line drift and are not in the key.
 
 `ChainItem(id)` is the membership test `InventoryAdvisor` uses to exempt chain tiers from TRASH.
 `Tick()` is driven from `AdvisorApply` (always, unthrottled by the toggle — the per-chain settings
