@@ -487,6 +487,11 @@ namespace NGUAdvisor
                     .OrderBy(x => x.UnlockCost).FirstOrDefault();
                 if (buy != null)
                     advice += $" · Unlock {buy.Name} ({buy.UnlockCost} seeds).";
+                bool rebirthDue = false;
+                string reminder = YggdrasilManager.RebirthHarvestReminder(out rebirthDue);
+                if (reminder != null)
+                    advice = $"{reminder} · {advice}";
+                _advice.ForeColor = rebirthDue ? UiTheme.Danger : UiTheme.Muted;
                 UiLayout.FitOrGrow(_advice, advice);   // last element on the panel — free to wrap
             }
             catch (Exception ex) { LogDebug($"Ygg panel: {ex.Message}"); }

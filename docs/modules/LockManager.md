@@ -44,6 +44,11 @@ again while its own lock is held and the condition has passed.
   re-tested against the AK thresholds (`ZoneHelpers.GoldTargetLosingAutokill()`, live stats): losing
   the autokill puts the titan set straight back and denies that titan's gold swap for 30 minutes —
   see GoldDropAdvisor.md.
+- **Yggdrasil** (`TryYggdrasilSwap`): the gear comes from `YggdrasilManager.SwapGearForPass(forced)`
+  — null means no gear swap (beards/diggers still follow their own toggles). It runs inside the
+  acquire `try`, so a throw there is cleaned up like any other. `YggdrasilGearSwapped` records the
+  outcome for the harvest log header. `NeedsHarvest()` may defer an unforced pass (companion
+  deferral, YggdrasilManager.md); that only ever happens before acquisition.
 - **Gold** (`TryGoldDropSwap`): on restore with `ManageGoldLoadouts` sets
   `Settings.GoldSnipeComplete = true` — the one-shot gold snipe latch other modules read.
 - After `RestoreGear()` the restored set predates the lock and may be stale —

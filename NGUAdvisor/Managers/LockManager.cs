@@ -35,6 +35,9 @@ namespace NGUAdvisor.Managers
 
         public static bool HasCookingLock() => currentLock == LockType.Cooking;
 
+        // Whether the current Yggdrasil pass put the Yggdrasil set on (read by the harvest log header).
+        public static bool YggdrasilGearSwapped { get; private set; }
+
         public static bool CanSwap() => currentLock == LockType.None || HasQuestLock();
 
         private static void AcquireLock(LockType newLock)
@@ -235,12 +238,15 @@ namespace NGUAdvisor.Managers
 
                     try
                     {
+                        YggdrasilGearSwapped = false;
                         SaveConfiguration();
 
-                        if (Settings.SwapYggdrasilLoadouts && (forced || YggdrasilManager.NeedsSwap()))
+                        var gear = YggdrasilManager.SwapGearForPass(forced, quiet: false);
+                        if (gear != null)
                         {
                             Log("Switching to Yggdrasil configuration");
-                            LoadoutManager.ChangeGear(GearOptimizer.ResolveModeGear(Settings.YggdrasilObjective, Settings.YggdrasilObjectiveRespawn, Settings.YggdrasilLoadout));
+                            LoadoutManager.ChangeGear(gear);
+                            YggdrasilGearSwapped = true;
                         }
                         else
                         {
