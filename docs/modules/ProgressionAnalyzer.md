@@ -7,9 +7,18 @@ intentionally diverge — never substitute one for the other (full contrast in S
 
 ## Chapter logic
 
-Sadistic → 8. Evil: T8 beaten → 7, T7 beaten → 6, else 5. Normal: T6 beaten → 4, boss ≥ 100 → 3,
+Sadistic → 8. Evil: T9 beaten → 7, T8 beaten → 6, else 5. Normal: T6 beaten → 4, boss ≥ 100 → 3,
 ≥ 58 → 2, else 1. Titan-beaten reads: T5–T12 (idx 4–11) all via the all-time
 `boss{N}Kills >= 1` counter (`ZoneHelpers.TitanKills`); T1–T4 inferred from boss thresholds.
+
+**The Evil chapters are the guide's (fixed 2026-10-02).** They used to open one titan early (ch6 on
+the T7 kill, ch7 on T8), while the guide opens ch6 with "Congrats on defeating The Godmother" (T8)
+and ch7 with "Congrats on defeating The Exile" (T9) — ch5 Evil-IDP covers both the T7 and the T8
+push. Every consumer reads the number as a GUIDE chapter (SpendPlanner's plans, GuideGear's keep
+horizons, ExpRatioTables' 4:150k:1 switch, which the guide makes in ch7), so the early start bought
+ch6 perks, trashed ch5 keeps and changed the EXP ratio a whole titan too soon. `MilestoneGoal`'s ch5
+branches (T7 → B166 → Kill T8) were unreachable under the old mapping and are live now; ch6 reads
+"R3 → kill T9" as a kill goal, the same push mode the T8–T9 stretch had before.
 
 ### `GoalIsKill`, not a text match on `NextGoal` (2026-09-16)
 

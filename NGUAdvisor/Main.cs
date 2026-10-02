@@ -475,6 +475,7 @@ namespace NGUAdvisor
                 Managers.CompatibilityGate.Initialize(_dir);
 
                 SeedBoostPriorityOnce();
+                Managers.SpendPlanner.ValidatePlans();
 
                 ZoneStatHelper.CreateOverrides(_dir);
 

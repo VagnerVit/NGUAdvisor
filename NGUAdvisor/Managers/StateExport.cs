@@ -109,7 +109,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "GEAR", () => Gear(sb, c));
             Section(sb, "DIGGERS", () => Diggers(sb, c));
             Section(sb, "BEARDS", () => Beards(sb, c));
-            Section(sb, "ITOPOD PERKS (owned)", () => Perks(sb, c));
+            Section(sb, "ITOPOD PERKS", () => Perks(sb, c));
             Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
             return sb.ToString();
@@ -406,15 +406,32 @@ namespace NGUAdvisor.Managers
         }
 
         // THE NAMES ARE THE POINT. perkName lives in the scene; a save reader can only ever print ids.
+        // EVERY perk, for the same reason as Quirks below; the description is scene data too and is the
+        // only in-process statement of what a perk actually does.
         private static void Perks(StringBuilder sb, Character c)
         {
             var ipc = c.adventureController.itopod;
             var levels = c.adventure.itopod.perkLevel;
             for (int id = 0; id < levels.Count && id < ipc.perkName.Count; id++)
             {
-                if (levels[id] <= 0) continue;
                 long max = id < ipc.maxLevel.Count ? ipc.maxLevel[id] : 0;
-                sb.AppendLine($"  {ipc.perkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}");
+                string cost = "";
+                try { cost = $" · {NumberFormatter.Abbrev(ipc.perkCost(id))} PP"; } catch { }
+                string req = "";
+                try
+                {
+                    if (id < ipc.perkDifficultyReq.Count && ipc.perkDifficultyReq[id] > difficulty.normal)
+                        req = $" · needs {ipc.perkDifficultyReq[id]}";
+                }
+                catch { }
+                string desc = "";
+                try
+                {
+                    if (id < ipc.perkDesc.Count && !string.IsNullOrEmpty(ipc.perkDesc[id]))
+                        desc = " · " + ipc.perkDesc[id].Replace("\r", " ").Replace("\n", " ").Trim();
+                }
+                catch { }
+                sb.AppendLine($"  [{id}] {ipc.perkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}{desc}");
             }
         }
 
@@ -438,7 +455,14 @@ namespace NGUAdvisor.Managers
                         req = $" · needs {qc.quirkDifficultyReq[id]}";
                 }
                 catch { }
-                sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}");
+                string desc = "";
+                try
+                {
+                    if (id < qc.quirkDesc.Count && !string.IsNullOrEmpty(qc.quirkDesc[id]))
+                        desc = " · " + qc.quirkDesc[id].Replace("\r", " ").Replace("\n", " ").Trim();
+                }
+                catch { }
+                sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}{desc}");
             }
         }
 
@@ -448,10 +472,7 @@ namespace NGUAdvisor.Managers
             var fruits = c.yggdrasil.fruits;
             int cap = ycon.capTier();
             for (int id = 0; id < fruits.Count && id < ycon.fruitName.Count; id++)
-            {
-                if (fruits[id].maxTier <= 0) continue;
-                sb.AppendLine($"  {ycon.fruitName[id]?.Trim()} — tier {fruits[id].maxTier}");
-            }
+                sb.AppendLine($"  [{id}] {ycon.fruitName[id]?.Trim()} — tier {fruits[id].maxTier}");
             sb.AppendLine($"  tier cap      {cap}");
         }
     }

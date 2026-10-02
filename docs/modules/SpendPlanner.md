@@ -56,6 +56,16 @@ while the guide still had buys queued (user-reported).
   plan — there is no perk boss-req field to guard on, so a still-locked one must never stall
   earlier steps.
 - Quirk name id 6 carries a trailing space in game data — hence the `?.Trim()`.
+- **Every step must be quotable from the guide (user-reported 2026-10-02).** The ch4 block once
+  carried More Inventory Space I/II, Bonus Boss EXP and TM Level Banks I/II — none of them in any
+  guide perk order — ahead of BB2, while ICB and the whole Evil-prep set were missing; auto-buy spent
+  PP on inventory slots a fully automated run never uses. Wandoos Lover is the one guide step left
+  out on purpose (the run feeds no Wandoos). Guide shorthand → live name: "Adventure Perk" =
+  Adventure Boost For Rich Perks I (guide ch6 numbers it 55; III costs 100× for half the effect),
+  "NGU 2" = Faster NGU Energy/Magic II, "Adventure Quirk" = Adventure Boost For Rich Quirks I.
+- `CanUnlockFruit` mirrors `FruitController.upgrade()`: Rage needs `itopodOn`, MacGuffin **α** (not β)
+  needs achievement 145, Quirks needs `beastOn`, the six mayo fruits need `cardsOn`, and Numbers is
+  never unlockable with seeds (`upgrade()` refuses it at tier 0; Troll Challenge #5 grants it).
 
 ## Buy execution mirrors the game's own click path (verified vs Assembly-CSharp)
 
@@ -64,10 +74,28 @@ while the guide still had buys queued (user-reported).
 changePage) are skipped — they carry no game state; no achievement/unlock hooks exist in that
 path. `BuyFruitTier` mirrors `FruitController.upgrade()`: deduct seeds + `maxTier++` — that game
 method has NO doEffect at all. Fruit cost = `baseSeedCost × ceil((tier+1)²)`; special-fruit
-unlock gates: Numbers = Troll ≥ 5, Rage = itopodOn, MacGuffin = achievement 145.
+unlock gates as listed above.
 
-Evil+ plan entries are intentionally partial — guide names need in-game verification when the
-user reaches those chapters (ch5 perk names verified vs Blaze Rkkz).
+The plans cover guide ch2-8. Every step name was resolved against the live catalog on 2026-10-02
+(state export: ITOPOD PERKS, BEAST QUIRKS and YGGDRASIL FRUITS list every entry with its index), and
+the guide's numbered ch6/ch8 entries resolve to exactly the indices it prints.
+
+- **`UntilChapter` closes a step.** Steps are sequential, so an open-ended "X until T8" (a
+  1000-level perk) would hold every later chapter behind it. A closed step is skipped by the buy
+  path AND by the planned-buy path. Ch7's "generally good" generics close at 7 so they never hold
+  up the 500k PP Welcome-to-Sadistic perk.
+- **`Nth` picks a duplicate name.** "Another MacGuffin Slot!" is perk 67 (5K) and 88 (40K); the plain
+  matcher returns the first exact match, so the 40K step needs `Nth = 2`.
+- **`WaitWhenShort` lets a quirk step not bank.** The ch6 Beast NGU Quirk (15k QP) banks QP only
+  without the Extended Quest Bank (ownership asked of `ApPurchaseAdvisor.Owned`); with it, the guide
+  gets the 15k as banked Majors after HD1, so the plan passes over it until it is affordable. A
+  failed ownership read reads "not owned" and banks — the guide's default path.
+- **`ValidatePlans()` runs once at load** (`Main.Start`) and logs `plan names checked — N steps, M
+  unresolved`, with one line per miss. Read it after any plan edit: a misnamed step is otherwise
+  silent until the run reaches it.
+- The chapter numbers are the guide's: ch6 opens on the T8 kill, ch7 on T9 (ProgressionAnalyzer.md).
+- Left out on purpose: Truly Idle Questing and The Beast's Fertilizer (the automation already
+  covers what they do), Wandoos Lover (no Wandoos in the run).
 
 Consumers: OptimizationAdvisor rows; AdvisorApply auto-buy toggles (`perks`, `quirks`,
 `yggbuys`).

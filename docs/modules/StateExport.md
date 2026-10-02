@@ -87,6 +87,9 @@ all four were wrong.
   steps you have not reached are CALLED — which is exactly what checking a plan against the guide
   needs. Four guide ch.4 quirks turned out to be missing from `QuirkPlan` and were only nameable once
   this printed them (SpendPlanner.md).
+- **ITOPOD PERKS and YGGDRASIL FRUITS list every entry too** (2026-10-02); perks also carry the
+  in-game description, the only in-process statement of what a perk does. The owned-only perk dump
+  hid that the ch.4 plan was buying perks no guide list names (SpendPlanner.md).
 - **`EXP ... buying toward <phase>`** — which guide ratio the EXP walk is aiming at. It is derived
   from the chapter and the T6 version, both a step removed from anything else in the dump, so without
   it a wrong ratio shows up only as EXP going somewhere surprising.

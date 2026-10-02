@@ -66,14 +66,16 @@ namespace NGUAdvisor.Managers
             string diffName = diff == difficulty.sadistic ? "Sadistic" : diff == difficulty.evil ? "Evil" : "Normal";
             int boss = ZoneHelpers.CurrentHighestBoss(c);
 
-            bool t6 = TitanBeaten(5), t7 = TitanBeaten(6), t8 = TitanBeaten(7);
+            bool t6 = TitanBeaten(5), t8 = TitanBeaten(7), t9 = TitanBeaten(8);
 
+            // Guide chapters open on the kill that names them: ch6 "Congrats on defeating The
+            // Godmother" (T8), ch7 "Congrats on defeating The Exile" (T9). Ch5 Evil-IDP spans T7 too.
             int chapter; string name;
             if (diff == difficulty.sadistic) { chapter = 8; name = "Sadistic"; }
             else if (diff == difficulty.evil)
             {
-                if (t8) { chapter = 7; name = "T9"; }
-                else if (t7) { chapter = 6; name = "T8-JRPG"; }
+                if (t9) { chapter = 7; name = "T9"; }
+                else if (t8) { chapter = 6; name = "T8-JRPG"; }
                 else { chapter = 5; name = "Evil-IDP"; }
             }
             else
@@ -210,12 +212,8 @@ namespace NGUAdvisor.Managers
                     if (!TitanBeaten(6)) return "B125 → kill T7";
                     if (boss < 166) { isKill = false; return "B166 → T8 puzzle"; }
                     return "Kill T8";
-                case 6:
-                    if (!TitanBeaten(7)) return "Kill T8";
-                    isKill = false;
-                    return "R3 → farm T-sets";
+                case 6: return "R3 → kill T9";
                 case 7:
-                    if (!TitanBeaten(8)) return "Kill T9";
                     isKill = false;
                     return "24 AK → Rad set";
                 case 8: return "Sadistic titans";
