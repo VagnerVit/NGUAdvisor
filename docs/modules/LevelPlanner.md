@@ -30,6 +30,11 @@ snapshotted targets.
   from P/T — user-caught). Extending to the Evil climb fixed a stale −1: the marathon never runs
   during the climb, so Wandoos ATs kept the Normal-era pause and never boosted E/M Wandoos
   (user-caught 2026-07-17). `ApplyPurpose` SETS (doesn't ratchet) — overshoot self-corrects.
+  **Outside those segments slots 3/4 are PAUSED (−1), not left alone** (2026-10-03, user-caught):
+  the game keeps `levelTarget` across rebirths, so a stop solved earlier (2.8M at a fresh run's
+  start, when Wandoos speed is low) stayed as the target, and AT HOUR's `CAPALLAT` waterfill gave
+  Wandoos Magic AT an equal share up to L90k against a live stop of ~20k. Pausing needs no gear read,
+  so it applies through temp loadouts too.
 - Return value `long.MinValue` = unknown → leave the current target alone; −1 = hold at zero
   (target 0 means UNCAPPED in the game's semantics — the reason freezes write `lvl > 0 ? lvl : −1`).
 
@@ -94,7 +99,7 @@ collapsed into one field again); the TM's basis and both TM level/target pairs; 
 AT slot, the current level, the current target and the solved stop (`block=`, `wanE=`, `wanM=`, with
 `stop` = `unknown` when the factor could not be read, `hold` for the −1 hold-at-zero case and
 `tempgear` when a temp loadout means the Wandoos stop is deliberately not solved) and `wanCaps=`
-saying whether this segment applies the Wandoos stops at all — `applied`, `not this segment`, or
+saying whether this segment applies the Wandoos stops at all — `applied`, `paused (not this segment)`, or
 `held (<lock> loadout worn)`.
 
 The gold probes are re-read inside the renderer rather than threaded out of the decision, so the

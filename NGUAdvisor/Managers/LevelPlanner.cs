@@ -152,8 +152,7 @@ namespace NGUAdvisor.Managers
                     var l = c.advancedTraining.level;
                     if (t != null && l != null && t.Length >= 5 && l.Length >= 5)
                     {
-                        string wanSeg = ChallengeOverlay.Segment;
-                        bool wanOwned = wanSeg == "NGU MARATHON" || wanSeg == "EVIL CLIMB" || wanSeg == "AUGMENTATION";
+                        bool wanOwned = WandoosStopsOwned(ChallengeOverlay.Segment);
                         // While a temp loadout is worn the stops are not solved at all (they would be
                         // solved from gear we are not keeping), so the log must not print a number
                         // either — `tempgear` is the honest value.
@@ -161,7 +160,7 @@ namespace NGUAdvisor.Managers
                         string wanE = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, energy: true));
                         string wanM = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, energy: false));
                         string wanState = !wanOwned
-                            ? "not this segment"
+                            ? "paused (not this segment)"
                             : tempGear ? $"held ({LockManager.GetLockTypeName()} loadout worn)" : "applied";
                         slots = $"tough=lvl{l[0]}/tgt{t[0]} power=lvl{l[1]}/tgt{t[1]}"
                               + $" block=lvl{l[2]}/tgt{t[2]}/stop{StopText(BlockStopLevel(c))}"
@@ -258,9 +257,14 @@ namespace NGUAdvisor.Managers
                 // 3/4 targets were solved from the WRONG gear, and they persisted after the loadout
                 // was restored. Leaving the target alone is the existing contract for "no answer"
                 // (ApplyPurpose ignores long.MinValue), so skip the two calls entirely.
-                string wanSeg = ChallengeOverlay.Segment;
-                if (!TempLoadoutWorn()
-                    && (wanSeg == "NGU MARATHON" || wanSeg == "EVIL CLIMB" || wanSeg == "AUGMENTATION"))
+                if (!WandoosStopsOwned(ChallengeOverlay.Segment))
+                {
+                    // The game keeps levelTarget across rebirths, so a stop solved in an earlier
+                    // segment or run would otherwise keep drawing an equal CAPALLAT share here.
+                    ApplyPurpose(targets, 3, PausedTarget);
+                    ApplyPurpose(targets, 4, PausedTarget);
+                }
+                else if (!TempLoadoutWorn())
                 {
                     ApplyPurpose(targets, 3, WandoosStopLevel(c, energy: true));
                     ApplyPurpose(targets, 4, WandoosStopLevel(c, energy: false));
@@ -274,6 +278,12 @@ namespace NGUAdvisor.Managers
         // needed. Only the gear-dependent solves care: Block's stop is a pure game-formula solve on
         // block.levelFactor and reads no gear at all, so it keeps running through locks.
         internal static bool TempLoadoutWorn() => !LockManager.CanSwap() || LockManager.HasQuestLock();
+
+        // The game's levelTarget value that pauses an AT slot (0 would mean uncapped).
+        private const long PausedTarget = -1;
+
+        private static bool WandoosStopsOwned(string segment)
+            => segment == "NGU MARATHON" || segment == "EVIL CLIMB" || segment == "AUGMENTATION";
 
         private static void ApplyPurpose(long[] targets, int slot, long stop)
         {
