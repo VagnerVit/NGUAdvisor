@@ -264,7 +264,7 @@ namespace NGUAdvisor.Managers
 
             // The scout answers only when a file on disk BEATS this preset at funding the plan's NGU
             // lanes; a tie or a miss leaves the preset standing.
-            var scouted = ProfileScout.Best(wantLrb, preset, out string why);
+            var scouted = ProfileScout.Best(wantLrb, diff, preset, out string why);
             if (scouted == null) return preset;
 
             reason = $"{reason} {why}";

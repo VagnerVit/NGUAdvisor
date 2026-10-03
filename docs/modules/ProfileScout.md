@@ -16,6 +16,10 @@ module is the thing it stood in for, and the constant is gone.
 1. **Hard filter on rebirth style.** An LRB profile and a cadence profile are not interchangeable at
    any score, so the wrong kind is *excluded*, never ranked. The caller supplies which kind it wants
    (`ProgressionAnalyzer.TitanPushInReach`).
+   **…and on difficulty** (2026-10-03, user-caught): a profile whose `NGUDiff` ever switches to a
+   track above `rebirthDifficulty` is excluded too. `NGUDiffBreakpoints` skips such a track, so the
+   profile's NGU half would silently never run — LRB-Evil (Diff 1 from hour 1) was recommended on
+   Normal for "funding" PP/Ygg/EXP. Profiles with no `NGUDiff` count as Normal.
 2. **Ranking by lane overlap** — how many of `NGUAdvisors.Compute`'s `EnergyTargets`/`MagicTargets`
    the profile's `Priorities` actually fund, across ALL breakpoints (not just time 0). `NGU-<n>` and
    `CAPNGU-<n>` both count; a CAP lane drinks what is left when its turn comes, which is still

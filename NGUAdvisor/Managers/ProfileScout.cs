@@ -36,6 +36,7 @@ namespace NGUAdvisor.Managers
             public string Name;
             public bool NoAutoRebirth;    // an LRB-style profile: nothing rebirths it on its own
             public bool IsPreset;
+            public int MaxNguDiff;        // highest NGU track any NGUDiff breakpoint switches to
             public int Matched;           // plan lanes this profile feeds
             public int Wanted;            // plan lanes in total
             public List<string> MatchedNames = new List<string>();
@@ -60,7 +61,7 @@ namespace NGUAdvisor.Managers
         // improving it — Goal-AdvDC and Normal-24hr fund exactly the same lanes, and picking between
         // them on lane count alone would be a coin toss dressed as a verdict. The lane overlap is the
         // only thing measured here, so it is the only thing allowed to overrule the caller.
-        public static Candidate Best(bool wantLrb, string fallback, out string reason)
+        public static Candidate Best(bool wantLrb, difficulty played, string fallback, out string reason)
         {
             if (_cachedWantLrb == wantLrb && (DateTime.UtcNow - _cachedAt).TotalMilliseconds < ScoutMs)
             {
@@ -83,9 +84,14 @@ namespace NGUAdvisor.Managers
                 int wanted = plan.EnergyTargets.Length + plan.MagicTargets.Length;
                 if (wanted == 0) return Nothing(wantLrb, fallback, "the plan wants no NGU lanes");
 
-                var candidates = Scan(plan, wanted).Where(c => c.NoAutoRebirth == wantLrb).ToList();
+                // A profile written for a harder difficulty is not runnable here: NGUDiffBreakpoints
+                // skips a track above rebirthDifficulty, so its NGU half silently never happens
+                // (2026-10-03: LRB-Evil recommended on Normal for funding PP/Ygg/EXP).
+                var candidates = Scan(plan, wanted)
+                    .Where(c => c.NoAutoRebirth == wantLrb && c.MaxNguDiff <= (int)played)
+                    .ToList();
                 if (candidates.Count == 0)
-                    return Nothing(wantLrb, fallback, $"no profile on disk is {(wantLrb ? "an LRB" : "a cadence")} profile");
+                    return Nothing(wantLrb, fallback, $"no profile on disk is {(wantLrb ? "an LRB" : "a cadence")} profile for this difficulty");
 
                 // Highest overlap wins; among equals the user's own file, then by name so the answer is
                 // stable from one refresh to the next.
@@ -166,6 +172,7 @@ namespace NGUAdvisor.Managers
                         Name = name,
                         IsPreset = PresetInstaller.IsPreset(name),
                         NoAutoRebirth = !HasAutoRebirth(bps),
+                        MaxNguDiff = MaxNguDiff(bps),
                         Wanted = wanted
                     };
 
@@ -207,6 +214,16 @@ namespace NGUAdvisor.Managers
             }
             JSONNode legacy = bps["RebirthTime"];
             return legacy != null && CustomAllocation.ParseTime(legacy) > 0;
+        }
+
+        private static int MaxNguDiff(JSONNode bps)
+        {
+            JSONNode diffs = bps["NGUDiff"];
+            if (diffs == null) return 0;
+            int max = 0;
+            foreach (JSONNode bp in diffs.Children)
+                if (bp["Diff"] != null) max = Math.Max(max, bp["Diff"].AsInt);
+            return max;
         }
 
         // A profile's priority tokens across ALL its breakpoints — what it feeds at any point in a run,
