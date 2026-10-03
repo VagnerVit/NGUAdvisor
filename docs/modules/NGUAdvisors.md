@@ -40,6 +40,17 @@ top two by rating. `Surplus` = positive-value lanes (> 1.0001) outside the hot s
 hard-caps every NGU at ONE level per tick, so a hot lane can't absorb extra pool; leftovers
 belong in MORE lanes, not deeper ones.
 
+**Chapter 4 uses the guide's priority, not the prune** (`NguGuidePriority`, 2026-10-03, user-caught).
+The guide's ch.4 "NGU Priority" is a per-NGU ladder, not "any NGU over 1.05×": E/M NGU > 1.05 →
+Adv-β / PP > 1.05 → Respawn < 0.95× → Gold / TM > 1.2 → else Energy splits **Adv-α/DC**, Magic
+**Ygg/EXP**. The first lane over its bar takes the pool ("put all E/M into that NGU for an hour");
+lower qualifying tiers and then the fallback pair are the surplus. Augs, Wandoos, Power-α/β and Number
+are never picked. Every NGU stays a CANDIDATE (the 2026-07-11 rule) — the ratings are still computed
+and shown; only selection changed. The prune's "deepen the top two" fallback is what broke it: at
+~332k levels Augs/Wandoos/Gold rated near-identically, the pair rotated every 30 s cache (hysteresis
+does not reach that branch) and Adv-α/DC idled. Other chapters keep the prune — ch.5 explicitly
+focuses NGU Augments, ch.6 BBs the eNGUs. Exit band 0.01 below each bar, as for the prune.
+
 **Thresholds have hysteresis across calls**: a lane enters at `HotEnterRatio = 1.05×/hr` and a lane
 already in the previous plan leaves only below `HotExitRatio = 1.04×/hr` (it must lose a fifth of its
 growth, not a rounding error). Within one call each lane's threshold is fixed, so the prune stays

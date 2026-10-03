@@ -21,6 +21,7 @@ namespace NGUAdvisor.Managers
     // ratio at their ACTUAL share is under 1.05x/hr (1.04 for a lane already in the plan),
     // re-split (survivors' shares grow), repeat.
     // The survivors are the lanes worth running; nothing hot -> deepen the top two by rating.
+    // Chapter 4 selects by the guide's own per-NGU priority instead (NguGuidePriority).
     public static class NGUAdvisors
     {
         public class Entry
@@ -221,10 +222,20 @@ namespace NGUAdvisor.Managers
                 Build(c, energyCandidates, false, ePool, p.Energy);
                 Build(c, magicCandidates, true, mPool, p.Magic);
 
-                p.EnergyTargets = Pick(c, p.Energy, false, ePool, prev?.EnergyTargets);
-                p.MagicTargets = Pick(c, p.Magic, true, mPool, prev?.MagicTargets);
-                p.EnergySurplus = Surplus(p.Energy, p.EnergyTargets);
-                p.MagicSurplus = Surplus(p.Magic, p.MagicTargets);
+                if (ChallengeOverlay.Chapter() == 4)
+                {
+                    p.EnergyTargets = GuidePick(c, p.Energy, false, ePool, prev?.EnergyTargets);
+                    p.MagicTargets = GuidePick(c, p.Magic, true, mPool, prev?.MagicTargets);
+                    p.EnergySurplus = GuideSurplus(p.Energy, false, p.EnergyTargets);
+                    p.MagicSurplus = GuideSurplus(p.Magic, true, p.MagicTargets);
+                }
+                else
+                {
+                    p.EnergyTargets = Pick(c, p.Energy, false, ePool, prev?.EnergyTargets);
+                    p.MagicTargets = Pick(c, p.Magic, true, mPool, prev?.MagicTargets);
+                    p.EnergySurplus = Surplus(p.Energy, p.EnergyTargets);
+                    p.MagicSurplus = Surplus(p.Magic, p.MagicTargets);
+                }
 
                 string Fmt(List<Entry> l) => l.Count == 0 ? "-"
                     : string.Join(", ", l.Take(3).Select(x => $"{x.Name} ×{Math.Min(x.Rating, 9.99):0.00}/hr").ToArray());
@@ -326,6 +337,23 @@ namespace NGUAdvisor.Managers
             }
             return keep.OrderByDescending(x => x.Rating).Select(x => x.Id).ToArray();
         }
+
+        private static int[] GuidePick(Character c, List<Entry> list, bool magic, double pool, int[] incumbents)
+        {
+            var ids = NguGuidePriority.Hot(magic, list.Select(e => e.Id).ToList(), id => RatingOf(list, id), incumbents);
+            double share = pool / Math.Max(1, ids.Length);
+            foreach (var e in list.Where(x => ids.Contains(x.Id)))
+            {
+                e.Lph = e.LphPerUnit * share;
+                e.Ratio = ValueRatio(c, magic, e.Id, e.Level, e.Lph);
+            }
+            return ids;
+        }
+
+        private static int[] GuideSurplus(List<Entry> list, bool magic, int[] targets)
+            => NguGuidePriority.Surplus(magic, list.Select(e => e.Id).ToList(), id => RatingOf(list, id), targets);
+
+        private static double RatingOf(List<Entry> list, int id) => list.First(e => e.Id == id).Rating;
 
         // Total levels on the track being leveled. The measured GROWTH rate is compared against a
         // prediction computed from THESE levels, so it has to count the same track: on Evil the

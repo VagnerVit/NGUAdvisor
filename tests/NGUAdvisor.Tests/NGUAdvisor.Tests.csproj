@@ -46,6 +46,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\ChallengeGates.cs" Link="Linked\ChallengeGates.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BloodRouter.cs" Link="Linked\BloodRouter.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NguGuidePriority.cs" Link="Linked\NguGuidePriority.cs" />
   </ItemGroup>
 
 </Project>

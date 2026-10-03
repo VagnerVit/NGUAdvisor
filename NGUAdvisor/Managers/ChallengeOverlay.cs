@@ -466,7 +466,7 @@ namespace NGUAdvisor.Managers
         private static int _chapter;
         private static DateTime _chapterAt = DateTime.MinValue;
 
-        private static int Chapter()
+        internal static int Chapter()
         {
             if ((DateTime.UtcNow - _chapterAt).TotalSeconds > 60)
             {
