@@ -18,8 +18,9 @@ Log noise control: cooldown/threshold misses only log inside a 10 s window after
 
 ## Iron Pill fail-safes (shared constants, also read by BloodPlanner)
 
-- `PillWorthFraction = 0.10` — refuse a cast whose gain is under 10 % of **base** adventure power
-  (`adventure.attack`, not the gear-inflated total).
+- `PillWorthFraction = 0.10` — refuse a cast whose gain is under 10 % of the adventure power
+  **summand** (`PillYardstick`: `adventure.attack` + gear flat attack + cube power, the sum
+  `Character.totalAdvAttack` builds before any multiplier — not the multiplied total).
 - `PillMinAvailableSec = 1800` — refuse for the first 30 min the pill is available past cooldown,
   so blood pools into a stronger pill.
 

@@ -8,6 +8,11 @@ namespace NGUAdvisor.Managers
         public const double PillWorthFraction = 0.10;      // min pill effect as a fraction of base adventure power
         public const double PillMinAvailableSec = 1800.0;  // 30-min availability hold before a cast is allowed
 
+        // The pill adds to adventure.attack, which the game sums with gear's flat attack and the cube
+        // BEFORE every multiplier (decomp Character.totalAdvAttack) — so its relative gain is pill / this.
+        internal static double PillYardstick(Character c)
+            => Math.Max(1.0, c.adventure.attack + c.inventoryController.adventureAttackBonus() + c.inventoryController.cubePower());
+
         public abstract class Spell
         {
             protected string name;
@@ -134,8 +139,8 @@ namespace NGUAdvisor.Managers
             // Advisor-only fail-safes (the on-rebirth forced cast bypasses these):
             //  1. Do not fire within the first 30 minutes the pill is available (past its cooldown), so
             //     blood keeps pooling into a stronger pill instead of firing the moment it comes ready.
-            //  2. Do not fire for a gain under 10% of the current BASE adventure power (adventure.attack --
-            //     the same base-stat yardstick BloodPlanner measures pill worth against).
+            //  2. Do not fire for a gain under 10% of the adventure power summand (PillYardstick -- the
+            //     same yardstick BloodPlanner measures pill worth against).
             protected override bool FailSafeHold(double effect, out string reason)
             {
                 double availableFor = Time - cooldown;
@@ -144,10 +149,10 @@ namespace NGUAdvisor.Managers
                     reason = $"available {Math.Max(0, availableFor) / 60.0:F0}m (< 30m fail-safe)";
                     return true;
                 }
-                double baseAdvPower = Math.Max(1.0, _character.adventure.attack);
-                if (effect < baseAdvPower * PillWorthFraction)
+                double summand = PillYardstick(_character);
+                if (effect < summand * PillWorthFraction)
                 {
-                    reason = $"gain {effect:F0} < 10% of base adv power {baseAdvPower:F0}";
+                    reason = $"gain {effect:F0} < 10% of adv power summand {summand:F0}";
                     return true;
                 }
                 reason = null;

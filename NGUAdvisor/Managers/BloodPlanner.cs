@@ -140,14 +140,11 @@ namespace NGUAdvisor.Managers
                 catch { }
                 p.PillPowerNow = Math.Min(powerNow, 100000000L);
 
-                // Worth gate (user rule): the pill grants FLAT blood^0.25 to the BASE Adventure
-                // Power/Toughness (game: character.adventure.attack/defense += num — the summand
-                // gear multipliers then scale). So the yardstick is the BASE stat, not
-                // totalAdvAttack: measuring against the gear-inflated total made the pill look
-                // worthless long after it stopped being so (user-caught). Evil+ pills are further
-                // multiplied by the ITOPOD ironPillBonus.
+                // Worth gate: the yardstick is the pre-multiplier summand the pill joins
+                // (BloodMagicManager.PillYardstick), not totalAdvAttack, whose multipliers scale the
+                // pill equally and cancel out. Evil+ pills are further multiplied by ironPillBonus.
                 double advNow = 1;
-                try { advNow = Math.Max(1, c.adventure.attack); } catch { }
+                try { advNow = BloodMagicManager.PillYardstick(c); } catch { }
                 double bestPossible = Math.Pow(Math.Max(blood, blood + bps * runLeft), 0.25);
                 try
                 {
@@ -159,7 +156,7 @@ namespace NGUAdvisor.Managers
                 p.PillWorthwhile = pillWorth;
                 if (!pillWorth)
                 {
-                    p.Text = $"Iron Pill skipped: +{bestPossible:0} vs {ExpBalancer.Fmt(advNow)} BASE adv power — no meaningful gain at this stage";
+                    p.Text = $"Iron Pill skipped: +{bestPossible:0} vs {ExpBalancer.Fmt(advNow)} adv power summand (base + gear + cube) — no meaningful gain at this stage";
                     p.Optimal = true;
                     return p;
                 }
@@ -207,7 +204,7 @@ namespace NGUAdvisor.Managers
 
                 // Mirror the caster fail-safe (BloodMagicManager.IronPill.FailSafeHold): it holds for the
                 // first 30 minutes the pill is available (pooling a stronger cast) and refuses any cast under
-                // 10% of base adventure power. Don't advertise "CAST NOW" for a cast the caster will refuse;
+                // 10% of the adventure power summand. Don't advertise "CAST NOW" for a cast the caster will refuse;
                 // keep pooling instead (PoolForPill stays set by FillRouting while cdLeft<900).
                 double availableFor = c.bloodMagic.adventureSpellTime.totalseconds - spells.adventureSpellCooldown;
                 if (availableFor < BloodMagicManager.PillMinAvailableSec
@@ -215,7 +212,7 @@ namespace NGUAdvisor.Managers
                 {
                     p.Text = availableFor < BloodMagicManager.PillMinAvailableSec
                         ? $"Iron Pill ready — pooling {FmtH(Math.Max(0, BloodMagicManager.PillMinAvailableSec - availableFor))} more (fail-safe holds the first 30m for a stronger cast)"
-                        : $"Iron Pill ready — holding: cast {p.PillPowerNow} < 10% of base adv power {ExpBalancer.Fmt(advNow)}";
+                        : $"Iron Pill ready — holding: cast {p.PillPowerNow} < 10% of adv power summand {ExpBalancer.Fmt(advNow)}";
                     p.Severity = 0;
                     return p;
                 }

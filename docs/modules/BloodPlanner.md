@@ -8,8 +8,9 @@ BloodPlanner only gathers the game reads into a `BudgetInput` and maps the plan 
 ## Game-truth formulas (decomp)
 
 - **Iron Pill** effect = `floor(blood^0.25)`, ×`ironPillBonus()` on Evil+, display-capped 1e8.
-  Grants FLAT base Adventure Power/Toughness (`adventure.attack/defense += num` — gear
-  multipliers then scale the summand). Breakpoints: next power point needs `(e+1)^4` blood.
+  Grants FLAT base Adventure Power/Toughness (`adventure.attack/defense += num`), which
+  `totalAdvAttack` sums with gear's flat attack and the cube BEFORE every multiplier. Breakpoints:
+  next power point needs `(e+1)^4` blood.
 - **NUMBER** (`RebirthPowerSpell`): `rebirthPower += blood` — LINEAR, uncapped, a straight
   multiplier on the whole next-run attack/defense multi; re-based to 1.0 every rebirth.
 - **Counterfeit Gold**: `1 + floor((log2(b/min)+1)²)/100` % GPS — LOG, **NO game cap**
@@ -26,9 +27,11 @@ BloodPlanner only gathers the game reads into a `BudgetInput` and maps the plan 
 
 ## Pill decision rules (each labeled with its origin)
 
-- **Worth gate**: yardstick is BASE `adventure.attack`, not `totalAdvAttack` — measuring against
-  the gear-inflated total made the pill look worthless long after it stopped being so
-  (user-caught). Threshold `BloodMagicManager.PillWorthFraction`.
+- **Worth gate**: yardstick is the pre-multiplier summand `BloodMagicManager.PillYardstick`
+  (base + gear flat attack + cube), not `totalAdvAttack` — the multipliers scale the pill and the
+  summand alike, so pill / summand IS the relative stat gain. Base alone (the previous yardstick)
+  overstated it ~34× on 2026-10-03 (159K base vs 5.38M summand: +5.9K read as 3.7 %, really 0.11 %);
+  the multiplied total understated it. Threshold `BloodMagicManager.PillWorthFraction`.
 - **Unreachable-this-run**: cooldown outlasting the TRUE time to the scheduled rebirth
   (`RunLeftSeconds`, NOT the ≥10 min-clamped `RunHorizonMinutes`) → don't pool (user-reported:
   magic was poured into blood for a pill that could never cast).
