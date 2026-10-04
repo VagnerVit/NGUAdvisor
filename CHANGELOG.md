@@ -4,6 +4,37 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-10-04
+
+### Added
+
+- **The state export lists every perk, quirk and fruit with its description**, plus the quest
+  inputs, the Iron Pill verdict and the beard slot breakdown.
+
+### Changed
+
+- **Perk, quirk and fruit buys follow the guide's own lists through chapter 8.** Inventory space,
+  Bonus Boss EXP and TM banks no longer jump ahead of Boosted Boosts II. Improved Cube Boosting and
+  the Evil prep perks are added. Evil chapters start on the guide's titan (ch.6 on T8, ch.7 on T9),
+  not one titan early.
+- **Chapter-4 NGU lanes follow the guide's priority ladder.** Augs, Wandoos and Gold no longer
+  rotate every 30 s while Adventure and Drop Chance sit idle.
+- **The advisor runs six beards.** The Number beard joins the set because its bonus multiplies the
+  next Number, but only while it is active at rebirth. Golden fills the last slot.
+- **LSC wears augment gear.** Adventure gear stays on only until the boss unlocks the laser sword.
+- **The Augments gear objective scores Energy Cap and Energy Power next to augment speed**, as the
+  Gear Optimizer and the game's own formula do.
+
+### Fixed
+
+- **Wandoos AT stops at its stop.** The game keeps the AT target across rebirths, so AT HOUR kept
+  feeding Wandoos Magic AT instead of Power and Toughness.
+- **Profiles for a harder difficulty are no longer recommended.** LRB-Evil was offered on Normal,
+  where its NGU half never runs.
+- **Iron Pill worth is measured correctly.** The old estimate overstated the gain about 34×.
+- **The AP panel no longer offers a beard slot no beard would fill**, and count rows show the
+  game's own `Bought: x / y`.
+
 ## [1.8.1] - 2026-10-01
 
 ### Fixed
