@@ -82,7 +82,15 @@ order:
 - Beards: **a manual profile that names beards owns the set** (`BeardBreakpoints.ActiveProfileBeards`,
   profile order, Golden-gated, truncated to `capBeards`; user rule 2026-09-29 — ADVISOR had replaced
   a 6-beard profile list with its 4). The Beards rec grades against the same `CurrentBeardSet`.
-  Without a profile list (or under AutoProfile): one set for every mode — `{1 Drops, 5 Adv, 3 NGU, 0 Stats}`. Leftover slots are filled
+  Without a profile list (or under AutoProfile): one set for every mode — `{1 Drops, 5 Adv, 3 NGU, 0 Stats}`,
+  then **Number (2) as the fifth** (user-reported 2026-10-04, "only 4/6 beards"): `tempNumberBonus`
+  = `1 + √L × 0.317` past L1000 multiplies the whole `nextAttackMulti`/`nextDefenseMulti`
+  (decomp `Rebirth.calculateNextMultis`), but only while the beard is active — at L6500 that is ×26.6
+  on the next Number, against a `√(N/(N+1))` growth cut for its pool-mates. Rebirth is manual
+  (`AutoRebirth` off), so no pre-rebirth hook can switch it on in time; it stays on. **Golden (6)
+  is the sixth** by user rule (2026-10-04, "fill the slots"), knowingly: its only consumer is TM
+  gold/s (`Character` TM gold formula), so it buys little for its pool-mates' growth cut. Still
+  Troll ≥ 7-gated, and deactivating it clears every digger (BeardManager special case). Leftover slots are filled
   ONLY into a resource pool the set does not use yet: `beardCountDivider()` divides growth by the
   count of active beards sharing a pool (`usesEnergy[]`), so only 0 → 1 in an EMPTY pool is free.
   The old "beards cost nothing, fill every slot" rule ignored the divider. Golden (6) needs Troll ≥ 7.

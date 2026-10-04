@@ -1164,9 +1164,12 @@ namespace NGUAdvisor.Managers
         private static int[] RecommendedDiggers(string mode) =>
             mode == "push" ? new[] { 2, 3, 8, 10, 1 } : new[] { 3, 8, 0, 9, 2 };
 
-        // 1 Drops, 5 Adv, 3 NGU, 0 Stats — one set for every mode (user rule). Wandoos (4) is out: its
-        // bonus feeds wandoos98Controller only, which nothing in the current chapters pushes.
-        private static int[] RecommendedBeards() => new[] { 1, 5, 3, 0 };
+        // 1 Drops, 5 Adv, 3 NGU, 0 Stats — one set for every mode (user rule). Number (2) takes the fifth
+        // slot despite sharing a pool: its temp bonus multiplies the whole next Number (decomp
+        // Rebirth.calculateNextMultis) and only counts while active at rebirth, which is done by hand.
+        // Golden (6) takes the sixth (user rule 2026-10-04: fill the slots) although it only feeds TM gold/s.
+        // Wandoos (4) is out: its bonus feeds wandoos98Controller only.
+        private static int[] RecommendedBeards() => new[] { 1, 5, 3, 0, 2, 6 };
 
         // The game's usesEnergy[] — which resource pool a beard grows from. null = unreadable.
         private static bool? UsesEnergy(Character c, int id)
