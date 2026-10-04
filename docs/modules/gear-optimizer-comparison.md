@@ -73,7 +73,7 @@ Reference factors live in `external/gear-optimizer/src/assets/ItemAux.js` (`sing
 | Objective | Native (`GearObjectives`) | Reference (`Factors`) | Note |
 |---|---|---|---|
 | Advanced Training | `[ATSpeed^1, EPower^0.5]` | `AT: [EPower^0.5, ECap^1, ATSpeed^1]` | Native omits ECap^1 **deliberately** (decided 2026-07-28): the advisor's allocator BBs AT (full bars), where extra cap adds no training speed. ECap only matters when AT runs under-fed — the site's manual-play assumption. |
-| Augments | `[AugSpeed]` | `AUGMENTATION: [ECap, EPower, AugSpeed]` | Native scores speed only. |
+| Augments | `[ECap, EPower, AugSpeed]` | `AUGMENTATION: [ECap, EPower, AugSpeed]` | **Matches** (2026-10-04). Decomp `getAugProgressPerTick` = `totalEnergyPower × augEnergy × (1 + Augs)`; the AT argument for dropping ECap does not carry over, because an augment worth gearing for (the LSC sword, the ch.5 phase-2 best aug) runs energy-starved, not BB'd. |
 | Beards | `[BeardSpeed]` | `BEARD: [EPower^¼, EBars^½, MPower^¼, MBars^½, BeardSpeed]` | Native scores speed only. |
 | Wandoos (combined) | `[WandoosSpeed]` | `WANDOOS: [ECap^½, WSpeed^½, MCap^½, WSpeed^½]` | Native E/M Wandoos variants DO match the site's EWANDOOS/MWANDOOS. |
 | Adventure | `[Power, Toughness]` product | no composite (separate Power / Toughness factors) | Native extension. Respawn deliberately excluded (base-0 stat explodes the product; TopRespawn pin covers it). |

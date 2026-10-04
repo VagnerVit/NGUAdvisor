@@ -30,7 +30,9 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
 - **Advanced Training** = `[ATSpeed^1, EPower^0.5]` — the site's `AT` factor also carries
   `ECap^1`. Omitted deliberately (decided 2026-07-28): the advisor's allocator BBs AT (full
   bars), where extra cap adds no training speed; ECap only matters under manual, under-fed play.
-- **Augments / Beards / Wandoos** score raw speed only; the site mixes in E/M cap/power/bars.
+- **Beards / Wandoos** score raw speed only; the site mixes in E/M cap/power/bars. **Augments**
+  matches the site's `AUGMENTATION` (`ECap × EPower × AugSpeed`) — the decomp's aug progress
+  multiplies all three.
 - **Adventure** (`Power^1 × Toughness^0.5`) and **Yggdrasil** (descending-exponent harvest priority
   4/4/3/2/1) are native extensions with no site counterpart. The 0.5 is deliberate: damage is
   `(attack − enemyDefense/2) × multiplier`, so kill rate is linear in Power and Toughness adds

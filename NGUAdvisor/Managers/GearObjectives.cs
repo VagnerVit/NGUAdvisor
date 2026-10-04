@@ -118,7 +118,9 @@ namespace NGUAdvisor.Managers
             // See docs/modules/gear-optimizer-comparison.md.
             new Objective("Advanced Training", new[]{ Stat.ATSpeed, Stat.EnergyPower },
                 new[]{ 1.0, 0.5 }),
-            new Objective("Augments", new[]{ Stat.AugSpeed }),
+            // Game truth (AugmentController.getAugProgressPerTick): progress = totalEnergyPower × augEnergy
+            // × (1 + gear Augs), and augEnergy is bounded by the cap — the site's AUGMENTATION factor.
+            new Objective("Augments", new[]{ Stat.EnergyCap, Stat.EnergyPower, Stat.AugSpeed }),
             new Objective("Beards", new[]{ Stat.BeardSpeed }),
             new Objective("Wandoos", new[]{ Stat.WandoosSpeed }),
             new Objective("Experience", new[]{ Stat.Experience }),

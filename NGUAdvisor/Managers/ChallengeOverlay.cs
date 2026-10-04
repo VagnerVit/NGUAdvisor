@@ -199,13 +199,37 @@ namespace NGUAdvisor.Managers
                 return;
             }
 
-            bool pushing = Phase == "push";
-            string want = pushing ? "Adventure" : "NGUs";
+            string want, why;
+            if (cur == "LSC")
+            {
+                // LSC completes on the sword alone; bosses matter only until they open its aug/upgrade.
+                bool gated = LaserSwordBossGated(c);
+                want = gated ? "Adventure" : "Augments";
+                why = gated ? $"LSC: boss {boss} has not unlocked the laser sword upgrade yet"
+                            : "LSC: the laser sword is the completion condition";
+            }
+            else
+            {
+                bool pushing = Phase == "push";
+                want = pushing ? "Adventure" : "NGUs";
+                why = pushing ? $"push phase: boss {boss} within reach" : "growth phase: at the boss wall";
+            }
             if (want != GearObjectiveOverride)
             {
                 GearObjectiveOverride = want;
-                Record("GEAR", $"gear → {want}", pushing ? $"push phase: boss {boss} within reach" : "growth phase: at the boss wall");
+                Record("GEAR", $"gear → {want}", why);
             }
+        }
+
+        // The boss requirements live in the Unity scene, so ask the controller rather than a constant.
+        private static bool LaserSwordBossGated(Character c)
+        {
+            try
+            {
+                var sword = c.augmentsController.augments[6];
+                return sword.augLocked() || sword.upgradeLocked();
+            }
+            catch { return false; }
         }
 
         // ---- Slice 2: allocation strips. The per-system challenge guards already exist (AugmentBP/

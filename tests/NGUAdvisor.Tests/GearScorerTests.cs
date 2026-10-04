@@ -75,5 +75,18 @@ namespace NGUAdvisor.Tests
                 new[] { bareWeapon, Item("Power", 100, weapon: true) }, stats, 50);
             Assert.Equal(50.0, vals[0]);
         }
+
+        // Aug progress per tick multiplies energy power, allocated energy (cap-bound) and gear Augs.
+        [Fact]
+        public void Augments_objective_scores_every_factor_of_aug_progress()
+        {
+            GearObjectives.Objective augments = null;
+            foreach (GearObjectives.Objective o in GearObjectives.Objectives)
+                if (o.Name == "Augments") augments = o;
+            Assert.NotNull(augments);
+            Assert.Equal(
+                new[] { GearObjectives.Stat.EnergyCap, GearObjectives.Stat.EnergyPower, GearObjectives.Stat.AugSpeed },
+                augments.Stats);
+        }
     }
 }

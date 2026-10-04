@@ -86,6 +86,11 @@ overrule what a profile says. Two gates enforce it, and both are the fix for one
   profile. The flag is NOT derivable from `ActiveChain`: after `GearBreakpoints`' smart default folds
   a challenge objective in, that chain is the ADVISOR's — see AllocationProfiles.md §GearBreakpoints,
   where the same report also stopped the smart default from outranking an explicit `ID` list.
+- **The rotation itself is push → "Adventure", growth → "NGUs", except in LSC**: LSC completes on
+  the laser sword alone and does not reset the Number, so bosses fall continuously and "push" would
+  hold Adventure gear for the whole challenge (user-reported 2026-10-04). LSC wears "Augments", and
+  "Adventure" only while the controller's `augLocked()`/`upgradeLocked()` say the boss has not yet
+  opened the sword (the boss requirements live in the Unity scene, not in code).
 - **Template takeover is `AutoProfile`-only** (below).
 
 - **Stripping**: tokens for systems a challenge kills are dropped (BestAug refuses NOAUG,
