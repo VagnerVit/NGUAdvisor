@@ -90,6 +90,9 @@ all four were wrong.
 - **ITOPOD PERKS and YGGDRASIL FRUITS list every entry too** (2026-10-02); perks also carry the
   in-game description, the only in-process statement of what a perk does. The owned-only perk dump
   hid that the ch.4 plan was buying perks no guide list names (SpendPlanner.md).
+- **QUESTS** prints the inputs of `BeastQuestController`'s own QP formula — bank, current quest and
+  what it pays, base rewards, `questRewardFactor()`, maxed quest items, drop chance, seconds per item
+  and the idle divider — so the quest strategy can be priced from game truth instead of the panel.
 - **`EXP ... buying toward <phase>`** — which guide ratio the EXP walk is aiming at. It is derived
   from the chapter and the T6 version, both a step removed from anything else in the dump, so without
   it a wrong ratio shows up only as EXP going somewhere surprising.

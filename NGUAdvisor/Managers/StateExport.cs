@@ -111,6 +111,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "BEARDS", () => Beards(sb, c));
             Section(sb, "ITOPOD PERKS", () => Perks(sb, c));
             Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
+            Section(sb, "QUESTS", () => Quests(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
             return sb.ToString();
         }
@@ -375,6 +376,9 @@ namespace NGUAdvisor.Managers
             sb.AppendLine($"  Spaghetti   {b.Loot.Mode,-3} in {b.Loot.Invested:E3} ({b.Loot.NowPct}%)  plan {b.Loot.TargetBlood:E3} ({b.Loot.TargetPct}%)");
             sb.AppendLine($"  NUMBER          in {b.NumberInvested:E3}  plan {b.NumberTarget:E3}");
             sb.AppendLine($"  route {b.Route}{(p.PoolForPill ? " (pooling for pill)" : "")} — {p.RouteReason}");
+            sb.AppendLine($"  Iron Pill  cd {p.CdLeftSec:0}/{p.CdTotalSec:0}s · cast now +{p.PillPowerNow} · base adv {NumberFormatter.Abbrev(c.adventure.attack)}"
+                        + $" + gear {NumberFormatter.Abbrev(c.inventoryController.adventureAttackBonus())} + cube {NumberFormatter.Abbrev(c.inventoryController.cubePower())}"
+                        + $" · worth {p.PillWorthwhile} · unreachable {p.UnreachableThisRun} — {p.Text}");
         }
 
         private static void Diggers(StringBuilder sb, Character c)
@@ -403,6 +407,8 @@ namespace NGUAdvisor.Managers
                             + $" perm {b.permLevel,-8} banked {b.bankedLevel,-8}"
                             + (active != null && active.Contains(id) ? "  [ACTIVE]" : ""));
             }
+            sb.AppendLine($"  slots {c.allBeards.capBeards()}/{c.allBeards.beardSize()} · AP bought {c.arbitrary.beardSlots}"
+                        + $" · purchase {c.purchases.hasBeardSlot1} · troll {c.allChallenges.trollChallenge.completions()}");
         }
 
         // THE NAMES ARE THE POINT. perkName lives in the scene; a save reader can only ever print ids.
@@ -464,6 +470,23 @@ namespace NGUAdvisor.Managers
                 catch { }
                 sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}{desc}");
             }
+        }
+
+        // The inputs of BeastQuestController's own QP formula: what a quest pays and how fast the idle
+        // bar fills, so the quest strategy can be priced without guessing.
+        private static void Quests(StringBuilder sb, Character c)
+        {
+            var q = c.beastQuest;
+            var qc = c.beastQuestController;
+            var inv = CultureInfo.InvariantCulture;
+            sb.AppendLine($"  bank          {q.curBankedQuests}/{qc.maxBankedQuests()} majors · next in {(qc.timerThreshold() - q.dailyQuestTimer.totalseconds) / 3600.0:0.0}h");
+            if (q.inQuest)
+                sb.AppendLine($"  current       {(q.reducedRewards ? "minor" : "major")} · {(q.idleMode ? "idle" : "manual")} · {q.curDrops}/{q.targetDrops} · zone {qc.curQuestZone()} · pays {qc.currentQuestQPValue()} QP{(q.allActive ? " (manual ×2 kept)" : "")}");
+            else
+                sb.AppendLine("  current       none");
+            sb.AppendLine($"  base reward   major {qc.majorQuestReward()} · minor {qc.minorQuestReward()} QP · factor {qc.questRewardFactor().ToString("0.000", inv)}");
+            sb.AppendLine($"  quest items   {qc.questItemsMaxxed()}/10 maxed (+2 % QP each)");
+            sb.AppendLine($"  drop          {(qc.questDropChance() * 100).ToString("0.00", inv)} % per kill · {qc.expectedTimePerDrop().ToString("0.0", inv)} s/item manual · idle ×{qc.idleDropFactor().ToString("0", inv)} slower");
         }
 
         private static void Fruits(StringBuilder sb, Character c)
