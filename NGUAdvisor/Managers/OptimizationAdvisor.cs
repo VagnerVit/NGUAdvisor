@@ -1075,12 +1075,32 @@ namespace NGUAdvisor.Managers
 
         public static int[] CurrentBeardSet()
         {
+            var c = Main.Character;
+            if (c == null) return null;
+            try { return BeardSetFor(c, Math.Max(1, c.allBeards.capBeards())); }
+            catch { return null; }   // capBeards() itself can throw before the scene is up
+        }
+
+        // Would one more beard slot change the set this advisor runs? False when every wanted beard
+        // (and every free empty-pool filler) already fits — an extra slot would stay empty.
+        public static bool ExtraBeardSlotUsed()
+        {
+            var c = Main.Character;
+            if (c == null) return true;
             try
             {
-                var c = Main.Character;
-                if (c == null) return null;
                 int slots = Math.Max(1, c.allBeards.capBeards());
+                if (slots >= c.allBeards.beardSize()) return false;
+                int[] now = BeardSetFor(c, slots), more = BeardSetFor(c, slots + 1);
+                return now == null || more == null || more.Length > now.Length;
+            }
+            catch { return true; }
+        }
 
+        private static int[] BeardSetFor(Character c, int slots)
+        {
+            try
+            {
                 // User rule (2026-09-29): a MANUAL profile that names beards owns the set, in its order.
                 // Same !AutoProfile guard as the digger pool, so a stale profile can't leak into AutoProfile.
                 int[] profileBeards = null;

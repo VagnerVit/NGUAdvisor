@@ -176,7 +176,7 @@ namespace NGUAdvisor
                         UiLayout.FitInto(_rows[i], "unresolved entry — cost unknown");
                         continue;
                     }
-                    UiLayout.FitInto(_rows[i], $"T{rec.Item.Tier} · {rec.Item.Name} — {Price(rec)}");
+                    UiLayout.FitInto(_rows[i], $"{Title(rec)} — {Price(rec)}");
                 }
             }
             catch (Exception ex) { LogDebug($"AP panel refresh: {ex.Message}"); }
@@ -197,7 +197,7 @@ namespace NGUAdvisor
             }
 
             _cardValue.ForeColor = UiTheme.Accent;
-            UiLayout.FitInto(_cardValue, $"T{rec.Item.Tier} · {rec.Item.Name}");
+            UiLayout.FitInto(_cardValue, Title(rec));
 
             // Affordability is stated ONLY beside a price we actually read. ApRec.Affordable is already
             // false when the cost is unknown, and printing "not affordable" there would dress a missing
@@ -209,6 +209,9 @@ namespace NGUAdvisor
 
             UiLayout.WrapInto(_cardNote, rec.Item.Note ?? "");
         }
+
+        private static string Title(ApRec rec)
+            => $"T{rec.Item.Tier} · {rec.Item.Name}{(rec.CountStatus != null ? $" · {rec.CountStatus}" : "")}";
 
         private static string Price(ApRec rec)
         {

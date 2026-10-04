@@ -107,6 +107,20 @@ back to hand-mapped `Arbitrary` count fields — the exact thing this design rej
 from row 3. Collapsing keeps the binding honest; the per-count guidance moves into the row's `Note`.
 Do not re-split these rows without first accepting a hand map.
 
+The count itself IS shown, still without a hand map: `ApRec.CountStatus` is the pod's own
+`useStatus()` ("Bought: 3 / 4"), kept only when it starts with `Bought: `, and the panel appends it to
+the row title — so "AP Beard Slots" no longer reads as the first slot when it is the fourth.
+
+### The one usefulness exception — AP Beard Slots (2026-10-04, user-caught)
+
+`shouldDisableBuyButton(28)` is `beardSlots >= maxBeardSpaces()` (4). It says "maxed", never "useful":
+with 3/4 bought, the base slot, `hasBeardSlot1` and Troll ≥ 4 already give 6 of 7 slots, and the 4th
+AP slot only opens a 7th for the one beard the beard set leaves out. `Unneeded()` skips the row while
+`OptimizationAdvisor.ExtraBeardSlotUsed()` is false — the beard-set logic run with one more slot picks
+nothing more. It fails toward "needed" (recommend), like `Owned()`. This is a deliberate exception to
+"ownership is only the game's predicate", approved by the user; do not generalize it to other rows
+without the same kind of owning-module answer.
+
 ## `Note` is a QUOTE, never our own words
 
 `Note` is guidance transcribed **verbatim** from OJ of Steel's AP Tier List, build 1.200. Rows the

@@ -20,6 +20,7 @@ namespace NGUAdvisor.Managers
         public bool CostKnown;    // false when the cost read failed — never render Cost as a price then
         public bool Affordable;
         public long Balance;
+        public string CountStatus; // the game's own "Bought: 3 / 4" for count entries; null otherwise
     }
 
     /// <summary>
@@ -57,6 +58,10 @@ namespace NGUAdvisor.Managers
         // for every id, which — see the Owned() comment — degrades to "nothing is owned" and would
         // silently recommend the whole tier list from the top.
         private static Dictionary<int, ArbitraryController> _pods;
+
+        // The game's predicate answers "maxed?", not "useful?": with AP beard slots at 3/4 and six beards
+        // running, the 4th buys a 7th slot whose only candidate is a beard the beard set leaves out.
+        private const int BeardSlotShopId = 28;
 
         public static long Balance()
         {
@@ -119,11 +124,14 @@ namespace NGUAdvisor.Managers
             long balance = Balance();
             foreach (ApItem item in ApTierTable.Items)
             {
-                if (Owned(item)) continue;
+                if (Owned(item) || Unneeded(item)) continue;
                 return Describe(item, balance);
             }
             return new ApRec();
         }
+
+        private static bool Unneeded(ApItem item)
+            => item.Source == ApSource.ShopId && item.Key == BeardSlotShopId && !OptimizationAdvisor.ExtraBeardSlotUsed();
 
         /// <summary>The next <paramref name="n"/> unowned entries, in the table's own order.</summary>
         public static IReadOnlyList<ApRec> Queue(int n)
@@ -134,7 +142,7 @@ namespace NGUAdvisor.Managers
             long balance = Balance();
             foreach (ApItem item in ApTierTable.Items)
             {
-                if (Owned(item)) continue;
+                if (Owned(item) || Unneeded(item)) continue;
                 recs.Add(Describe(item, balance));
                 if (recs.Count >= n) break;
             }
@@ -154,7 +162,24 @@ namespace NGUAdvisor.Managers
             // Unaffordable when the price is unknown: claiming "you can afford it" without a price
             // would be a guess, and this row's whole job is to be honest about what it does not know.
             rec.Affordable = rec.CostKnown && balance >= cost;
+            rec.CountStatus = CountStatus(item);
             return rec;
+        }
+
+        private static string CountStatus(ApItem item)
+        {
+            if (item.Source != ApSource.ShopId) return null;
+            try
+            {
+                ArbitraryController pod = ControllerFor(item.Key);
+                string status = pod?.useStatus();
+                return status != null && status.StartsWith("Bought: ", StringComparison.Ordinal) ? status : null;
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"ApPurchaseAdvisor: status read failed for {item.Name}: {e.Message}");
+                return null;
+            }
         }
 
         // Every row is priced through a shop pod, including hearts and repeatables — being absent from
