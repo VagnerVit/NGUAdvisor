@@ -15,9 +15,14 @@ each OS's A/D bonus over a run-matched window and recommends the best.
 ## Projection assumptions (documented, deliberate)
 
 - Allocation = whole current E/M cap (how CAPWAN behaves when it can).
-- **Full-boot speed**: live speed ÷ `bootupSpeedFactor()` — right after rebirth the bootup factor
-  is ~0, which would zero every projection and silently block the auto-switch exactly when
-  switching is free. `boot < 0.02` → verdict `Known=false`, retry next tick.
+- **Full-boot speed**: live speed ÷ `bootupSpeedFactor()` × the full-boot factor, via
+  `AtMath.WandoosBaseSpeed` (the same normalization `LevelPlanner`'s Wandoos-AT stop uses) — right
+  after rebirth the bootup factor is ~0, which would zero every projection and silently block the
+  auto-switch exactly when switching is free. The full-boot factor is **1.1 with `wandoosComplete`**,
+  else 1: the game applies that ×1.1 only once bootup reaches 1, so dividing by the pre-boot factor
+  alone understated every projection by 10 % until the boot finished. The AT slot and the digger stay
+  in the speed (live state common to all three OSs). `boot < 0.02` → verdict `Known=false`, retry
+  next tick.
 - **The current OS keeps its banked levels; the other two start from 0** — the game's `changeOS`
   wipes the target's levels. Without this the current OS is understated and the advantage ratio
   is biased toward switching.

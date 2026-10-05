@@ -70,11 +70,9 @@ namespace NGUAdvisor.Managers
                 // block the auto-switch at exactly the moment switching is free). Divide the live
                 // speed by the current bootup factor; if wandoos has barely booted the numbers are
                 // unstable, so report unknown and let the next tick (a minute later) decide.
-                double boot = 1.0;
-                try { boot = c.wandoos98Controller.bootupSpeedFactor(); } catch { }
-                if (boot < 0.02) return v;
-                double speedE = c.totalWandoosEnergySpeed() / boot;
-                double speedM = c.totalWandoosMagicSpeed() / boot;
+                double? speedE = FullBootSpeed(c, c.totalWandoosEnergySpeed());
+                double? speedM = FullBootSpeed(c, c.totalWandoosMagicSpeed());
+                if (!speedE.HasValue || !speedM.HasValue) return v;
                 double capE = c.totalCapEnergy();
                 double capM = c.totalCapMagic();
                 double seconds = minutes * 60.0;
@@ -86,8 +84,8 @@ namespace NGUAdvisor.Managers
                 for (int os = 0; os < 3; os++)
                 {
                     // 1 level per tick max (the game adds progress once per 0.02s tick)
-                    double rateE = Math.Min(capE * speedE / baseTimes[os], 1.0) * 50.0;
-                    double rateM = Math.Min(capM * speedM / baseTimes[os], 1.0) * 50.0;
+                    double rateE = Math.Min(capE * speedE.Value / baseTimes[os], 1.0) * 50.0;
+                    double rateM = Math.Min(capM * speedM.Value / baseTimes[os], 1.0) * 50.0;
                     double lE = rateE * seconds, lM = rateM * seconds;
                     // The current OS keeps its already-banked levels; the other two correctly
                     // start from 0 because switching to them wipes their levels (changeOS zeroes
@@ -174,12 +172,9 @@ namespace NGUAdvisor.Managers
                 // Same full-boot projection Compare() uses: the live speed right after a rebirth is
                 // ~0, which would make every lane look worthless exactly when the levels are
                 // cheapest. Under-booted reads are unstable, so keep the lane.
-                double boot = 1.0;
-                try { boot = c.wandoos98Controller.bootupSpeedFactor(); } catch { }
-                if (boot < 0.02) return true;
-
-                double speed = (energy ? c.totalWandoosEnergySpeed() : c.totalWandoosMagicSpeed()) / boot;
-                double rate = Math.Min(alloc * speed / BaseTimes(c)[os], 1.0) * 50.0;
+                double? speed = FullBootSpeed(c, energy ? c.totalWandoosEnergySpeed() : c.totalWandoosMagicSpeed());
+                if (!speed.HasValue) return true;
+                double rate = Math.Min(alloc * speed.Value / BaseTimes(c)[os], 1.0) * 50.0;
                 double levels = rate * RunSeconds();
 
                 double bonus = energy ? BonusFor(os, levels, 0.0) : BonusFor(os, 0.0, levels);
@@ -190,6 +185,17 @@ namespace NGUAdvisor.Managers
                 Main.LogDebug($"WandoosAdvisor.DumpWorthwhile: {e.Message}");
                 return true;
             }
+        }
+
+        // Live speed at a full boot, including the game's x1.1 for wandoosComplete; null while barely
+        // booted. The AT slot and the digger stay in: they are live state common to every OS.
+        private static double? FullBootSpeed(Character c, double liveSpeed)
+        {
+            double boot = 1.0;
+            try { boot = c.wandoos98Controller.bootupSpeedFactor(); } catch { }
+            bool complete = false;
+            try { complete = c.inventory.itemList.wandoosComplete; } catch { }
+            return AtMath.WandoosBaseSpeed(liveSpeed, 1.0, boot, complete ? 1.1 : 1.0, 1.0);
         }
 
         // The game's Wandoos98Controller.wandoosBonus(), with levels as inputs.
