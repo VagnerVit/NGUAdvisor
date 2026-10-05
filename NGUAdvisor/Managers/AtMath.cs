@@ -119,6 +119,34 @@ namespace NGUAdvisor.Managers
             return Math.Pow((multiplier - 1.0) / 0.1, 2.5);
         }
 
+        // Below this the bootup factor is too small to divide out reliably (WandoosAdvisor uses the same floor).
+        public const double MinWandoosBoot = 0.02;
+
+        // The Wandoos speed a Wandoos-AT stop is solved against: fully booted, without the Wandoos digger
+        // (it does not run in the marathon) and without this AT slot's own (1 + f·L). Decomp
+        // Character.totalWandoos*Speed multiplies all three in; bootupSpeedFactor reaches 1.1 only once
+        // booted with wandoosComplete, so the full-boot factor is passed in, not assumed to be 1.
+        public static double? WandoosBaseSpeed(double liveSpeed, double atFactor, double boot, double fullBoot, double digger)
+        {
+            if (double.IsNaN(liveSpeed) || double.IsInfinity(liveSpeed) || liveSpeed <= 0) return null;
+            if (double.IsNaN(boot) || boot < MinWandoosBoot) return null;
+            if (atFactor <= 0 || fullBoot <= 0 || digger <= 0) return null;
+            return liveSpeed / atFactor / boot * fullBoot / digger;
+        }
+
+        // The Wandoos-AT level at which the dump's one-level-per-tick allocation (decomp capAmount* =
+        // baseTime / speed) costs `share` of the cap. Speed carries the slot as (1 + f·L), so solve for L.
+        // 0 = already met at level 0.
+        public static long? WandoosStopLevel(double baseTime, double cap, double baseSpeed, double levelFactor, double share)
+        {
+            if (baseTime <= 0 || cap <= 0 || baseSpeed <= 0 || levelFactor <= 0 || share <= 0) return null;
+            double needFactor = baseTime / (share * cap * baseSpeed);
+            if (double.IsNaN(needFactor) || double.IsInfinity(needFactor)) return null;
+            double levels = (needFactor - 1.0) / levelFactor;
+            if (levels >= long.MaxValue) return null;
+            return levels <= 0 ? 0 : (long)Math.Ceiling(levels);
+        }
+
         // Highest level still blitz-boosting: progressPerTick >= 1 <=> L <= M/baseTime - 1.
         // The community sheet's equivalent cell omits the -1 (it solves for L+1), so it reads one
         // higher. The decomp is the authority here; do not "correct" this toward the spreadsheet.

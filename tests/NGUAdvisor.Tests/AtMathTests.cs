@@ -248,5 +248,49 @@ namespace NGUAdvisor.Tests
             Assert.NotNull(seconds);
             Assert.Equal(AtMath.SecondsToLevel(1000, 5000, 0.5 * 1001 / 0.02).Value, seconds.Value, 6);
         }
+
+        // Worked by hand: 1 % of a 1e10 cap is 1e8; BB = 1e15 / speed <= 1e8 needs speed 1e7, i.e.
+        // (1 + 0.001·L) = 10 against a base speed of 1e6 — L = 9000.
+        [Fact]
+        public void WandoosStopIsTheLevelWhereTheDumpCostsTheShare()
+        {
+            Assert.Equal(9000L, AtMath.WandoosStopLevel(1e15, 1e10, 1e6, 0.001, 0.01));
+        }
+
+        [Fact]
+        public void WandoosStopIsZeroWhenTheDumpIsAlreadyCheapEnough()
+        {
+            Assert.Equal(0L, AtMath.WandoosStopLevel(1e15, 1e10, 1e8, 0.001, 0.01));
+        }
+
+        // The 2026-10-05 log: the stop swung 3.64x when the Wandoos digger toggled. With the digger
+        // divided out both readings are the same speed: 72.8 / 2 / 3.64 = 20 / 2 = 10.
+        [Fact]
+        public void WandoosBaseSpeedIgnoresTheWandoosDigger()
+        {
+            double? withDigger = AtMath.WandoosBaseSpeed(72.8, 2.0, 1.1, 1.1, 3.64);
+            double? without = AtMath.WandoosBaseSpeed(20.0, 2.0, 1.1, 1.1, 1.0);
+            Assert.Equal(10.0, withDigger.Value, 9);
+            Assert.Equal(10.0, without.Value, 9);
+        }
+
+        // Half booted with wandoosComplete: the live 5 is half of the unboosted 10, and a full boot
+        // adds the game's x1.1 on top — 11, not 10.
+        [Fact]
+        public void WandoosBaseSpeedIsTheFullyBootedSpeed()
+        {
+            Assert.Equal(11.0, AtMath.WandoosBaseSpeed(5.0, 1.0, 0.5, 1.1, 1.0).Value, 9);
+        }
+
+        [Fact]
+        public void WandoosStopRefusesToAnswerRatherThanInventALevel()
+        {
+            Assert.Null(AtMath.WandoosBaseSpeed(5.0, 1.0, 0.01, 1.1, 1.0));
+            Assert.Null(AtMath.WandoosBaseSpeed(0.0, 1.0, 1.0, 1.0, 1.0));
+            Assert.Null(AtMath.WandoosBaseSpeed(double.NaN, 1.0, 1.0, 1.0, 1.0));
+            Assert.Null(AtMath.WandoosStopLevel(1e15, 1e10, 1e6, 0.0, 0.01));
+            Assert.Null(AtMath.WandoosStopLevel(1e15, 0.0, 1e6, 0.001, 0.01));
+            Assert.Null(AtMath.WandoosStopLevel(1e300, 1.0, 1e-300, 1e-10, 0.01));
+        }
     }
 }

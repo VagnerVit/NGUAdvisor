@@ -13,28 +13,46 @@ snapshotted targets.
   `advancedTrainingController.block.levelFactor` — no gear at all — so unlike the Wandoos stops below
   it keeps running through mode locks.
 - **Wandoos ATs (3=E, 4=M)**: stop once Wandoos' cap-speed dump costs ≤ 1 % of max E/M. Dump cost
-  = `baseTime / totalWandoosSpeed`; solve `(1 + f·L)` from `baseTime / (0.01 × cap × speedOther)`.
-  Recomputed live (OS levels raise baseTime during the run). **Gated on the worn gear being the gear
-  we keep** (2026-08-10): the solve reads live gear-derived caps and speeds, but `Tick()` runs
-  OUTSIDE `LockManager.CanSwap()`, so with a temp loadout equipped (gold set, titan set, pit, ygg,
-  cooking — or the quest gear `CanSwap()` deliberately lets through, hence
-  `!CanSwap() || HasQuestLock()`) slots 3/4 were solved from the WRONG gear and the wrong targets
-  PERSISTED after the loadout was restored. While a temp loadout is worn the two `ApplyPurpose` calls
-  are skipped entirely — "leave the target alone" is already the contract for no answer
-  (`long.MinValue`) — and `[CapDbg]` reports `wanCaps=held (<lock> loadout worn)` with
-  `stop=tempgear` rather than printing a number solved from gear we are not keeping. Do not "restore"
-  the ungated calls: they look harmless because they self-correct next tick, but only *after* the
-  restore, and the marathon spends AT against them meanwhile. `TempLoadoutWorn()` is `internal`
-  because `NGUAdvisors.Compute` holds its lane plan on the same gate. **Segment-gated**: NGU MARATHON +
-  (Evil) EVIL CLIMB / AUGMENTATION — NOT AT HOUR (its weaker caps inflate targets and steal AT
-  from P/T — user-caught). Extending to the Evil climb fixed a stale −1: the marathon never runs
-  during the climb, so Wandoos ATs kept the Normal-era pause and never boosted E/M Wandoos
-  (user-caught 2026-07-17). `ApplyPurpose` SETS (doesn't ratchet) — overshoot self-corrects.
-  **Outside those segments slots 3/4 are PAUSED (−1), not left alone** (2026-10-03, user-caught):
-  the game keeps `levelTarget` across rebirths, so a stop solved earlier (2.8M at a fresh run's
-  start, when Wandoos speed is low) stayed as the target, and AT HOUR's `CAPALLAT` waterfill gave
-  Wandoos Magic AT an equal share up to L90k against a live stop of ~20k. Pausing needs no gear read,
-  so it applies through temp loadouts too.
+  = `baseTime / totalWandoosSpeed` (decomp `capAmountEnergy/Magic`); the speed carries the slot
+  linearly as `(1 + f·L)`, so `AtMath.WandoosStopLevel` solves for L. Recomputed live (OS levels
+  raise `baseTime` during the run).
+  - **Solved against the BASE speed** (`AtMath.WandoosBaseSpeed`): live speed with this slot's
+    `(1 + f·L)`, the bootup factor and the Wandoos digger divided out, times the full-boot factor
+    (`bootupSpeedFactor` reaches **1.1** only once booted with `wandoosComplete`; dividing by the
+    pre-boot value alone would drop that 10 %). `boot < 0.02` → unknown. Both terms were measured:
+    the digger toggling moved the stop 7 283 ↔ 26 593 (×3.64, same ratio on E and M) within one AT
+    HOUR on 2026-10-05, and a near-zero bootup at a fresh run's start produced the 2.8M stop of
+    2026-10-03. The digger is divided out because it does not run in the marathon (owner's call),
+    so the marathon's dump never sees it.
+  - **Gated on the worn gear being the gear we keep** (2026-08-10): the solve reads live
+    gear-derived caps and speeds, but `Tick()` runs OUTSIDE `LockManager.CanSwap()`, so with a temp
+    loadout equipped (gold set, titan set, pit, ygg, cooking — or the quest gear `CanSwap()`
+    deliberately lets through, hence `!CanSwap() || HasQuestLock()`) slots 3/4 were solved from the
+    WRONG gear and the wrong targets PERSISTED after the loadout was restored. While a temp loadout
+    is worn the stops are `long.MinValue`, which `ApplyPurpose` treats as "leave the target alone",
+    and `[CapDbg]` prints `stop=tempgear`. `TempLoadoutWorn()` is `internal` because
+    `NGUAdvisors.Compute` holds its lane plan on the same gate.
+  - **Per segment** — `ApplyPurpose` SETS (doesn't ratchet):
+
+    | segment | slots 3/4 target |
+    |---|---|
+    | NGU MARATHON, (Evil) EVIL CLIMB, AUGMENTATION | the live stop; the marathon's is remembered |
+    | AT HOUR | `min(live stop, last marathon stop)`; the live stop alone while no marathon stop is known |
+    | anything else | paused (−1), also through temp loadouts |
+
+    **Why AT HOUR is bounded by the marathon** (2026-10-05, owner's call): AT HOUR is the only
+    segment that feeds AT in earnest — the marathon's `CAPALLAT` is a surplus absorber after the NGU
+    lanes — so pausing Wandoos ATs there meant they practically never grew and the dump held 5–20 %
+    of E cap through the marathon. But AT HOUR wears AT gear, whose weaker cap inflates the live
+    solve (user-caught, 2026-07-17), and AT levels cannot be un-bought. The marathon stop is solved on
+    the gear the dump actually runs on, so it caps the AT HOUR target. It is a process-lifetime static
+    so it survives the rebirth into the next run's AT HOUR. After a fresh inject it is unknown until
+    the marathon runs once, and AT HOUR uses the live stop meanwhile (owner's call, 2026-10-05): that
+    day the AT gear read an energy cap of 11.6B against the marathon's 9.94B, so the inflation the
+    bound guards against did not hold, and pausing cost the whole run's Wandoos AT.
+    **Why everything else is paused, not left alone** (2026-10-03, user-caught): the game keeps
+    `levelTarget` across rebirths, so a stale stop kept drawing an equal `CAPALLAT` share (Wandoos
+    Magic AT fed up to L90k against a live stop of ~20k).
 - Return value `long.MinValue` = unknown → leave the current target alone; −1 = hold at zero
   (target 0 means UNCAPPED in the game's semantics — the reason freezes write `lvl > 0 ? lvl : −1`).
 
@@ -98,8 +116,10 @@ separately — `augStarved=` and `digStarved=`** (the digger half was missing fr
 collapsed into one field again); the TM's basis and both TM level/target pairs; `purpose=` plus, per
 AT slot, the current level, the current target and the solved stop (`block=`, `wanE=`, `wanM=`, with
 `stop` = `unknown` when the factor could not be read, `hold` for the −1 hold-at-zero case and
-`tempgear` when a temp loadout means the Wandoos stop is deliberately not solved) and `wanCaps=`
-saying whether this segment applies the Wandoos stops at all — `applied`, `paused (not this segment)`, or
+`tempgear` when a temp loadout means the Wandoos stop is deliberately not solved), the remembered
+`marathon` stop and the solve's inputs (`cap=`, `boot=`, `digger=`), and `wanCaps=` saying how this
+segment applies the Wandoos stops — `applied`, `AT HOUR min(live, marathon)`,
+`AT HOUR live (no marathon stop measured yet)`, `paused (not this segment)`, or
 `held (<lock> loadout worn)`.
 
 The gold probes are re-read inside the renderer rather than threaded out of the decision, so the

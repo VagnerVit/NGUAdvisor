@@ -152,20 +152,25 @@ namespace NGUAdvisor.Managers
                     var l = c.advancedTraining.level;
                     if (t != null && l != null && t.Length >= 5 && l.Length >= 5)
                     {
-                        bool wanOwned = WandoosStopsOwned(ChallengeOverlay.Segment);
+                        string seg = ChallengeOverlay.Segment;
                         // While a temp loadout is worn the stops are not solved at all (they would be
                         // solved from gear we are not keeping), so the log must not print a number
                         // either — `tempgear` is the honest value.
                         bool tempGear = TempLoadoutWorn();
-                        string wanE = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, energy: true));
-                        string wanM = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, energy: false));
-                        string wanState = !wanOwned
-                            ? "paused (not this segment)"
-                            : tempGear ? $"held ({LockManager.GetLockTypeName()} loadout worn)" : "applied";
+                        string inE = "", inM = "";
+                        string wanE = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, true, out inE));
+                        string wanM = tempGear ? "tempgear" : StopText(WandoosStopLevel(c, false, out inM));
+                        string wanState = tempGear && (WandoosStopsOwned(seg) || seg == "AT HOUR")
+                            ? $"held ({LockManager.GetLockTypeName()} loadout worn)"
+                            : WandoosStopsOwned(seg) ? "applied"
+                            : seg != "AT HOUR" ? "paused (not this segment)"
+                            : _marathonStopE == long.MinValue && _marathonStopM == long.MinValue
+                                ? "AT HOUR live (no marathon stop measured yet)"
+                                : "AT HOUR min(live, marathon)";
                         slots = $"tough=lvl{l[0]}/tgt{t[0]} power=lvl{l[1]}/tgt{t[1]}"
                               + $" block=lvl{l[2]}/tgt{t[2]}/stop{StopText(BlockStopLevel(c))}"
-                              + $" wanE=lvl{l[3]}/tgt{t[3]}/stop{wanE}"
-                              + $" wanM=lvl{l[4]}/tgt{t[4]}/stop{wanM}"
+                              + $" wanE=lvl{l[3]}/tgt{t[3]}/stop{wanE}/marathon{StopText(_marathonStopE)} {inE}"
+                              + $" wanM=lvl{l[4]}/tgt{t[4]}/stop{wanM}/marathon{StopText(_marathonStopM)} {inM}"
                               + $" wanCaps={wanState}";
                     }
                 }
@@ -243,31 +248,31 @@ namespace NGUAdvisor.Managers
                 }
 
                 ApplyPurpose(targets, 2, BlockStopLevel(c));
-                // Wandoos-AT stops are measured against the ACTIVE loadout's E/M caps, so they run only in
-                // segments where Wandoos is the INTENDED sink: NGU MARATHON, plus on Evil the EVIL CLIMB /
-                // AUGMENTATION phases (Wandoos is a primary early-Evil E/M sink). NOT AT HOUR — its weaker
-                // caps inflate the targets and steal AT from Power/Toughness (user-caught). Extending to the
-                // Evil climb fixes a STALE -1: the profile-owned marathon never runs during the climb, so the
-                // Wandoos ATs kept the Normal-era -1 and never boosted E/M Wandoos (user-caught 2026-07-17).
-                // (ApplyPurpose sets, doesn't ratchet, so a brief overshoot self-corrects next tick.)
-                // …and only while the WORN gear is the gear we are keeping. WandoosStopLevel solves
-                // against live gear-derived caps and speeds, but Tick() runs outside
-                // LockManager.CanSwap() — so with a temp loadout equipped (a gold set, a titan set,
-                // pit/ygg/cooking, or the quest gear CanSwap() deliberately lets through) the slot
-                // 3/4 targets were solved from the WRONG gear, and they persisted after the loadout
-                // was restored. Leaving the target alone is the existing contract for "no answer"
-                // (ApplyPurpose ignores long.MinValue), so skip the two calls entirely.
-                if (!WandoosStopsOwned(ChallengeOverlay.Segment))
+                // The stops are solved from the worn gear, and a temp loadout is not the gear we keep;
+                // ApplyPurpose ignores long.MinValue, so "leave the target alone" needs no extra branch.
+                // The game keeps levelTarget across rebirths, hence the explicit pause elsewhere.
+                string seg = ChallengeOverlay.Segment;
+                bool tempGear = TempLoadoutWorn();
+                long stopE = tempGear ? long.MinValue : WandoosStopLevel(c, energy: true);
+                long stopM = tempGear ? long.MinValue : WandoosStopLevel(c, energy: false);
+                if (WandoosStopsOwned(seg))
                 {
-                    // The game keeps levelTarget across rebirths, so a stop solved in an earlier
-                    // segment or run would otherwise keep drawing an equal CAPALLAT share here.
+                    if (seg == "NGU MARATHON") RememberMarathonStops(stopE, stopM);
+                    ApplyPurpose(targets, 3, stopE);
+                    ApplyPurpose(targets, 4, stopM);
+                }
+                else if (seg == "AT HOUR")
+                {
+                    if (!tempGear)
+                    {
+                        ApplyPurpose(targets, 3, AtHourStop(stopE, _marathonStopE));
+                        ApplyPurpose(targets, 4, AtHourStop(stopM, _marathonStopM));
+                    }
+                }
+                else
+                {
                     ApplyPurpose(targets, 3, PausedTarget);
                     ApplyPurpose(targets, 4, PausedTarget);
-                }
-                else if (!TempLoadoutWorn())
-                {
-                    ApplyPurpose(targets, 3, WandoosStopLevel(c, energy: true));
-                    ApplyPurpose(targets, 4, WandoosStopLevel(c, energy: false));
                 }
             }
             catch (Exception e) { Main.LogDebug($"LevelPlanner purpose caps: {e.Message}"); }
@@ -284,6 +289,26 @@ namespace NGUAdvisor.Managers
 
         private static bool WandoosStopsOwned(string segment)
             => segment == "NGU MARATHON" || segment == "EVIL CLIMB" || segment == "AUGMENTATION";
+
+        // The last stop solved in NGU MARATHON, the segment whose gear the Wandoos dump actually runs on.
+        // Static on purpose: it must survive the rebirth into the next run's AT HOUR.
+        private static long _marathonStopE = long.MinValue, _marathonStopM = long.MinValue;
+
+        private static void RememberMarathonStops(long stopE, long stopM)
+        {
+            if (stopE != long.MinValue) _marathonStopE = stopE;
+            if (stopM != long.MinValue) _marathonStopM = stopM;
+        }
+
+        // AT HOUR feeds AT, but in AT gear: a weaker cap there would inflate the live solve, and AT
+        // levels cannot be un-bought. So a known marathon stop bounds it; without one the live solve
+        // stands (LevelPlanner.md, "Why AT HOUR is bounded by the marathon").
+        private static long AtHourStop(long liveStop, long marathonStop)
+        {
+            if (marathonStop == long.MinValue) return liveStop;
+            if (liveStop == long.MinValue) return marathonStop;
+            return Math.Min(liveStop, marathonStop);
+        }
 
         private static void ApplyPurpose(long[] targets, int slot, long stop)
         {
@@ -304,31 +329,35 @@ namespace NGUAdvisor.Managers
             catch { return long.MinValue; }
         }
 
-        // Wandoos ATs stop once the Wandoos cap-speed dump costs <= 1% of max E/M. The dump cost
-        // is baseTime / totalWandoosSpeed, and speed scales with (1 + f·L) — solve for L. The
-        // stop moves as the OS levels raise baseTime during the run; recomputed live. Reads
-        // CURRENT gear (cap + speed) — callers must invoke this during the marathon only, and never
-        // while a mode lock's temp loadout is worn (TempLoadoutWorn()).
-        private static long WandoosStopLevel(Character c, bool energy)
+        // Wandoos ATs stop once the Wandoos cap-speed dump costs <= 1% of max E/M, solved by
+        // AtMath.WandoosStopLevel against the fully booted, digger-free speed. Reads CURRENT gear
+        // (cap + speed), so never call it while a mode lock's temp loadout is worn (TempLoadoutWorn()).
+        private const double WandoosDumpShare = 0.01;
+
+        private static long WandoosStopLevel(Character c, bool energy) => WandoosStopLevel(c, energy, out _);
+
+        private static long WandoosStopLevel(Character c, bool energy, out string inputs)
         {
+            inputs = "unreadable";
             try
             {
                 if (!c.buttons.wandoos.interactable || c.wandoos98.disabled) return long.MinValue;
                 var ctl = energy ? c.advancedTrainingController.wandoosEnergy : c.advancedTrainingController.wandoosMagic;
                 float f = ctl.levelFactor;
-                if (f <= 0) return long.MinValue;
-
                 long lvl = c.advancedTraining.level[energy ? 3 : 4];
                 double speed = energy ? c.totalWandoosEnergySpeed() : c.totalWandoosMagicSpeed();
                 double baseTime = energy ? (double)c.wandoos98Controller.baseEnergyTime() : (double)c.wandoos98Controller.baseMagicTime();
                 double cap = energy ? (double)c.totalCapEnergy() : (double)c.totalCapMagic();
-                if (speed <= 0 || cap <= 0 || baseTime <= 0) return long.MinValue;
+                double boot = c.wandoos98Controller.bootupSpeedFactor();
+                double fullBoot = c.inventory.itemList.wandoosComplete ? 1.1 : 1.0;
+                double digger = c.allDiggers.totalWandoosSpeedBonus();
+                inputs = $"cap={NumberFormatter.Abbrev(cap)} boot={boot:0.###} digger={digger:0.###}";
 
-                double sOther = speed / (1.0 + f * lvl);          // speed without this AT's factor
-                double needFactor = baseTime / (0.01 * cap * sOther);   // required (1 + f·L)
-                double levels = (needFactor - 1.0) / f;
-                if (levels <= 0) return -1;                       // already <= 1% at level 0: hold
-                return (long)Math.Ceiling(levels);
+                double? baseSpeed = AtMath.WandoosBaseSpeed(speed, 1.0 + f * lvl, boot, fullBoot, digger);
+                if (!baseSpeed.HasValue) return long.MinValue;
+                long? stop = AtMath.WandoosStopLevel(baseTime, cap, baseSpeed.Value, f, WandoosDumpShare);
+                if (!stop.HasValue) return long.MinValue;
+                return stop.Value > 0 ? stop.Value : PausedTarget;   // already <= 1% at level 0: hold
             }
             catch { return long.MinValue; }
         }

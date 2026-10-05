@@ -4,6 +4,13 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Wandoos AT grows in AT HOUR.** The AT HOUR feeds it up to its stop, capped by the stop last
+  measured in the marathon, so the Wandoos dump no longer holds 5–20 % of the energy cap.
+- **The Wandoos AT stop no longer jumps with the Wandoos digger or the Wandoos bootup.** It is solved
+  against the fully booted speed without the digger, which does not run in the marathon.
+
 ## [1.8.2] - 2026-10-04
 
 ### Added
