@@ -4,8 +4,27 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-10-12
+
+### Changed
+
+- **Titan gold gear goes on only when the drop can raise the bank by at least 5 %.** Otherwise the
+  titan is killed in its own loot set, Drop Chance included.
+- **The gold set fills its spare accessory slots with Drop Chance.** Before, slots without a gold
+  item kept whatever was worn.
+- **NGU lanes split energy and magic along BB breakpoints.** The equal split left most of the pool
+  idle in TM HOUR. NGU x/hr ratings use the game's own bonus formula and one level per tick.
+- **RECOVERY no longer flips back and forth.** It has separate enter and leave bars and a minimum
+  stay, and its AT is capped at 40 % so the NGU lanes keep energy.
+
 ### Fixed
 
+- **The gold drop prediction counts the gold set you will really wear**, pinned items and the forced
+  Respawn included.
+- **Titan kill projections use one Adventure set.** Attack and defense came from two different sets
+  nobody can wear at once, which overstated both. They are also re-measured after every gear swap.
+- **Equal-scoring accessories go to the item the rest of the gear chain prefers**, not to whichever
+  came first in the inventory.
 - **Wandoos AT grows in AT HOUR.** The AT HOUR feeds it up to its stop, capped by the stop last
   measured in the marathon, so the Wandoos dump no longer holds 5–20 % of the energy cap.
 - **The Wandoos AT stop no longer jumps with the Wandoos digger or the Wandoos bootup.** It is solved
