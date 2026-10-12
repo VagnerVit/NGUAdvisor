@@ -4,6 +4,18 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-10-12
+
+### Added
+
+- **yggdrasil.log names the fruit behind every harvest line**, with its tier, so you can see what
+  each fruit gave.
+
+### Fixed
+
+- **The Yggdrasil advice line is no longer cut off.** The pre-rebirth harvest reminder wraps onto
+  more lines instead of ending in "…".
+
 ## [1.8.3] - 2026-10-12
 
 ### Changed
