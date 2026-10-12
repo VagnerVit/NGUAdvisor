@@ -472,24 +472,24 @@ namespace NGUAdvisor.Managers
                     if (_fc.harvestTier(10) > 0 && Settings.FavoredMacguffin >= 0)
                     {
                         InventoryManager.ManageFavoredMacguffin(false, true);
-                        _fc.consumeFruit(10);
+                        EatLogged(10);
                     }
                     InventoryManager.RestoreMacguffins();
-                    _yc.consumeAll(true);
+                    ConsumeAllLogged(true);
                 }
                 else
                 {
                     if (_fc.harvestTier(10) > 0 && _fc.harvestTier(10) >= macguffinFruit.maxTier && Settings.FavoredMacguffin >= 0)
                     {
                         InventoryManager.ManageFavoredMacguffin(false, true);
-                        _fc.consumeFruit(10);
+                        EatLogged(10);
                     }
                     InventoryManager.RestoreMacguffins();
-                    _yc.consumeAll();
+                    ConsumeAllLogged(false);
                     if (MacguffinFruit2Ready())
-                        _fc.consumeFruit(13);
+                        EatLogged(13);
                     if (QPFruitReady())
-                        _fc.consumeFruit(14);
+                        EatLogged(14);
                 }
                 LockManager.RestoreYggdrasilSwap();
                 ReadTooltipLog(true);
@@ -499,6 +499,31 @@ namespace NGUAdvisor.Managers
                 CleanupFailedYggdrasilHarvest();
                 throw;
             }
+        }
+
+        // AllYggdrasil.consumeAll(bool)'s own loop (decomp), one fruit at a time: the game's tooltip
+        // lines never name the fruit, so each fruit's lines are read and tagged right after it is taken.
+        private static void ConsumeAllLogged(bool overrideFlag)
+        {
+            for (var i = 0; i < Fruits.Count; i++)
+            {
+                int tier = _fc.harvestTier(i);
+                if (tier < 1 || (!overrideFlag && tier < Fruits[i].maxTier))
+                    continue;
+                if (Fruits[i].eatFruit)
+                    _fc.consumeFruit(i);
+                else
+                    _fc.harvest(i);
+                ReadTooltipLog(true, $"{FruitName(i)} T{tier}{(Fruits[i].eatFruit ? "" : " harvest")}");
+            }
+            _yc.refreshMenu();
+        }
+
+        private static void EatLogged(int i)
+        {
+            int tier = _fc.harvestTier(i);
+            _fc.consumeFruit(i);
+            ReadTooltipLog(true, $"{FruitName(i)} T{tier}");
         }
 
         // The cleanup faults are reported and dropped, never rethrown. RestoreConfiguration transitions
@@ -593,8 +618,10 @@ namespace NGUAdvisor.Managers
         // AllGoldDiggerController.upgradeMaxLevel posts one of these per level the digger restore buys.
         private const string DiggerCapRaised = "raised this digger's max level to ";
 
-        public static void ReadTooltipLog(bool doLog)
+        // source: the fruit the new lines came from, prefixed to each so the log says what gave what.
+        public static void ReadTooltipLog(bool doLog, string source = null)
         {
+            string prefix = source == null ? "" : $"  {source}: ";
             var bLog = Main.Character.tooltip.log;
             var log = bLog.GetFieldValue<TooltipLog, List<string>>("Eventlog");
             var diggerCaps = new List<string>();
@@ -610,12 +637,12 @@ namespace NGUAdvisor.Managers
                     if (at >= 0)
                         diggerCaps.Add(line.Substring(at + DiggerCapRaised.Length).TrimEnd('!', ' '));
                     else
-                        LogYggdrasil(line);
+                        LogYggdrasil(prefix + line);
                 }
                 log[i] += "<b></b>";
             }
             if (diggerCaps.Count > 0)
-                LogYggdrasil($"Digger max level raised {diggerCaps.Count}x (to {string.Join(", ", diggerCaps.Distinct().ToArray())})");
+                LogYggdrasil($"{prefix}Digger max level raised {diggerCaps.Count}x (to {string.Join(", ", diggerCaps.Distinct().ToArray())})");
         }
 
         // Multi-line tooltips (Adventure's stat list, the "You also gain:" fruits) become one record.

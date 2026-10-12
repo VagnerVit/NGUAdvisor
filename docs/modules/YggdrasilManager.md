@@ -93,7 +93,11 @@ valuation throw falls back to swapping (the pre-gate behaviour) — it must neve
   the normal path requires the MacGuffin fruit to be at max tier.
 - `ReadTooltipLog(false)` before / `(true)` after: the game's tooltip event log is marked with a
   `<b></b>` sentinel so only NEW harvest lines get written to **yggdrasil.log**
-  (`Main.LogYggdrasil`). Each tooltip is one record: multi-line tooltips (Adventure's stat list,
+  (`Main.LogYggdrasil`). **Per-fruit attribution** (user request 2026-10-12): the game's lines never
+  name the fruit, so `ConsumeAllLogged` replays `AllYggdrasil.consumeAll(bool)`'s own loop (same
+  condition, same `consumeFruit`/`harvest` call, `refreshMenu` at the end) and reads the log after
+  each fruit, prefixing its lines `  <Fruit> T<tier>: …` (`harvest` = seeds-only fruit). The MacGuffin
+  α/β and Quirks fruits eaten outside the loop go through `EatLogged`. Each tooltip is one record: multi-line tooltips (Adventure's stat list,
   "You also gain:") are joined on one line. The digger restore's per-level
   `AllGoldDiggerController.upgradeMaxLevel` tooltips ("raised this digger's max level to N", up to
   30 per Gold pass) collapse into one `Digger max level raised Nx (to …)` line.

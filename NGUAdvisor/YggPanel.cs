@@ -492,7 +492,9 @@ namespace NGUAdvisor
                 if (reminder != null)
                     advice = $"{reminder} · {advice}";
                 _advice.ForeColor = rebirthDue ? UiTheme.Danger : UiTheme.Muted;
-                UiLayout.FitOrGrow(_advice, advice);   // last element on the panel — free to wrap
+                // Last element on the panel — free to wrap. The harvest reminder names every held tier
+                // (up to a dozen fruits), which alone outgrows the default two lines.
+                UiLayout.FitOrGrow(_advice, advice, 4);
             }
             catch (Exception ex) { LogDebug($"Ygg panel: {ex.Message}"); }
         }
