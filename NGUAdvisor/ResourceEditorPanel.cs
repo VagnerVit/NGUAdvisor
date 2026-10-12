@@ -323,20 +323,22 @@ namespace NGUAdvisor
             {
                 Size = new Size(ColCapW, UiTheme.SText(22) + UiTheme.S(2));
                 BorderStyle = BorderStyle.FixedSingle;
-                _yes = Half("Yes", 0);
-                _no = Half("No", ColCapW / 2);
+                // Halves of the CLIENT width: the FixedSingle border takes a pixel on each side.
+                int inner = ClientSize.Width;
+                _yes = Half("Yes", 0, inner / 2);
+                _no = Half("No", inner / 2, inner - inner / 2);
                 _yes.Click += (s, e) => Set(true, true);
                 _no.Click += (s, e) => Set(false, true);
                 Controls.Add(_yes); Controls.Add(_no);
                 Restyle();
             }
 
-            private Label Half(string t, int x) => new Label
+            private Label Half(string t, int x, int w) => new Label
             {
                 Text = t,
                 Location = new Point(x, 0),
                 // Fixed-height label holding 9pt: the height takes the TextH floor, never raw S().
-                Size = new Size(ColCapW / 2 - 1, UiTheme.SText(22)),
+                Size = new Size(w, UiTheme.SText(22)),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = UiTheme.Ui
             };
