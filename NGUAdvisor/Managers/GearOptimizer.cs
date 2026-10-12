@@ -128,6 +128,8 @@ namespace NGUAdvisor.Managers
             double barA = 0, barD = 0;
             // The most any spawning target still needs from drop chance; Known=false = it buys nothing.
             var lootNeed = new BoostFarmAdvisor.GearLootNeed();
+            // Every kill in this set banks gold, so the richest spawning target decides; -1 = none.
+            int goldZone = -1;
             try
             {
                 var targets = Main.Settings.TitanSwapTargets;
@@ -135,6 +137,10 @@ namespace NGUAdvisor.Managers
                 {
                     if (targets == null || i >= targets.Length || !targets[i]) continue;
                     if (!ZoneHelpers.TitanSpawningSoon(i)) continue;
+                    int zone = ZoneHelpers.TitanZones[i];
+                    if (Main.Settings.ManageGoldLoadouts && GoldDropTables.BaseGold(zone, true) >
+                        (goldZone < 0 ? 0 : GoldDropTables.BaseGold(goldZone, true)))
+                        goldZone = zone;
                     var need = BoostFarmAdvisor.TitanGearLootFor(i);
                     if (need.Known && (!lootNeed.Known || need.Target > lootNeed.Target)) lootNeed = need;
                     if (ZoneHelpers.AutokillAvailable(i)) continue;
@@ -153,7 +159,7 @@ namespace NGUAdvisor.Managers
                 Main.Log("Titan fight is live (not AK) — kill set overrides the loot objective");
                 // Pins must not override a real fight either -- the same death loop this override
                 // exists for (loot/pinned gear equipped into a live titan) applies to pinned items too.
-                var killSet = KillSetWithDropChance(barA, barD, Main.Settings.TitanObjectiveRespawn, lootNeed);
+                var killSet = KillSetWithDropChance(barA, barD, Main.Settings.TitanObjectiveRespawn, lootNeed, goldZone);
                 if (killSet != null && killSet.Length > 0) return killSet;
                 return ResolveModeGear("Adventure", Main.Settings.TitanObjectiveRespawn, fallback, new int[0]);
             }
@@ -181,17 +187,21 @@ namespace NGUAdvisor.Managers
             return ResolveModeGear(obj, Main.Settings.TitanObjectiveRespawn, fallback);
         }
 
-        // Live-fight kill set (user rule: wear what the kill needs, the rest for drop chance). Adventure
-        // owns the main slots and keeps accessories only while the projected stats still clear the
-        // fight's bar; every accessory it gives back goes to Drop Chance. Attack is projected linearly
-        // in the Power score, as ProjectedBestGear does. Unpinned: pins never enter a real fight.
-        // null when the bar or the objectives can't be read.
+        // Live-fight kill set (user rule: wear what the kill needs, the rest for loot). Adventure owns the
+        // main slots and keeps accessories only while the projected stats still clear the fight's bar.
+        // The accessories it gives back go to Gold Drops first when this kill's drop in that set beats
+        // the bank by TitanRebankMargin (a non-AK titan is never a gold-swap target, so this is the
+        // only way its gold reaches the bank), then to Drop Chance. Attack is projected linearly in the
+        // Power score, as ProjectedBestGear does. The user's pins never enter a real fight; the only pins
+        // here are the gold set's own main-slot gold items, and each one only while Clears holds.
+        // null when the bar or the objectives can't be read. goldZone -1 = no gold in play.
         private static int[] KillSetWithDropChance(double barA, double barD, bool forceTopRespawn,
-                                                   BoostFarmAdvisor.GearLootNeed lootNeed)
+                                                   BoostFarmAdvisor.GearLootNeed lootNeed, int goldZone)
         {
             try
             {
                 var adventure = FindObjective("Adventure");
+                var goldDrops = FindObjective(GearObjectives.Stat.GoldDrops);
                 var dropChance = FindObjective(GearObjectives.Stat.DropChance);
                 var power = FindObjective("Power");
                 var toughness = FindObjective("Toughness");
@@ -213,26 +223,75 @@ namespace NGUAdvisor.Managers
                 // uncapped roll; otherwise the kill keeps every accessory.
                 bool dcPays = lootNeed.Known && lootNeed.Target > ScoreOf(full, dropChance);
                 bool fullClears = Clears(full);
-                if (dcPays && fullClears)
+
+                // Free accessories one at a time while the bar still clears. The tail takes them: Gold
+                // Drops (when asked) claims the ones carrying gold, then Drop Chance — or Adventure again
+                // when this titan needs no more drop chance, so a gold-only trim never strands a slot.
+                Result Trim(Result start, int[] pins, bool withGold, out int keptSlots)
                 {
-                    for (int slots = full.Accessories.Count - 1; slots >= 0; slots--)
+                    Result trimmed = start;
+                    keptSlots = start.Accessories.Count;
+                    for (int slots = start.Accessories.Count - 1; slots >= 0; slots--)
                     {
-                        var run = OptimizeCore(new[]
-                        {
-                            new GearPriority { Objective = adventure, MaxAccessorySlots = slots },
-                            new GearPriority { Objective = dropChance, MaxAccessorySlots = GearChain.Unlimited },
-                        }, noPins, forceTopRespawn);
+                        var chain = new List<GearPriority> { new GearPriority { Objective = adventure, MaxAccessorySlots = slots } };
+                        if (withGold) chain.Add(new GearPriority { Objective = goldDrops, MaxAccessorySlots = GearChain.Unlimited });
+                        chain.Add(new GearPriority { Objective = dcPays ? dropChance : adventure, MaxAccessorySlots = GearChain.Unlimited });
+                        var run = OptimizeCore(chain, pins, forceTopRespawn);
                         if (!Clears(run)) break;
-                        best = run;
-                        kept = slots;
+                        trimmed = run;
+                        keptSlots = slots;
                     }
+                    return trimmed;
                 }
+
+                bool goldPays = false;
+                double goldPred = 0, reachable = 0, bank = GoldDropAdvisor.Banked();
+                bool saturated = false;
+                int[] goldPins = noPins;
+                if (fullClears && goldDrops != null && goldZone >= 0)
+                {
+                    // Gold also sits in main slots (a gold helmet), which Adventure owns. The gold set's
+                    // main-slot gold items are tried as pins — together and one by one — and a variant
+                    // counts only while the bar still clears; the richest drop wins.
+                    var goldSet = GoldSet();
+                    int[] goldMain = GoldMainSlotItems(goldSet);
+                    var variants = new List<int[]> { noPins };
+                    if (goldMain.Length > 0) variants.Add(goldMain);
+                    if (goldMain.Length > 1) variants.AddRange(goldMain.Select(id => new[] { id }));
+                    Result withGold = null;
+                    int keptWithGold = 0;
+                    foreach (var pins in variants)
+                    {
+                        var start = pins.Length == 0 ? full
+                            : OptimizeCore(new[] { new GearPriority { Objective = adventure, MaxAccessorySlots = GearChain.Unlimited } },
+                                           pins, forceTopRespawn);
+                        if (!Clears(start)) continue;
+                        var run = Trim(start, pins, true, out int k);
+                        double pred = GoldDropAdvisor.PredictedDropInSet(goldZone, ScoreOf(run, goldDrops));
+                        if (withGold != null && pred <= goldPred) continue;
+                        withGold = run; keptWithGold = k; goldPred = pred; goldPins = pins;
+                    }
+                    // With drop chance at stake the gold must beat the bank by the swap margin; without it
+                    // the freed slots would only go back to Adventure, so beating the bank is enough —
+                    // unless the bank already sits within BankSaturation of the best drop reachable here.
+                    reachable = goldSet == null ? 0 : GoldDropAdvisor.PredictedDropInSet(goldZone, ScoreOf(goldSet, goldDrops));
+                    saturated = bank > 0 && reachable > 0 && bank >= reachable * GoldDropAdvisor.BankSaturation;
+                    double margin = dcPays ? GoldDropAdvisor.TitanRebankMargin : 1.0;
+                    goldPays = withGold != null && goldPred > 0 && !saturated && (bank <= 0 || goldPred > bank * margin);
+                    if (goldPays) { best = withGold; kept = keptWithGold; }
+                    else goldPins = noPins;
+                }
+                if (!goldPays && dcPays && fullClears)
+                    best = Trim(full, noPins, false, out kept);
+
                 double projA = atk * ScoreOf(best, power) / curP, projD = def * ScoreOf(best, toughness) / curT;
                 string Shortfall(string stat, double projected, double bar) => projected >= bar
                     ? ""
                     : $" {stat} {((projected / bar - 1) * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture)}%";
+                string goldNote = goldZone < 0 || !fullClears ? ""
+                    : $", gold {(goldPays ? "takes its accessories" + (goldPins.Length > 0 ? $" + {string.Join(", ", goldPins.Select(id => Main.ItemName(id)).ToArray())}" : "") : saturated ? "skipped, bank within 5 % of the best reachable" : "skipped")} (~{NumberFormatter.Abbrev(goldPred)} vs {NumberFormatter.Abbrev(bank)} banked, {GoldDropAdvisor.PctVsBank(goldPred, bank)}; best reachable ~{NumberFormatter.Abbrev(reachable)})";
                 string verdict = kept < full.Accessories.Count
-                    ? $"Adventure keeps {kept}/{full.Accessories.Count} accessories, Drop Chance the rest"
+                    ? $"Adventure keeps {kept}/{full.Accessories.Count} accessories, {(goldPays ? "Gold Drops + " : "")}{(dcPays ? "Drop Chance" : "Adventure")} the rest"
                     : !fullClears
                         ? $"Adventure keeps all {kept} accessories, bar NOT cleared by full Adventure"
                           + $" ({(Shortfall("Power", projA, barA) + Shortfall("Toughness", projD, barD)).Trim()})"
@@ -241,10 +300,22 @@ namespace NGUAdvisor.Managers
                             : $"Adventure keeps all {kept} accessories, one fewer misses the bar";
                 Main.Log($"Titan kill set: {verdict} "
                        + $"(bar {NumberFormatter.Abbrev(barA)} / {NumberFormatter.Abbrev(barD)}, "
-                       + $"projected {NumberFormatter.Abbrev(projA)} / {NumberFormatter.Abbrev(projD)})");
+                       + $"projected {NumberFormatter.Abbrev(projA)} / {NumberFormatter.Abbrev(projD)}){goldNote}");
                 return best.AllIds().Where(x => x > 0).Distinct().ToArray();
             }
             catch (Exception e) { Main.LogDebug($"Titan kill set failed: {e.Message}"); return null; }
+        }
+
+        // The gold set's main-slot items that carry Gold Drops (a gold helmet): the only main-slot
+        // gold a kill set can borrow.
+        private static int[] GoldMainSlotItems(Result set)
+        {
+            if (set == null) return new int[0];
+            var idToItem = CachedPools(false).IdToItem;
+            return new[] { set.MainWeapon, set.OffWeapon, set.Head, set.Chest, set.Legs, set.Boots }
+                .Where(id => id != 0 && idToItem.TryGetValue(id, out var it)
+                             && it.Stats.TryGetValue(GearObjectives.Stat.GoldDrops, out var v) && v > 0)
+                .Distinct().ToArray();
         }
 
         // Gold gear resolution with a data-driven default: when the user configured NEITHER a gold

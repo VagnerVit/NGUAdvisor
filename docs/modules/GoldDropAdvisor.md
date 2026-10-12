@@ -52,6 +52,9 @@ titan zones and the titan-beats-zone ordering.
   exactly the 4.25× the swap is worth (`[TitanGoldDbg] … pred=633B … gearx=1 … lock=Default`,
   `[GoldSnipeDbg] SKIP zone=20 pred=569B vsBank=-95.5%`). Any swap or restore now re-measures.
 
+`PredictedDropInSet(zone, setGoldScore)` is the same prediction for a PROPOSED set — its gear factor
+is that set's Gold Drops score over the worn one. The live-fight kill set uses it (GearOptimizer.md).
+
 ## Decisions
 
 | Caller | Rule |
@@ -73,7 +76,12 @@ both causes are fixed: the prediction now uses the best roll (×5) and the gear 
 worn set. The gate is re-evaluated every 60 s pass, so a grown gold bonus re-opens it on the next
 spawn. The `TitanMoneyDone` latch does not gate targeting — it records that a bank was collected (for
 `ZoneHelpers`' kill detection) and `ApplyTitanGold` re-arms it. When refused, `[TitanGoldDbg]` still
-carries the height pick's `pred=` and `vsBank=`, so the shortfall is visible.
+carries the height pick's `pred=` and `vsBank=`, so the shortfall is visible. The views read the same
+pass's verdict (`AdvisorApply.GoldTitanGate()`, never a re-prediction): the Gold pipeline's TITAN BANK
+chip shows `BELOW BANK −x %` instead of "AT NEXT AK KILL", and the advice row says the kills stay in
+the titan set. A **real-fight** titan (not AK at its spawn version, e.g. Beast v4) is never a gold-swap
+target; its gold reaches the bank only through the kill set's freed accessories, under the same
+`TitanRebankMargin` test (`KillSetWithDropChance`).
 
 ## Ranking, not height (`AdvisorApply.BestGoldTitan`)
 

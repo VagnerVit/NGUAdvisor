@@ -424,7 +424,12 @@ namespace NGUAdvisor.Managers
                         try { ver = ZoneHelpers.TitanVersion(best); } catch { }
                         var done = Main.Settings.TitanMoneyDone;
                         bool banked = done != null && best < done.Length && done[best];
-                        if (banked)
+                        var gate = AdvisorApply.GoldTitanGate();
+                        if (gate.Known && !gate.Worth)
+                            list.Add(new Rec { System = "Gold", AutoKey = "titangold", Optimal = true, Text = gate.Predicted > 0
+                                ? $"Titan {best + 1} (v{ver}) gold cannot beat the bank ({GoldDropAdvisor.PctVsBank(gate.Predicted, gate.Banked)}) — kills stay in the titan set"
+                                : $"Titan {best + 1} (v{ver}): no gold swap (drops no gold, or its gold set lost the autokill)" });
+                        else if (banked)
                             list.Add(new Rec { System = "Gold", AutoKey = "titangold", Text = $"Titan {best + 1} (v{ver}) gold banked this run", Optimal = true });
                         else
                             list.Add(new Rec { System = "Gold", AutoKey = "titangold", Text = $"Bank gold on Titan {best + 1} (v{ver}) AK", Severity = 1 });

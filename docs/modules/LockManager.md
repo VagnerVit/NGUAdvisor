@@ -43,7 +43,10 @@ again while its own lock is held and the condition has passed.
   overrides loot objectives on real fights — see GearOptimizer.md). After the gold set goes on it is
   re-tested against the AK thresholds (`ZoneHelpers.GoldTargetLosingAutokill()`, live stats): losing
   the autokill puts the titan set straight back and denies that titan's gold swap for 30 minutes —
-  see GoldDropAdvisor.md.
+  see GoldDropAdvisor.md. **The gold set never goes on while a non-AK titan spawns in the same window**
+  (`ZoneHelpers.LiveFightSpawning()`): the set is per window, the re-test only covers gold targets, and
+  Beast v4 spawning next to an AK Walderp would otherwise be fought in gold gear. The kill set then
+  carries the gold itself (freed accessories + main-slot gold pins, GearOptimizer.md).
 - **Yggdrasil** (`TryYggdrasilSwap`): the gear comes from `YggdrasilManager.SwapGearForPass(forced)`
   — null means no gear swap (beards/diggers still follow their own toggles). It runs inside the
   acquire `try`, so a throw there is cleaned up like any other. `YggdrasilGearSwapped` records the

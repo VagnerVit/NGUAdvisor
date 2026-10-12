@@ -332,6 +332,29 @@ namespace NGUAdvisor.Managers
             return -1;
         }
 
+        // Is a titan spawning in this window that will NOT auto-kill (Beast v4 next to an AK Walderp)?
+        // The gold set is chosen per window, not per titan, so it must not go on then: the post-swap
+        // re-test above only covers the gold targets, and the live fight would be fought in gold gear.
+        public static bool LiveFightSpawning()
+        {
+            var spawning = _titanSnapshotSummary.TitansSpawningSoon;
+            for (int i = 0; i < spawning.Count; i++)
+            {
+                if (!spawning[i].ShouldUseTitanLoadout && !spawning[i].ShouldUseGoldLoadout) continue;
+                try
+                {
+                    if (!AutokillAvailable(spawning[i].TitanIndex))
+                        return true;
+                }
+                catch (Exception e)
+                {
+                    LogDebug($"Live-fight check for titan {spawning[i].TitanIndex}: {e.Message}");
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public static void RefreshTitanSnapshots()
         {
             if (!Main.Character.buttons.adventure.IsInteractable())

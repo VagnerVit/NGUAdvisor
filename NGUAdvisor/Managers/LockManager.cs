@@ -177,7 +177,10 @@ namespace NGUAdvisor.Managers
                 {
                     SaveConfiguration();
 
-                    if (ZoneHelpers.ShouldRunGoldLoadout())
+                    bool liveFight = ZoneHelpers.LiveFightSpawning();
+                    if (ZoneHelpers.ShouldRunGoldLoadout() && liveFight)
+                        Log("A live titan fight spawns in this window — kill set instead of the gold set");
+                    if (ZoneHelpers.ShouldRunGoldLoadout() && !liveFight)
                     {
                         Log("Switching to Gold Drop configuration for titans");
                         LoadoutManager.ChangeGear(GearOptimizer.ResolveGoldGear());

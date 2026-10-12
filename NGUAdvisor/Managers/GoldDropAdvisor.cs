@@ -92,6 +92,19 @@ namespace NGUAdvisor.Managers
             catch { return 0; }
         }
 
+        // The drop of a kill in a PROPOSED set (the live-fight kill set): its gear factor is that set's
+        // Gold Drops score over the worn one, the same ratio GoldGearFactor takes for the gold set.
+        public static double PredictedDropInSet(int zone, double setGoldScore)
+        {
+            double baseGold = GoldDropTables.BaseGold(zone, true);
+            var gold = GearOptimizer.FindObjective(GearObjectives.Stat.GoldDrops);
+            double worn = gold == null ? 0 : GearOptimizer.CurrentScore(gold);
+            if (baseGold <= 0 || worn <= 0 || setGoldScore <= 0)
+                return 0;
+            try { return baseGold * RollMax * Main.Character.totalGoldbonus() * setGoldScore / worn; }
+            catch { return 0; }
+        }
+
         // Would a gold kill in this zone raise the Time Machine at all? `margin` is the improvement
         // demanded (1.0 = any gain). An unknown zone returns true — no data must never block a snipe.
         public static bool BeatsBank(int zone, bool bossOnly, double margin, out double predicted, out double banked)
@@ -118,6 +131,10 @@ namespace NGUAdvisor.Managers
 
         // Owner's rule: a titan swap below +5 % on the bank is not worth giving up the titan's loot set.
         public const double TitanRebankMargin = 1.05;
+
+        // Owner's rule: a bank within 5 % of the best drop reachable (the full gold set, best roll) is
+        // not chased any further.
+        public const double BankSaturation = 0.95;
 
         // Is this titan worth wearing the gold set for? Only when the drop, at its best roll and in the
         // gold set, can lift the bank by TitanRebankMargin — otherwise the kill goes down in the titan

@@ -217,8 +217,9 @@ reference has no equivalent feature.
 - `ResolveTitanGear()` — **safety override**: if any targeted titan spawns soon and is NOT
   auto-killable, the loot objective is replaced by "Adventure" (kill set) — the loot set on a real
   fight was a user-reported death loop (twice: empty loadout, then drop gear on a live T6v2). On that
-  path it also passes `new int[0]` for `pinnedIds`, i.e. **the real-fight override drops pins too**:
-  pinned loot/utility gear equipped into a live titan is the same death loop the override exists for.
+  path it also passes `new int[0]` for `pinnedIds`, i.e. **the real-fight override drops the user's
+  pins too**: pinned loot/utility gear equipped into a live titan is the same death loop the override
+  exists for. (The kill set's gold-helmet pins below are the optimizer's own and gated by the bar.)
   The live-fight set is `KillSetWithDropChance`: the bar is the highest staged requirement
   (`OptimizationAdvisor.StagedRequirementFor`, staged on projected best-gear stats) among the
   spawning real-fight titans; Adventure keeps the main slots and walks its accessory budget down
@@ -226,6 +227,19 @@ reference has no equivalent feature.
   Drop Chance — **only while the titan's own need (`BoostFarmAdvisor.TitanGearLootFor`) is above the
   full kill set's drop chance**; a titan with nothing wanted behind an uncapped roll keeps every
   accessory on Adventure. Full Adventure short of the bar → full Adventure, unchanged.
+  **Gold first, when the kill can raise the bank (user rule 2026-10-12).** A real-fight titan is never
+  a gold-swap target (`BestGoldTitan` ranks AK titans only), so before this its gold — The Beast's 5M
+  base, 5× Walderp's — could not reach the bank. With `ManageGoldLoadouts` on, the richest spawning
+  target's zone (`goldZone`) is priced: the trim runs with a tail `Gold Drops(all) > Drop Chance(all)`
+  (`> Adventure(all)` when the titan needs no more drop chance, so no freed slot is stranded), and that
+  set is kept only when `GoldDropAdvisor.PredictedDropInSet` beats the bank — by `TitanRebankMargin`
+  while drop chance is at stake, by any amount when the freed slots would only go back to Adventure
+  (user rule 2026-10-12) — and never once the bank sits within `BankSaturation` (95 %) of the best drop
+  reachable (the full gold set on that titan, best roll); else the plain DC trim runs. **Main slots too:** gold also sits in main slots (a gold helmet) that
+  Adventure owns, so the gold set's main-slot gold items (`GoldMainSlotItems`) are tried as pins —
+  all together and one by one — each variant kept only while the bar still clears; the richest drop
+  wins. The log line ends `gold takes its accessories [+ <pinned item>]` or `gold skipped (~X vs Y
+  banked, −Z%)`.
   The `Titan kill set:` log names which of the four outcomes ran: accessories handed to Drop Chance,
   `bar NOT cleared by full Adventure (Toughness -28%)` (per-stat shortfall), "this titan needs no more
   drop chance", or "one fewer misses the bar". It says "Drop Chance the rest" only when Drop Chance got

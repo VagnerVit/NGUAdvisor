@@ -410,8 +410,14 @@ namespace NGUAdvisor
                     bankQueued = done == null || best >= done.Length || !done[best];
                     // Version tag comes from the game's own enemy entry (user-reported: "Walderp v1"
                     // mislabel — WALDERP has no versions; Beast V1/V2 are separate enemy #s).
+                    var gate = AdvisorApply.GoldTitanGate();
+                    bool refused = gate.Known && !gate.Worth;
+                    if (refused) bankQueued = false;
                     bankValue = TitansPanel.AbbrevWithVersion(best);
-                    bankSub = challenge != null ? "CHALLENGE-LIMITED" : (bankQueued ? "AT NEXT AK KILL" : "UP TO DATE");
+                    // Predicted 0 = refused for another reason (no gold drop, autokill-loss cooldown).
+                    bankSub = challenge != null ? "CHALLENGE-LIMITED"
+                        : refused ? (gate.Predicted > 0 ? $"BELOW BANK {GoldDropAdvisor.PctVsBank(gate.Predicted, gate.Banked)}" : "NO GOLD SWAP")
+                        : (bankQueued ? "AT NEXT AK KILL" : "UP TO DATE");
                 }
 
                 SetStage(1, !sniping && !bankQueued, Fmt1(tmGold), tmGold > 0 ? cf : "WAITING ON SNIPE");

@@ -420,6 +420,18 @@ namespace NGUAdvisor.Managers
 
         public static int GoldTitanTarget() => _goldTitanKnown && _goldTitan >= 0 ? _goldTitan : HighestAkTitan();
 
+        // The bank gate's verdict on that target, cached by the same pass: a titan the gate refuses gets
+        // no gold set, so the views must not say it banks. Known=false before the first pass.
+        public struct GoldTitanVerdict
+        {
+            public bool Known, Worth;
+            public double Predicted, Banked;
+        }
+
+        private static GoldTitanVerdict _goldVerdict;
+
+        public static GoldTitanVerdict GoldTitanGate() => _goldVerdict;
+
         // Why no gold gear on that autokill? Every input of the decision in one debug line, emitted only
         // when the answer changes — "the titan was auto-killed in the wrong gear" is otherwise invisible
         // after the fact: the deciding values (AK titan, ranked pick, done latch, predicted drop, TM bank)
@@ -480,9 +492,9 @@ namespace NGUAdvisor.Managers
             if (best >= 0)
                 try { ver = ZoneHelpers.TitanVersion(best); } catch { }
             LogTitanGoldState(best, ver, predicted, worth, runnerUp, runnerUpPredicted);
-            if (best < 0) return;
-
             double bank = GoldDropAdvisor.Banked();
+            _goldVerdict = new GoldTitanVerdict { Known = best >= 0, Worth = worth, Predicted = predicted, Banked = bank };
+            if (best < 0) return;
 
             // The "already banked this run" latch does NOT survive here any more (user-reported: an
             // auto-killed titan went down in loot gear because it had banked once already). Whether the next
