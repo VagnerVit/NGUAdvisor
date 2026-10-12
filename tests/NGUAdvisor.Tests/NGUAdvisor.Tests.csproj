@@ -47,6 +47,8 @@
     <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\BloodRouter.cs" Link="Linked\BloodRouter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguGuidePriority.cs" Link="Linked\NguGuidePriority.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NguBbSplit.cs" Link="Linked\NguBbSplit.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NguGain.cs" Link="Linked\NguGain.cs" />
   </ItemGroup>
 
 </Project>

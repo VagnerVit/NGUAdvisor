@@ -855,7 +855,36 @@ namespace NGUAdvisor.Managers
             //            a pin or by an earlier priority and is never re-picked. Frozen accessories DO
             //            still score through the normal add path, which is what makes the greedy fill
             //            "best marginal accessory given what is already worn".
-            void AccessoryOptimize(ScoreContext c0, int cap, int firstFree)
+            // A tie on the step's own objective goes to the candidate the REST of the chain prefers:
+            // earlier (higher-priority) steps first, then later ones, then raw Power. Pool order would
+            // otherwise decide, e.g. The Sands of Time (MC 20) over Ring of Might (MC 20 + Respawn + P/T).
+            const double TieEpsilon = 1e-12;
+            int CompareScores(double a, double b)
+            {
+                if (Math.Abs(a - b) <= TieEpsilon * Math.Max(Math.Abs(a), Math.Abs(b))) return 0;
+                return a > b ? 1 : -1;
+            }
+
+            // Scores r with `id` already in its slot, so the caller places the candidate first.
+            double[] TieKey(IReadOnlyList<ScoreContext> tieBreakers, int id)
+            {
+                var key = new double[tieBreakers.Count + 1];
+                for (int t = 0; t < tieBreakers.Count; t++) key[t] = tieBreakers[t].ScoreOf(r);
+                if (idToItem.TryGetValue(id, out var item)) item.Stats.TryGetValue(GearObjectives.Stat.Power, out key[tieBreakers.Count]);
+                return key;
+            }
+
+            bool BeatsOnTie(double[] candidate, double[] incumbent)
+            {
+                for (int t = 0; t < candidate.Length; t++)
+                {
+                    int cmp = CompareScores(candidate[t], incumbent[t]);
+                    if (cmp != 0) return cmp > 0;
+                }
+                return false;
+            }
+
+            void AccessoryOptimize(ScoreContext c0, IReadOnlyList<ScoreContext> tieBreakers, int cap, int firstFree)
             {
                 if (cap <= 0 || accPool.Count == 0) return;
                 SyncAccSet();
@@ -864,12 +893,24 @@ namespace NGUAdvisor.Managers
                 // (and the id-dedup in BuildPools) enforces a real game rule — it is NOT an optimizer limitation.
                 while (r.Accessories.Count < cap)
                 {
-                    int best = 0; double bs = c0.ScoreOf(r);
+                    int best = 0; double bs = c0.ScoreOf(r); double[] bestTie = null;
+                    int last = r.Accessories.Count;
                     foreach (var c in accPool)
                     {
                         if (accSet.Contains(c.Key)) continue;   // one copy per accessory id (game rule)
-                        r.Accessories.Add(c.Key); double s = c0.ScoreOf(r); r.Accessories.RemoveAt(r.Accessories.Count - 1);
-                        if (s > bs) { bs = s; best = c.Key; }
+                        r.Accessories.Add(c.Key);
+                        double s = c0.ScoreOf(r);
+                        int cmp = CompareScores(s, bs);
+                        if (cmp > 0) { bs = s; best = c.Key; bestTie = null; }
+                        // A tie with "add nothing" never fills a slot: a step keeps only what its own
+                        // objective gains from, and the slot stays free for the next step.
+                        else if (cmp == 0 && best != 0)
+                        {
+                            var tie = TieKey(tieBreakers, c.Key);
+                            if (bestTie == null) { r.Accessories[last] = best; bestTie = TieKey(tieBreakers, best); }
+                            if (BeatsOnTie(tie, bestTie)) { best = c.Key; bestTie = tie; }
+                        }
+                        r.Accessories.RemoveAt(last);
                     }
                     if (best == 0) break; // nothing improves
                     r.Accessories.Add(best);
@@ -881,7 +922,7 @@ namespace NGUAdvisor.Managers
                     bool improved = false;
                     for (int i = firstFree; i < r.Accessories.Count; i++)
                     {
-                        int cur = r.Accessories[i]; int best = cur; double bs = c0.ScoreOf(r);
+                        int cur = r.Accessories[i]; int best = cur; double bs = c0.ScoreOf(r); double[] bestTie = null;
                         // Slot i is the one being re-picked, so it must not veto its own candidates:
                         // drop it from the membership set for the duration of the scan. (This mirrors the
                         // old List.Contains behaviour, where slot i already held the previous candidate
@@ -891,7 +932,14 @@ namespace NGUAdvisor.Managers
                         {
                             if (c.Key == cur || accSet.Contains(c.Key)) continue;
                             r.Accessories[i] = c.Key; double s = c0.ScoreOf(r);
-                            if (s > bs) { bs = s; best = c.Key; }
+                            int cmp = CompareScores(s, bs);
+                            if (cmp > 0) { bs = s; best = c.Key; bestTie = null; }
+                            else if (cmp == 0)
+                            {
+                                var tie = TieKey(tieBreakers, c.Key);
+                                if (bestTie == null) { r.Accessories[i] = best; bestTie = TieKey(tieBreakers, best); }
+                                if (BeatsOnTie(tie, bestTie)) { best = c.Key; bestTie = tie; }
+                            }
                         }
                         r.Accessories[i] = best;
                         accSet.Add(best);
@@ -901,14 +949,14 @@ namespace NGUAdvisor.Managers
                 }
             }
 
-            void RunOptimize(ScoreContext c0, int cap, int firstFree)
+            void RunOptimize(ScoreContext c0, IReadOnlyList<ScoreContext> tieBreakers, int cap, int firstFree)
             {
                 // alternate until stable (slots interact only through the product objective)
                 double prev = double.NegativeInfinity;
                 for (int round = 0; round < 5; round++)
                 {
                     MainAscent(c0);
-                    AccessoryOptimize(c0, cap, firstFree);
+                    AccessoryOptimize(c0, tieBreakers, cap, firstFree);
                     double cur = c0.ScoreOf(r);
                     if (cur <= prev * (1 + 1e-12)) break;
                     prev = cur;
@@ -1029,13 +1077,18 @@ namespace NGUAdvisor.Managers
                     || (!pinnedMain.Contains(part.Legs) && r.Legs != 0)
                     || (!pinnedMain.Contains(part.Boots) && r.Boots != 0);
 
+                // ONE ScoreContext PER PRIORITY. ScoreContext is not re-entrant (see its comment):
+                // priorities must never share one, and no priority's scoring loop ever runs inside
+                // another's. A tie-break calls the other steps' ScoreOf between two of this step's
+                // calls, never inside one.
+                var contexts = steps.Select(s => new ScoreContext(s.Objective, idToItem, cube, baseItem, offhandFactor))
+                                    .ToList();
+                lead = contexts[0];
+
                 for (var k = 0; k < steps.Count; k++)
                 {
-                    // ONE ScoreContext PER PRIORITY. ScoreContext is not re-entrant (see its comment):
-                    // priorities must never share one, and no priority's scoring loop ever runs inside
-                    // another's.
-                    var ctx = new ScoreContext(steps[k].Objective, idToItem, cube, baseItem, offhandFactor);
-                    if (k == 0) lead = ctx;
+                    var ctx = contexts[k];
+                    var tieBreakers = contexts.Where((_, j) => j != k).ToList();
 
                     // The budget is recomputed here from the slots ACTUALLY filled so far, not from a
                     // plan drawn up before the chain ran -- Optimizer.js:268 calls count_accslots(:136)
@@ -1054,10 +1107,10 @@ namespace NGUAdvisor.Managers
                     // accessory-only, which is exactly "freeze the main slots once they are claimed".
                     if (!mainSlotsOwned)
                     {
-                        RunOptimize(ctx, cap, frozenAccCount);
+                        RunOptimize(ctx, tieBreakers, cap, frozenAccCount);
                         mainSlotsOwned = AnyFreeMainSlotFilled();
                     }
-                    else AccessoryOptimize(ctx, cap, frozenAccCount);
+                    else AccessoryOptimize(ctx, tieBreakers, cap, frozenAccCount);
 
                     frozenAccCount = r.Accessories.Count;
                 }

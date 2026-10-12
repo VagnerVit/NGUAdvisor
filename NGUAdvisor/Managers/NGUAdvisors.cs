@@ -31,8 +31,8 @@ namespace NGUAdvisor.Managers
             public long Level;
             public double Rating;     // x/hr with the FULL pool — the GO-site-comparable score
             public double Ratio;      // x/hr at the equal share it actually gets when running
-            public double Lph;        // levels/hr at that share (GrowthPanel's predicted rate)
-            public double LphPerUnit; // levels/hr per allocated unit (internal to the prune loop)
+            public double Lph;        // levels gained in an hour at that share (GrowthPanel's predicted rate)
+            public double LphPerUnit; // levels/hr per allocated unit at the current level, uncapped
         }
 
         public class Plan
@@ -158,15 +158,29 @@ namespace NGUAdvisor.Managers
             catch { return 0; }
         }
 
-        // Bonus-multiplier ratio for dL more levels: (1 + f(L+dL)) / (1 + fL) — exact for every
-        // NGU except Respawn, which has its own capped time-reduction curve.
+        // Bonus-multiplier ratio for dL more levels on the game's own curve (NguGain: linear to the
+        // softcap, a power past it). Respawn has its own capped time-reduction curve.
         private static double ValueRatio(Character c, bool magic, int id, double level, double dL)
         {
             if (dL <= 0) return 1.0;
             if (!magic && id == 2) return RespawnRatio(c, level, dL);
             double f = Factor(c, magic, id);
-            if (f > 0) return (1.0 + f * (level + dL)) / (1.0 + f * level);
+            if (f > 0) return NguGain.Ratio(magic, id, Track(c), level, dL, f);
             return (level + dL + 1.0) / (level + 1.0);
+        }
+
+        private static int Track(Character c)
+        {
+            try
+            {
+                switch (c.settings.nguLevelTrack)
+                {
+                    case difficulty.evil: return 1;
+                    case difficulty.sadistic: return 2;
+                    default: return 0;
+                }
+            }
+            catch { return 0; }
         }
 
         // Respawn value = respawnTime(old)/respawnTime(new), from the game's exact curve
@@ -280,7 +294,7 @@ namespace NGUAdvisor.Managers
                     if (divider <= 0) continue;
                     // progressPerTick = power / divider x allocated x mult / (level+1); 50 ticks/s.
                     double lphPerUnit = power / divider * mult / (level + 1) * 50.0 * 3600.0;
-                    double rating = ValueRatio(c, magic, id, level, lphPerUnit * pool);
+                    double rating = ValueRatio(c, magic, id, level, NguGain.LevelsInHour(level, lphPerUnit * pool));
                     into.Add(new Entry
                     {
                         Id = id,
@@ -317,7 +331,7 @@ namespace NGUAdvisor.Managers
                 double share = pool / keep.Count;
                 foreach (var e in keep)
                 {
-                    e.Lph = e.LphPerUnit * share;
+                    e.Lph = NguGain.LevelsInHour(e.Level, e.LphPerUnit * share);
                     e.Ratio = ValueRatio(c, magic, e.Id, e.Level, e.Lph);
                 }
                 var hot = keep.Where(x => x.Ratio >= Threshold(x)).ToList();
@@ -328,7 +342,7 @@ namespace NGUAdvisor.Managers
                     double s2 = pool / keep.Count;
                     foreach (var e in keep)
                     {
-                        e.Lph = e.LphPerUnit * s2;
+                        e.Lph = NguGain.LevelsInHour(e.Level, e.LphPerUnit * s2);
                         e.Ratio = ValueRatio(c, magic, e.Id, e.Level, e.Lph);
                     }
                     break;
@@ -344,7 +358,7 @@ namespace NGUAdvisor.Managers
             double share = pool / Math.Max(1, ids.Length);
             foreach (var e in list.Where(x => ids.Contains(x.Id)))
             {
-                e.Lph = e.LphPerUnit * share;
+                e.Lph = NguGain.LevelsInHour(e.Level, e.LphPerUnit * share);
                 e.Ratio = ValueRatio(c, magic, e.Id, e.Level, e.Lph);
             }
             return ids;

@@ -73,6 +73,8 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 shouldRetry &= temp.Count > 0;
             }
 
+            NGUBP.Rebalance(temp);
+
             _character.NGUController.refreshMenu();
             _character.wandoos98Controller.refreshMenu();
             _character.advancedTrainingController.refresh();

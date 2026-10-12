@@ -37,6 +37,23 @@ optimize_layouts/pareto`), native runs, per priority:
 3. **Alternation** (`RunOptimize`) — main ascent ↔ accessory pass, ≤5 rounds, stop when the score
    stops improving (relative epsilon 1e-12).
 
+### Accessory ties go to the rest of the chain (2026-10-04)
+
+When two accessories score equal (relative 1e-12) on the step's own objective, the one the **other
+steps** prefer wins: earlier steps first (higher priority), then later ones, then the item's raw
+Power (the same "nobody has an opinion" measure as `FillEmptyMainSlotsByPower`). Without it pool
+order decided: user-reported under `Respawn(1) > Move Cooldown(1) > …`, the MC step wore
+`[91] The Sands of Time` (MC 20) over `[137] Ring of Might` (MC 20 + Respawn 4 + 13 332 P/T) — a
+strictly dominated pick, because no step after MC valued what the ring adds.
+
+- **A tie with "add nothing" never fills a slot.** The greedy fill still stops when no candidate
+  strictly improves the step's objective; the tie-break only chooses *among* improving candidates,
+  so a step never takes more slots than its objective earns (the budget rule in GearChain.md).
+- The lexicographic key (step score, then tie-breakers) strictly increases on every local swap, so
+  the swap loop cannot cycle.
+- Main slots (`PickSlot`) are unchanged: the step that owns them has an opinion by construction, and
+  `FillEmptyMainSlotsByPower` covers the slots it left empty.
+
 Accessory uniqueness (`accSet`): one copy per accessory id — a real game rule, not an optimizer
 limitation. During a slot's re-pick scan its own current item is removed from the set so it does
 not veto candidates.

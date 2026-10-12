@@ -59,8 +59,22 @@ Contract (`ResourceBreakpoint`):
   `min(need, idle-at-their-turn)`**, so they stay OUT of the equal-share divisor. Allocation walks
   the list IN ORDER recomputing idle/prioCount per non-cap token, which is why ChallengeOverlay
   emits surplus NGU lanes as `CAPNGU-*` (see ChallengeOverlay.md).
-- `:pct` suffix caps a priority at a percentage (of cap for CAP tokens, of idle otherwise).
+- `:pct` suffix caps a priority at a percentage (of cap for CAP tokens, of idle otherwise). On the
+  group token `ALLAT`/`CAPALLAT` it caps the five slots TOGETHER (`AdvancedTrainingBP.GroupShare`
+  subtracts what earlier slots hold); per slot it would have meant up to 5 × pct.
 - `CapCalc` is the shared "highest BB breakpoint reachable in the next 10 s" solver.
+
+**Equal-share NGU lanes are re-split along BB breakpoints after the walk** (`NGUBP.Rebalance` →
+`NguBbSplit`, both PerformSwaps). An NGU gains at most one level per tick and drops the overfill, so a
+lane holding A of its BB levels every `ceil(BB/A)` ticks (GO `NGU.js vreachable` models it the same
+way): only BB/k amounts buy speed. The equal split quantised down and idled the remainder — measured
+2026-10-08 in TM HOUR: Ygg and EXP at 8.74B / 8.78B (one level per 3 ticks), 8.7B of 28B idle; after
+the re-split 12.6B / 13.0B (one per 2 ticks), 34M idle. The rule follows the guide — ch.4 "put all E/M
+into that NGU", ch.6 "Aim to BB", and only as the fallback "split Magic into Ygg/EXP": lanes reach BB in
+token order while the pool covers them, the rest is split equally, and the split's quantisation
+leftover lifts lanes to their next breakpoint in token order. Only the non-cap NGU lanes' own holdings
+plus the idle pool are re-split, so every other token keeps what it took; `CAPNGU` absorbers therefore
+still drink the leftover before the re-split sees it.
 
 `ParseBreakpointArray` deliberately takes **no rebirthTime parameter** — the rebirth deadline is a
 property of the RUN, not of a parsed breakpoint.

@@ -79,9 +79,12 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
                     long n = NeedFor(j);
                     if (n > 0) needs.Add(n);
                 }
-                if (needs.Count <= 1) return myNeed;
 
-                long avail = _character.idleEnergy;
+                // A `:pct` on the group token caps the GROUP (guide ch.5: "run AT with <40% of your
+                // Energy cap"), not each of the five slots.
+                long avail = Math.Min(_character.idleEnergy, Math.Max(0L, CeilingAllocation() - HeldByGroup()));
+                if (needs.Count <= 1) return Math.Min(myNeed, avail);
+
                 needs.Sort();
                 int remaining = needs.Count;
                 foreach (var n in needs)
@@ -97,6 +100,14 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             {
                 return myNeed;
             }
+        }
+
+        private static long HeldByGroup()
+        {
+            long held = 0;
+            for (int i = 0; i < 5; i++)
+                held += _character.advancedTraining.energy[i];
+            return held;
         }
 
         // A group member's cap need (same formula CalculateATCap uses): funded 500 levels ahead

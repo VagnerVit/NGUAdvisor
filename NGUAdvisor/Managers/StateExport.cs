@@ -113,6 +113,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
             Section(sb, "QUESTS", () => Quests(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
+            Section(sb, "TITAN FIGHT INPUTS", () => TitanFightInputs(sb, c));
             return sb.ToString();
         }
 
@@ -176,6 +177,23 @@ namespace NGUAdvisor.Managers
                 return v.Known && !string.IsNullOrEmpty(v.Phase) ? $"  · buying toward {v.Phase}" : "";
             }
             catch { return ""; }
+        }
+
+        // Raw inputs for an offline fight model: the move table lives in the scene (AdventureController
+        // fields), not in code, so only the running game can report it. Stats are as worn right now.
+        private static void TitanFightInputs(StringBuilder sb, Character c)
+        {
+            float beast = c.adventureController.beastModeBonus();
+            sb.AppendLine($"  hp {c.totalAdvHP():E3} · regen {c.totalAdvHPRegen():E3}/s · attack {c.totalAdvAttack():E3} (beast x{beast}) · defense {c.totalAdvDefense():E3}");
+            sb.AppendLine($"  beast mode {c.adventure.beastModeOn} · cooldown factor {c.totalCooldownBonus():0.###} · ultimate power {c.ultimateAttackPower():0.##}");
+            foreach (System.Reflection.FieldInfo f in typeof(AdventureController).GetFields())
+            {
+                if (f.FieldType != typeof(float)) continue;
+                if (f.Name.EndsWith("Multi") || f.Name.EndsWith("Cooldown") || f.Name.EndsWith("Time") || f.Name.EndsWith("Duration"))
+                    sb.AppendLine($"  {f.Name} = {((float)f.GetValue(c.adventureController)).ToString(CultureInfo.InvariantCulture)}");
+            }
+            foreach (Enemy e in c.adventureController.enemyList[19])
+                sb.AppendLine($"  enemy {e.name}: rate {e.attackRate} atk {e.attack:E3} def {e.defense:E3} regen {e.regen:E3} hp {e.maxHP:E3} ai {e.AI}");
         }
 
         private static void Resources(StringBuilder sb, Character c)

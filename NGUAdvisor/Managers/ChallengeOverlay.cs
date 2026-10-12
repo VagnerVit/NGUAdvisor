@@ -52,12 +52,13 @@ namespace NGUAdvisor.Managers
                 double cur = c.nextAttackMulti;
                 if (cur <= 0) return;
 
-                // First sample, or a rebirth reset (the multiplier collapsed): start a fresh window.
+                // First sample, or the multiplier collapsed: start a fresh window. A rebirth is caught
+                // by the runSec gate above, so a collapse here is a mid-run swap — keep the last
+                // projection rather than blanking RECOVERY's input for two minutes.
                 if (_numSampleAt == DateTime.MinValue || cur < _numSample * 0.5)
                 {
                     _numSample = cur;
                     _numSampleAt = DateTime.UtcNow;
-                    Bosses30 = double.NaN;   // warming up
                     return;
                 }
 
@@ -522,7 +523,7 @@ namespace NGUAdvisor.Managers
             //               (one bounded decision per run — the time anchor stays the law)
             //   RECOVERY  — number still cheap (>=2 boss/30m), but never past hour 4
             //   MARATHON  — everything after (the guide's 22h); its start is never delayed
-            bool numberCheap = !double.IsNaN(Bosses30) && Bosses30 >= 2.0;
+            bool numberCheap = NumberCheapForRecovery(runSec);
 
             // EVIL CLIMB (guide ch.5 sub-mode A) — early Evil is a boss RE-CLIMB, not a mature 24h run:
             // entering Evil re-locks TM/AT/Wandoos and resets the Number, so the TM/AT/RECOVERY/MARATHON
@@ -553,11 +554,30 @@ namespace NGUAdvisor.Managers
 
             if (seg != Segment)
             {
+                if (seg == "RECOVERY") _recoverySinceRunSec = runSec;
                 Segment = seg;
                 if (Main.Settings != null && Main.Settings.AutoProfile)
                     Record("SEGMENT", $"segment → {seg}",
                         $"run {runSec / 3600:0.0}h · {(double.IsNaN(Bosses30) ? Phase : $"≈{Bosses30:0.#} boss/30m")}");
             }
+        }
+
+        // RECOVERY swaps gear and allocation both ways, so a projection hovering at one threshold
+        // flapped it (2026-10-07: MARATHON 2.0h -> RECOVERY 2.04h -> MARATHON 2.17h). Separate
+        // enter/exit bars plus a minimum stay.
+        private const double RecoveryEnterBosses30 = 2.5;
+        private const double RecoveryExitBosses30 = 1.5;
+        private const double RecoveryMinStaySeconds = 900;
+        private static double _recoverySinceRunSec;
+
+        private static bool NumberCheapForRecovery(double runSec)
+        {
+            if (Segment == "RECOVERY" && runSec >= _recoverySinceRunSec)   // a rebirth ends the stay
+            {
+                if (runSec - _recoverySinceRunSec < RecoveryMinStaySeconds) return true;
+                return !double.IsNaN(Bosses30) && Bosses30 >= RecoveryExitBosses30;
+            }
+            return !double.IsNaN(Bosses30) && Bosses30 >= RecoveryEnterBosses30;
         }
 
         private static string SegmentGear()
@@ -685,12 +705,23 @@ namespace NGUAdvisor.Managers
                     list.Add("CAPTM:30");
                     list.Add("CAPWAN:30");
                     if (e) list.Add("BESTAUG");
+                    else
+                    {
+                        // Magic has no BESTAUG to drink the rest: TM, Wandoos and rituals all stop at
+                        // their 1-per-tick caps (measured 2026-10-08: 26.5B of 28B magic idle all hour).
+                        // Energy must NOT get these — a non-cap NGU token would split BESTAUG's share.
+                        foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
+                        foreach (var t in ChapterNgusSurplus(type)) if (!list.Contains(t)) list.Add(t);
+                    }
                     break;
                 case "RECOVERY":
                     if (e) list.Add("CAPALLBT");   // cheap caps first (adventure stats for the push)
                     list.Add("CAPTM:5");
                     list.Add("CAPWAN:30");
-                    if (e) { list.Add("BESTAUG"); list.Add("CAPALLAT"); }
+                    // AT as a capped group, not a drain: a CAP token ahead of the NGU lanes took all it
+                    // could use and left them nothing. Guide ch.5: "run AT with <40% of your Energy cap.
+                    // Prioritize NGUs first".
+                    if (e) { list.Add("BESTAUG"); list.Add("CAPALLAT:40"); }
                     else list.Add("NGU-3");   // D3: the Number NGU IS the number-growth allocation
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
                     break;

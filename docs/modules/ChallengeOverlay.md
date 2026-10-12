@@ -29,7 +29,7 @@ EVIL CLIMB   → Ch.5 and boss < 125 (Evil re-climb; TM/AT/Wandoos are re-locked
 AUGMENTATION → Ch.5, boss ≥ 125, TM unlocked, 0.5 h ≤ run < 3 h (guide ch5 phase 2)
 TM HOUR      → TM unlocked AND (TM gold empty OR run < 1 h)
 AT HOUR      → AT unlocked AND run < AtHourPlanner.EndSec(...)   (extendable to the 5 h mark)
-RECOVERY     → number still cheap (Bosses30 ≥ 2) AND run < 4 h
+RECOVERY     → number still cheap AND run < 4 h  (enter Bosses30 ≥ 2.5, leave < 1.5, stay ≥ 15 min)
 NGU MARATHON → everything after (the guide's 22 h) — its start is never delayed
 ```
 
@@ -54,6 +54,20 @@ neglected Basic Training). BT caps are fixed within a run (decomp `Training` —
 rebirth), so the old "BT energy persists once capped" held for tiers capped at hour 0, but tiers that
 unlock later (previous tier at 5000×id) and caps left partial by a short hour-0 pool were never
 topped up once AT HOUR / NGU MARATHON took over.
+
+**RECOVERY has hysteresis and keeps its input through gear swaps.** A single 2.0 bar flapped the
+segment (2026-10-07: MARATHON 2.0 h → RECOVERY 2.04 h → MARATHON 2.17 h), and every flip swaps gear
+and allocation. The projection window restarts when `nextAttackMulti` halves — a mid-run gear swap,
+since a rebirth is caught by the 600 s gate — and now keeps the last `Bosses30` instead of going NaN.
+
+**RECOVERY's AT is `CAPALLAT:40`, a group cap.** As a plain `CAPALLAT` ahead of the NGU lanes it took
+everything it could use and left them nothing. Guide ch.5: "run AT with <40% of your Energy cap.
+Prioritize NGUs first". EVIL CLIMB keeps the uncapped group: past boss 115 the guide BBs AT P/T.
+
+**TM HOUR magic ends on the NGU lanes; TM HOUR energy does not.** Magic's TM HOUR tokens (`CAPTM`,
+`CAPWAN`, `BR`) all stop at a 1-per-tick cap, so without an NGU tail 95 % of the magic cap sat idle
+for the whole first hour (save 2026-10-08: 26.5B of 28B). Energy keeps `BESTAUG` as its sink: a
+non-cap `NGU-*` after it would join the equal-share divisor and halve the augment's share.
 
 ## NGU candidates (D2)
 

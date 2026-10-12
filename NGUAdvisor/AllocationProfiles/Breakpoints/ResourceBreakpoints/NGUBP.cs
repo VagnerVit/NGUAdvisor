@@ -1,4 +1,7 @@
+using NGUAdvisor.Managers;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 {
@@ -70,6 +73,54 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         protected override bool CorrectResourceType() => Type == ResourceType.Energy || Type == ResourceType.Magic;
 
+        // Re-splits what the equal-share NGU lanes hold, plus the idle pool, along BB breakpoints
+        // (NguBbSplit). Runs after the whole walk, so every other token keeps what it took.
+        public static void Rebalance(IEnumerable<ResourceBreakpoint> walked)
+        {
+            List<NGUBP> lanes = walked.OfType<NGUBP>().Where(x => !x.IsCap)
+                .GroupBy(x => x.Index).Select(g => g.First()).ToList();
+            if (lanes.Count == 0)
+                return;
+
+            bool magic = lanes[0].Type == ResourceType.Magic;
+            double pool = magic ? _character.magic.idleMagic : _character.idleEnergy;
+            foreach (NGUBP lane in lanes)
+                pool += lane.Held();
+
+            NguBbSplit.Result plan = NguBbSplit.Plan((i, k) => lanes[i].BbAt(k), lanes.Count, pool);
+            foreach (NGUBP lane in lanes)
+                lane.Release();
+            for (int i = 0; i < lanes.Count; i++)
+            {
+                if (plan.Amounts[i] <= 0)
+                    continue;
+                lanes[i].SetInput(plan.Amounts[i]);
+                if (magic)
+                    _character.NGUController.NGUMagic[lanes[i].Index].add();
+                else
+                    _character.NGUController.NGU[lanes[i].Index].add();
+            }
+        }
+
+        private long Held() => Type == ResourceType.Magic
+            ? _character.NGU.magicSkills[Index].magic
+            : _character.NGU.skills[Index].energy;
+
+        private void Release()
+        {
+            if (Type == ResourceType.Magic)
+                _character.NGUController.NGUMagic[Index].removeAllMagic();
+            else
+                _character.NGUController.NGU[Index].removeAllEnergy();
+        }
+
+        // BB at one level per k ticks, with the same 10 s lookahead the cap calc uses at that speed.
+        private double BbAt(int k)
+        {
+            int offset = 500 / k;
+            return Type == ResourceType.Magic ? MagicBb(offset) : EnergyBb(offset);
+        }
+
         private long CalculateNGUEnergyCap()
         {
             var calcA = GetNGUEnergyCapCalc(500);
@@ -98,6 +149,22 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         {
             var ret = new CapCalc(1, 0);
 
+            var num3 = EnergyBb(offset);
+            var num4 = Math.Ceiling(num3 / Math.Ceiling(num3 / MaxAllocation) * 1.00000202655792);
+            long num;
+            if (num4 > _character.idleEnergy)
+                num = _character.idleEnergy;
+            else
+                num = (long)num4;
+
+            var ppt = num4 / num3;
+            ret.Num = num;
+            ret.PPT = ppt;
+            return ret;
+        }
+
+        private double EnergyBb(int offset)
+        {
             var num1 = 0.0f;
             if (_character.settings.nguLevelTrack == difficulty.normal)
                 num1 = _character.NGU.skills[Index].level + 1L + offset;
@@ -116,13 +183,18 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             if (_character.settings.nguLevelTrack >= difficulty.sadistic)
                 num2 /= _character.NGUController.NGU[0].sadisticDivider();
             var num3 = Math.Ceiling(_character.NGUController.energySpeedDivider(Index) * (double)num1 / num2);
-            if (num3 < 1.0)
-                num3 = 1.0;
+            return num3 < 1.0 ? 1.0 : num3;
+        }
 
+        private CapCalc GetNGUMagicCapCalc(int offset)
+        {
+            var ret = new CapCalc(1, 0);
+
+            var num3 = MagicBb(offset);
             var num4 = Math.Ceiling(num3 / Math.Ceiling(num3 / MaxAllocation) * 1.00000202655792);
             long num;
-            if (num4 > _character.idleEnergy)
-                num = _character.idleEnergy;
+            if (num4 > _character.magic.idleMagic)
+                num = _character.magic.idleMagic;
             else
                 num = (long)num4;
 
@@ -132,10 +204,8 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return ret;
         }
 
-        private CapCalc GetNGUMagicCapCalc(int offset)
+        private double MagicBb(int offset)
         {
-            var ret = new CapCalc(1, 0);
-
             var num1 = 0.0f;
             if (_character.settings.nguLevelTrack == difficulty.normal)
                 num1 = _character.NGU.magicSkills[Index].level + 1L + offset;
@@ -154,20 +224,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             if (_character.settings.nguLevelTrack >= difficulty.sadistic)
                 num2 /= _character.NGUController.NGUMagic[0].sadisticDivider();
             var num3 = Math.Ceiling(_character.NGUController.magicSpeedDivider(Index) * (double)num1 / num2);
-            if (num3 < 1.0)
-                num3 = 1.0;
-
-            var num4 = Math.Ceiling(num3 / Math.Ceiling(num3 / MaxAllocation) * 1.00000202655792);
-            long num;
-            if (num4 > _character.magic.idleMagic)
-                num = _character.magic.idleMagic;
-            else
-                num = (long)num4;
-
-            var ppt = num4 / num3;
-            ret.Num = num;
-            ret.PPT = ppt;
-            return ret;
+            return num3 < 1.0 ? 1.0 : num3;
         }
     }
 }

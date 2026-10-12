@@ -45,6 +45,8 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 shouldRetry &= temp.Count > 0;
             }
 
+            NGUBP.Rebalance(temp);
+
             _character.timeMachineController.updateMenu();
             _character.bloodMagicController.updateMenu();
             _character.NGUController.refreshMenu();
