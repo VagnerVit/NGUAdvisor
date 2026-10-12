@@ -4,6 +4,23 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.5] - 2026-10-12
+
+### Changed
+
+- **Titans you fight for real can raise the gold bank.** The kill set gives the accessories and the
+  gold helmet it can spare to Gold Drops when the kill would beat the bank. While the titan still
+  needs Drop Chance the gold has to beat the bank by 5 %. A bank within 5 % of the best reachable
+  drop is not chased any further.
+
+### Fixed
+
+- **The gold set no longer goes into a live titan fight.** When a titan that does not auto-kill
+  spawns together with a gold target, the window gets the kill set.
+- **The TITAN BANK tile shows why a titan does not bank** ("BELOW BANK −x %" or "NO GOLD SWAP")
+  instead of "AT NEXT AK KILL".
+- **The Yes/No cap toggle in the allocation editor stays inside its frame.**
+
 ## [1.8.4] - 2026-10-12
 
 ### Added
