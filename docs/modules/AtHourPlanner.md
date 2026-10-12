@@ -61,7 +61,7 @@ without runtime verification.
 
 ## Reference stats — two attack references (user decision + a real 1.5× bug)
 
-Live P/T projected onto the optimizer's best Power/Toughness gear
+Live P/T projected onto the kill loadout — one unpinned Adventure set
 (`OptimizationAdvisor.ProjectedBestGear`) — AT HOUR wears AT-speed gear; thresholds are met in
 the KILL loadout. Then:
 
@@ -105,9 +105,9 @@ Return contract, so the view never prints a number it cannot stand behind:
 `GoalMetLabel` is a shared constant so the view distinguishes "already met" from "cannot determine"
 without string-matching this module's prose. **It touches none of the decision machinery** — no
 `EndSec`, `Decide`, persistence, window, `MaxEnd`, buffer or `Solve` — and it writes nothing. Note it
-goes through `OptimizationAdvisor.ProjectedBestGear`, whose two optimizer runs are cached for 120 s;
-the ≤1/s panel refresh therefore costs an optimizer pass twice a minute at worst, the same cost this
-planner already pays.
+goes through `OptimizationAdvisor.ProjectedBestGear`, whose optimizer run is cached for 120 s (and
+re-run on a gear swap); the ≤1/s panel refresh therefore costs an optimizer pass twice a minute at
+worst, the same cost this planner already pays.
 
 ## Decision details
 

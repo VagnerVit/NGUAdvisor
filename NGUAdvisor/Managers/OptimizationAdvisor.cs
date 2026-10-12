@@ -629,29 +629,34 @@ namespace NGUAdvisor.Managers
             return false;
         }
 
-        // Would the optimizer's best Power/Toughness gear clear a requirement current gear can't?
-        // Attack scales ~linearly with the Power stat, so best/current objective-score ratios are a
-        // sound projection multiplier. Cached: two optimizer runs are heavy.
+        // Would the kill set clear a requirement current gear can't? Attack scales ~linearly with the
+        // Power stat, so the kill set's Power/Toughness over the worn ones is a sound projection
+        // multiplier. Both come from ONE Adventure set — the set a real fight wears (ResolveTitanGear,
+        // unpinned) — never from a best-Power and a best-Toughness set nobody can wear at once.
+        // Keyed on the worn set as well as the TTL: callers multiply by LIVE attack/defense, so a ratio
+        // measured in another mode's gear is off by that whole swap (same fix as GoldGearFactor).
         private static double _projAtkMult = 1, _projDefMult = 1;
         private static DateTime _projAt = DateTime.MinValue;
+        private static string _projWorn;
 
         public static void ProjectedBestGear(out double atkMult, out double defMult)
         {
-            if ((DateTime.UtcNow - _projAt).TotalSeconds > 120)
+            string worn = string.Join(",", LoadoutManager.CurrentGearIds());
+            if (worn != _projWorn || (DateTime.UtcNow - _projAt).TotalSeconds > 120)
             {
                 _projAt = DateTime.UtcNow;
+                _projWorn = worn;
                 try
                 {
                     var pow = GearOptimizer.FindObjective("Power");
                     var tou = GearOptimizer.FindObjective("Toughness");
+                    var adventure = GearOptimizer.FindObjective("Adventure");
                     double curP = GearOptimizer.CurrentScore(pow);
                     double curT = GearOptimizer.CurrentScore(tou);
-                    // No pins: these are projection MULTIPLIERS against CurrentScore, which knows nothing
-                    // about pins, so both sides must measure the same unconstrained best.
-                    var bestP = GearOptimizer.Optimize(pow, false, new int[0]);
-                    var bestT = GearOptimizer.Optimize(tou, false, new int[0]);
-                    _projAtkMult = curP > 0 && bestP != null && bestP.Score > curP ? bestP.Score / curP : 1;
-                    _projDefMult = curT > 0 && bestT != null && bestT.Score > curT ? bestT.Score / curT : 1;
+                    var kill = GearOptimizer.Optimize(adventure, Main.Settings.TitanObjectiveRespawn, new int[0]);
+                    double killP = GearOptimizer.ScoreOf(kill, pow), killT = GearOptimizer.ScoreOf(kill, tou);
+                    _projAtkMult = curP > 0 && killP > curP ? killP / curP : 1;
+                    _projDefMult = curT > 0 && killT > curT ? killT / curT : 1;
                 }
                 catch { _projAtkMult = 1; _projDefMult = 1; }
             }

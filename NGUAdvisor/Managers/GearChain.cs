@@ -140,6 +140,21 @@ namespace NGUAdvisor.Managers
             };
         }
 
+        // Gold swap set (user rule): Gold Drops takes every accessory that carries it, Drop Chance the
+        // rest. A lone Gold Drops step stops filling at the first accessory without the stat, and
+        // ChangeGear leaves an unlisted slot as it was worn.
+        public static List<GearPriority> GoldChain()
+        {
+            var gold = FindObjective(GearObjectives.Stat.GoldDrops);
+            var dropChance = FindObjective(GearObjectives.Stat.DropChance);
+            if (gold == null || dropChance == null) return null;
+            return new List<GearPriority>
+            {
+                new GearPriority { Objective = gold, MaxAccessorySlots = Unlimited },
+                new GearPriority { Objective = dropChance, MaxAccessorySlots = Unlimited },
+            };
+        }
+
         public static Preset FindPreset(string name)
             => Presets.Concat(new[] { ItopodPush })
                       .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));

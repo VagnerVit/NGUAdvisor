@@ -18,9 +18,13 @@ can act on the row. Read-only itself; `Analyze()` cached 2 s; every rec individu
   increments them (only ImportExport zeroes them). T6 per-version kills = achievements 148–151
   (Beast v1–v4); T7+ keep NO per-version record (spawn-version proxy). User report: chip stuck
   on "FIRST KILL (v2)" after a confirmed v2 kill.
-- `ProjectedBestGear()` — best/current Power and Toughness objective-score ratios as attack/def
-  projection multipliers (attack ~linear in the Power stat); cached 120 s (two optimizer runs).
-  `ProjectedBestStats()` applies them to live P/T.
+- `ProjectedBestGear()` — the kill set's Power and Toughness over the worn ones as attack/def
+  projection multipliers (attack ~linear in the Power stat). **Both from ONE unpinned Adventure set**
+  (the set `ResolveTitanGear` fights in, `TitanObjectiveRespawn` honoured), scored via `ScoreOf` —
+  never a best-Power set for attack plus a best-Toughness set for defense, which no loadout can wear
+  at once and which over-projects both (2026-10-12). Cached 120 s **and keyed on the worn set**: callers
+  multiply by live P/T, so a ratio measured in Ygg/gold/quest gear and applied after the restore is off
+  by the whole swap (the GoldGearFactor bug). `ProjectedBestStats()` applies them to live P/T.
 - `PushObjective()` — the version the kill machinery fights: highest version past
   `NextObjective()` whose staged requirement (staged on projected stats, regen gate included) the
   best P/T set clears. Only ApplyTitans and the Titans hero card read it; everything tracking AK

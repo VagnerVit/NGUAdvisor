@@ -252,11 +252,58 @@ namespace NGUAdvisor.Managers
         // the optimizer knows the inventory better than a hand-picked list.
         public static int[] ResolveGoldGear()
         {
+            var set = GoldSet(quiet: false);
+            return set != null ? set.AllIds().Where(x => x > 0).Distinct().ToArray() : Main.Settings.GoldDropLoadout;
+        }
+
+        // The optimized set ResolveGoldGear equips — pins and the forced respawn included — as a Result
+        // so GoldDropAdvisor can score the gold it will really carry. null = the static GoldDropLoadout.
+        public static Result GoldSet(bool quiet = true)
+        {
             string obj = Main.Settings.GoldObjective;
             var fallback = Main.Settings.GoldDropLoadout;
             if (string.IsNullOrEmpty(obj) && (fallback == null || fallback.Length == 0))
                 obj = "Gold Drops";
-            return ResolveModeGear(obj, Main.Settings.GoldObjectiveRespawn, fallback);
+            if (string.IsNullOrEmpty(obj)) return null;
+            bool respawn = Main.Settings.GoldObjectiveRespawn;
+
+            var goldChain = string.Equals(obj, GearObjectives.Stat.GoldDrops, StringComparison.OrdinalIgnoreCase)
+                ? GearChain.GoldChain()
+                : null;
+            if (goldChain != null)
+            {
+                try
+                {
+                    // OptimizeCore, not Optimize: the saturation trim measures the FARM zone, and the
+                    // slots it hands back would only go unlisted — the gold kill happens elsewhere.
+                    var r = OptimizeCore(goldChain, null, respawn);
+                    if (r.AllIds().Any(x => x > 0))
+                    {
+                        if (!quiet) Main.Log($"Gold gear optimized for '{GearChain.Describe(goldChain)}'{(respawn ? " (+top respawn)" : "")}.");
+                        return r;
+                    }
+                }
+                catch (Exception e) { if (!quiet) Main.LogDebug($"Gold chain failed: {e.Message}; using the plain objective."); }
+            }
+
+            var single = FindObjective(obj);
+            if (single == null)
+            {
+                if (!quiet) Main.LogDebug($"Mode objective '{obj}' not recognized; using static loadout.");
+                return null;
+            }
+            try
+            {
+                var r = Optimize(new[] { new GearPriority { Objective = single, MaxAccessorySlots = GearChain.Unlimited } },
+                                 null, respawn);
+                if (r.AllIds().Any(x => x > 0))
+                {
+                    if (!quiet) Main.Log($"Mode gear optimized for '{single.Name}'{(respawn ? " (+top respawn)" : "")}.");
+                    return r;
+                }
+            }
+            catch (Exception e) { if (!quiet) Main.LogDebug($"Mode optimize '{obj}' failed: {e.Message}; using static loadout."); }
+            return null;
         }
 
         // Quest gear: the set with the most quest items per second in the zone this quest rolled. The

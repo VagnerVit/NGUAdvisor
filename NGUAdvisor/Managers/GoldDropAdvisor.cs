@@ -59,8 +59,12 @@ namespace NGUAdvisor.Managers
                 double worn = GearOptimizer.CurrentScore(objective);
                 if (worn <= 0)
                     return _gearFactor;
-                // No pins: this is the best/worn RATIO, and CurrentScore above is unpinned.
-                double best = GearOptimizer.Optimize(objective, false, new int[0]).Score;
+                // The set the swap will really equip, pins and forced respawn included. A static gold
+                // loadout has no Result to score, so it keeps the unpinned best as an upper bound.
+                var goldSet = GearOptimizer.GoldSet();
+                double best = goldSet != null
+                    ? GearOptimizer.ScoreOf(goldSet, objective)
+                    : GearOptimizer.Optimize(objective, false, new int[0]).Score;
                 _gearFactor = best > worn ? best / worn : 1.0;
             }
             catch (Exception e)
@@ -112,14 +116,13 @@ namespace NGUAdvisor.Managers
         public static bool ZoneSnipeBeatsBank(int zone, out double predicted, out double banked)
             => BeatsBank(zone, true, 1.0, out predicted, out banked);
 
-        // Is this titan worth wearing the gold set for? The bank does NOT enter the answer, and that is the
-        // whole point (user-reported: an auto-killed titan went down in loot gear because its predicted
-        // drop sat under the bank). The kill happens with or without us; the gold set only changes what it
-        // drops, and LockManager re-tests the autokill right after the swap, so a swap that would cost the
-        // kill is undone. With no fight to lose there is nothing to weigh against — the only titans worth
-        // skipping are the ones that drop no gold at all (BEAST, THE TRAITOR).
-        //
-        // `predicted` is still reported so the log can say what the swap is expected to be worth.
+        // Owner's rule: a titan swap below +5 % on the bank is not worth giving up the titan's loot set.
+        public const double TitanRebankMargin = 1.05;
+
+        // Is this titan worth wearing the gold set for? Only when the drop, at its best roll and in the
+        // gold set, can lift the bank by TitanRebankMargin — otherwise the kill goes down in the titan
+        // set (TitanObjective, e.g. Drop Chance), which is what the swap would cost. The bank is
+        // re-read every pass, so a grown gold bonus re-opens the swap on the next spawn.
         public static bool TitanKillWorthGoldGear(int titanIndex, out double predicted, out double banked)
         {
             predicted = 0;
@@ -131,8 +134,7 @@ namespace NGUAdvisor.Managers
             int zone = ZoneHelpers.TitanZones[titanIndex];
             if (GoldDropTables.BaseGold(zone, true) <= 0)
                 return false;
-            predicted = PredictedDrop(zone, true);
-            return true;
+            return BeatsBank(zone, true, TitanRebankMargin, out predicted, out banked);
         }
 
         // Titans whose gold swap turned out to cost the autokill (checked against live stats right after

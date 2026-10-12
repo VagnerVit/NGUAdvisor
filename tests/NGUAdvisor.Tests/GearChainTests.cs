@@ -138,6 +138,13 @@ namespace NGUAdvisor.Tests
             Assert.Equal(GearChain.Unlimited, chain[1].MaxAccessorySlots);
         }
 
+        // Accessories without Gold Drops must not stay as worn — Drop Chance takes them.
+        [Fact]
+        public void GoldChain_FillsTheAccessoriesGoldLeavesWithDropChance()
+        {
+            Assert.Equal("Gold Drops(all) > Drop Chance(all)", GearChain.Describe(GearChain.GoldChain()));
+        }
+
         [Fact]
         public void LootChain_RefusesAnUnknownOrRedundantObjective()
         {

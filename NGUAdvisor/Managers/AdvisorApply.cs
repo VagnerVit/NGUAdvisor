@@ -377,11 +377,9 @@ namespace NGUAdvisor.Managers
         // nothing at all if a zero-gold titan were ever the top AK one (user-reported: "sniping when it
         // shouldn't").
         //
-        // Eligibility is unchanged and still owned by TitanKillWorthGoldGear (auto-killable, not inside
-        // its DenyGoldSwap cooldown, drops gold at all) — this only decides WHICH of the eligible
-        // candidates to target. There is deliberately still no payoff gate against the bank: the
-        // auto-kill happens whether the gold set is equipped or not, so ranking picks which titan, never
-        // whether to go at all (see docs/modules/GoldDropAdvisor.md).
+        // Eligibility is owned by TitanKillWorthGoldGear (auto-killable, not inside its DenyGoldSwap
+        // cooldown, drops gold, beats the bank by TitanRebankMargin) — this only decides WHICH of the
+        // eligible candidates to target (see docs/modules/GoldDropAdvisor.md).
         public static int BestGoldTitan(out double predicted, out int runnerUp, out double runnerUpPredicted)
         {
             RefreshAkTitans();
@@ -469,10 +467,14 @@ namespace NGUAdvisor.Managers
             bool worth = best >= 0;
             _goldTitan = best;
             _goldTitanKnown = true;
-            // Nothing eligible (every AK titan denied, or none drops gold): fall back to the height pick so
+            // Nothing eligible (every AK titan denied, short of the bank, or none drops gold): fall back to the height pick so
             // the clearing pass below still runs — it is what removes a denied titan from TitanGoldTargets.
             if (!worth)
+            {
                 best = HighestAkTitan();
+                // The debug line must show WHY it was refused: the drop that fell short of the bank.
+                if (best >= 0) GoldDropAdvisor.TitanKillWorthGoldGear(best, out predicted, out _);
+            }
 
             int ver = 1;
             if (best >= 0)
@@ -483,10 +485,9 @@ namespace NGUAdvisor.Managers
             double bank = GoldDropAdvisor.Banked();
 
             // The "already banked this run" latch does NOT survive here any more (user-reported: an
-            // auto-killed titan went down in loot gear because it had banked once already). The kill is
-            // free, so every AK cycle is another chance at a bigger drop as the gold bonus grows — the
-            // latch's real job is telling the kill-detection in ZoneHelpers that a bank was collected, and
-            // it gets re-armed for the next spawn right here.
+            // auto-killed titan went down in loot gear because it had banked once already). Whether the next
+            // cycle is worth gold gear is TitanKillWorthGoldGear's bank test; the latch's real job is telling
+            // the kill-detection in ZoneHelpers that a bank was collected, and it gets re-armed here.
             var done = Main.Settings.TitanMoneyDone;
             if (worth && done != null && best < done.Length && done[best])
             {
@@ -495,9 +496,8 @@ namespace NGUAdvisor.Managers
                 int akVer = 1;
                 var banked = Main.Settings.TitanGoldVersionBanked;
                 if (banked != null && best < banked.Length) akVer = banked[best];
-                string why = akVer > 0 && akVer < ver ? $"AK version rose to v{ver}" : "the kill is free";
-                string versusBank = predicted > bank ? "would beat" : "cannot beat";
-                Main.Log($"Advisor: swapping gold gear for the next Titan {best + 1} kill ({why}; ~{NumberFormatter.Abbrev(predicted)} {versusBank} {NumberFormatter.Abbrev(bank)} banked)");
+                string why = akVer > 0 && akVer < ver ? $"AK version rose to v{ver}" : "gold bonus grew";
+                Main.Log($"Advisor: swapping gold gear for the next Titan {best + 1} kill ({why}; ~{NumberFormatter.Abbrev(predicted)} would beat {NumberFormatter.Abbrev(bank)} banked)");
             }
 
             var targets = new bool[ZoneHelpers.TitanZones.Length];

@@ -237,7 +237,12 @@ reference has no equivalent feature.
   loot**. Handing a loot objective the whole set spends the Power/Toughness the AK thresholds are
   measured against, which is how an auto-kill quietly becomes a real fight. Falls back to the plain
   objective if the chain does not resolve (unknown name, or the objective already IS Adventure).
-- `ResolveGoldGear()` — nothing configured → optimize for "Gold Drops" (data-driven default).
+- `ResolveGoldGear()` — nothing configured → optimize for "Gold Drops" (data-driven default). A
+  "Gold Drops" objective runs as `GearChain.GoldChain()` = `Gold Drops(all) > Drop Chance(all)`:
+  accessories with no gold stat go to drop chance instead of staying as worn. The gold factor
+  (`GoldDropAdvisor.GoldGearFactor`) is unaffected — step 0 is the same single-stat optimize. No
+  `TrimSaturatedDropChance`: it measures the farm zone, not the gold kill's. `GoldSet()` returns that
+  set as a `Result` (null = static loadout) so `GoldDropAdvisor.GoldGearFactor` scores what is equipped.
 - `OptimizeAndEquip(obj, forceTopRespawn)` — optimize + equip live.
 ## `BuildPools` — one entry per id, and it must be the copy the EQUIPPER would pick
 

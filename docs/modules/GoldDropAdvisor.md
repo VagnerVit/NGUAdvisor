@@ -39,7 +39,10 @@ titan zones and the titan-beats-zone ordering.
   be worth it while the CURRENT gear says otherwise. `totalGoldbonus()` multiplies exactly one
   gear-dependent factor, `(1 + bonuses[GoldDropAmount] + bonuses[GoldDrop2] + cubeGoldBonus())`, and
   a single-stat "Gold Drops" score IS that factor (`rawTotal/100`, cube folded in) — so
-  `Optimize("Gold Drops").Score / CurrentScore("Gold Drops")` is the multiplier. Cached 120 s
+  `ScoreOf(GearOptimizer.GoldSet(), "Gold Drops") / CurrentScore("Gold Drops")` is the multiplier.
+  `GoldSet()` is the very set `ResolveGoldGear` equips, **pins and the forced respawn included**, so a
+  pinned non-gold item lowers the prediction exactly as it lowers the drop. A static `GoldDropLoadout`
+  has no `Result` to score and falls back to the unpinned best (upper bound). Cached 120 s
   (`Optimize` walks the inventory); it falls back to 1.0 on any failure, which UNDER-states the drop
   and can only leave a snipe armed.
 - **The cache is keyed on the worn set** (`LoadoutManager.CurrentGearIds()` in slot order) as well as
@@ -57,22 +60,20 @@ titan zones and the titan-beats-zone ordering.
 | `Main.SetResnipe` ("new zone fightable") | a higher zone only re-arms the snipe if its boss beats the bank; the zone is still recorded so it doesn't re-test every second |
 | `AdvisorApply.ApplyGold` (starvation) | starving for augments is no reason to re-snipe when the bank is already out of reach — that gold must come from a titan |
 | `AdvisorApply.ApplyGold` ("gold drop improved") | re-arms a latched snipe once the grown gold bonus clears `RebankMargin` × bank, with no new zone needed |
-| `AdvisorApply.ApplyTitanGold` | **no payoff gate at all** — `TitanKillWorthGoldGear` says yes for any AK titan that drops gold and is not deny-listed; which of those to target is ranked by gold (below) |
+| `AdvisorApply.ApplyTitanGold` | `TitanKillWorthGoldGear`: AK, drops gold, not deny-listed **and** predicted > `TitanRebankMargin` (1.05) × bank (no bank yet = any drop); which of those to target is ranked by gold (below) |
 
-`RebankMargin = 1.25` applies to the ZONE snipe only: re-arming it means fighting a zone in loot gear
+`RebankMargin = 1.25` applies to the ZONE snipe: re-arming it means fighting a zone in loot gear
 for a while, so a sliver of predicted gain is not worth it.
 
-**Why titan gold has no gate** (user-reported bug, `[TitanGoldDbg]` caught it): the auto-kill happens
-whether we swap or not, so the gold set cannot cost a fight — only `LockManager`'s post-swap autokill
-re-test can veto it. With nothing to weigh against, comparing the predicted drop to the bank could only
-produce false negatives, and it did: a titan that had already banked once stayed on loot gear for the
-rest of the run. The `TitanMoneyDone` latch therefore no longer gates targeting either — it records
-that a bank was collected (for `ZoneHelpers`' kill detection) and `ApplyTitanGold` re-arms it for the
-next spawn. Every AK cycle is another shot at a bigger drop as the gold bonus grows.
-
-The re-arm line says which case it is — "~2.69T would beat 12.7T banked" vs "cannot beat" — because
-the old "re-banking gold … (~633B vs 12.7T banked)" read as a promise to raise a bank the drop could
-not reach. The swap happens either way; only the wording follows the prediction.
+**Titan gold gate (owner's rule, 2026-10-12):** a gold swap costs the titan's own loot set
+(`TitanObjective`, e.g. Drop Chance), so it only goes on when the drop can lift the bank by ≥ 5 %;
+otherwise the kill goes down in the titan set. An earlier version had no gate because the bank test
+gave false negatives — a titan that had banked once stayed on loot gear for the rest of the run — but
+both causes are fixed: the prediction now uses the best roll (×5) and the gear factor is keyed on the
+worn set. The gate is re-evaluated every 60 s pass, so a grown gold bonus re-opens it on the next
+spawn. The `TitanMoneyDone` latch does not gate targeting — it records that a bank was collected (for
+`ZoneHelpers`' kill detection) and `ApplyTitanGold` re-arms it. When refused, `[TitanGoldDbg]` still
+carries the height pick's `pred=` and `vsBank=`, so the shortfall is visible.
 
 ## Ranking, not height (`AdvisorApply.BestGoldTitan`)
 
@@ -91,12 +92,11 @@ With T3 as the highest AK titan the advisor banked 300k where 400k was on offer;
 the top would have banked nothing. `BestGoldTitan` ranks the eligible candidates by
 `PredictedDrop(zone, bossOnly: true)` instead and returns the winner plus the runner-up (for the log).
 
-- **Eligibility is unchanged** and still belongs to `TitanKillWorthGoldGear`: auto-killable (the same
+- **Eligibility** belongs to `TitanKillWorthGoldGear`: auto-killable (the same
   `ZoneHelpers.AutokillAvailable` sweep `HighestAkTitan` uses, one 30 s cache for both), not inside its
-  `DenyGoldSwap` cooldown, and `baseGold > 0`. Zero-gold titans therefore can never win a gold ranking,
-  which is the point.
-- **Ranking picks WHICH titan, never WHETHER** — there is still no payoff gate against the bank, for the
-  reasons in the next section.
+  `DenyGoldSwap` cooldown, `baseGold > 0`, and the `TitanRebankMargin` bank test. Zero-gold titans
+  therefore can never win a gold ranking, which is the point.
+- **Ranking picks WHICH titan, never WHETHER** — whether is the bank test above.
 - The live factors (`totalGoldbonus`, `GoldGearFactor`) are common to every candidate and cannot reorder
   them, which is why the ordering is unit-testable straight off the table
   (`GoldDropTablesTests.Titan2_out_drops_titan3`).
