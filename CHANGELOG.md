@@ -4,6 +4,19 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.6] - 2026-10-13
+
+### Added
+
+- **Blood NUMBER can be switched off.** Systems > BLOOD has an Off / Equal share dropdown for NUMBER,
+  like Spaghetti and Counterfeit. Off splits the run's blood between those two only; the leftover
+  pool still goes into NUMBER right before the rebirth, which would wipe it anyway.
+
+### Changed
+
+- **The TITAN BANK tile and the gold advice show a titan you fight for real** when its kill set can
+  raise the bank more than the auto-killed one ("KILL SET · UP TO +x %").
+
 ## [1.8.5] - 2026-10-12
 
 ### Changed
