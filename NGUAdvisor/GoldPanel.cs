@@ -411,11 +411,17 @@ namespace NGUAdvisor
                     // Version tag comes from the game's own enemy entry (user-reported: "Walderp v1"
                     // mislabel — WALDERP has no versions; Beast V1/V2 are separate enemy #s).
                     var gate = AdvisorApply.GoldTitanGate();
+                    var live = AdvisorApply.LiveFightGold();
                     bool refused = gate.Known && !gate.Worth;
+                    // A titan fought for real can out-bank every AK one (Beast 5M vs Walderp 1M base): it
+                    // takes the stage whenever its kill set is worth chasing and the AK pick is not richer.
+                    bool liveLeads = live.Chase && (refused || live.UpTo > gate.Predicted);
                     if (refused) bankQueued = false;
-                    bankValue = TitansPanel.AbbrevWithVersion(best);
+                    if (liveLeads) bankQueued = true;
+                    bankValue = TitansPanel.AbbrevWithVersion(liveLeads ? live.Titan : best);
                     // Predicted 0 = refused for another reason (no gold drop, autokill-loss cooldown).
                     bankSub = challenge != null ? "CHALLENGE-LIMITED"
+                        : liveLeads ? $"KILL SET · UP TO {GoldDropAdvisor.PctVsBank(live.UpTo, live.Banked)}"
                         : refused ? (gate.Predicted > 0 ? $"BELOW BANK {GoldDropAdvisor.PctVsBank(gate.Predicted, gate.Banked)}" : "NO GOLD SWAP")
                         : (bankQueued ? "AT NEXT AK KILL" : "UP TO DATE");
                 }

@@ -81,7 +81,12 @@ pass's verdict (`AdvisorApply.GoldTitanGate()`, never a re-prediction): the Gold
 chip shows `BELOW BANK −x %` instead of "AT NEXT AK KILL", and the advice row says the kills stay in
 the titan set. A **real-fight** titan (not AK at its spawn version, e.g. Beast v4) is never a gold-swap
 target; its gold reaches the bank only through the kill set's freed accessories, under the same
-`TitanRebankMargin` test (`KillSetWithDropChance`).
+`TitanRebankMargin` test (`KillSetWithDropChance`). The views show it too
+(`AdvisorApply.LiveFightGold()`, same 60 s pass, logged as `[LiveGoldDbg]`): the richest swap-target
+titan that does not AK but whose staged bar the projected stats clear, priced at its UPPER bound (the
+full gold set, best roll — the kill set itself is only priced at spawn). While that bound beats the
+bank and the bank is not within `BankSaturation` of it, it takes the TITAN BANK chip as
+`KILL SET · UP TO +x %` whenever the AK pick is refused or poorer.
 
 ## Ranking, not height (`AdvisorApply.BestGoldTitan`)
 

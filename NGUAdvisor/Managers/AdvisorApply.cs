@@ -432,6 +432,54 @@ namespace NGUAdvisor.Managers
 
         public static GoldTitanVerdict GoldTitanGate() => _goldVerdict;
 
+        // The richest titan fought for real (not AK at its spawn version) whose kill set clears the bar on
+        // the projected stats. Its gold reaches the bank only through the kill set
+        // (GearOptimizer.KillSetWithDropChance), which is priced at spawn, so the views quote the UPPER
+        // bound: the full gold set at the best roll. Chase = that bound beats the bank and the bank is
+        // not yet within BankSaturation of it.
+        public struct LiveGoldVerdict
+        {
+            public bool Known, Chase;
+            public int Titan;
+            public double UpTo, Banked;
+        }
+
+        private static LiveGoldVerdict _liveGold;
+        private static string _lastLiveGoldDbg;
+
+        public static LiveGoldVerdict LiveFightGold() => _liveGold;
+
+        private static LiveGoldVerdict FindLiveFightGold(double bank)
+        {
+            var found = new LiveGoldVerdict { Titan = -1, Banked = bank };
+            try
+            {
+                var targets = Main.Settings.TitanSwapTargets;
+                OptimizationAdvisor.ProjectedBestStats(out var pa, out var pd);
+                for (int i = 0; i < ZoneHelpers.TitanZones.Length; i++)
+                {
+                    if (targets == null || i >= targets.Length || !targets[i]) continue;
+                    int zone = ZoneHelpers.TitanZones[i];
+                    if (GoldDropTables.BaseGold(zone, true) <= 0 || ZoneHelpers.AutokillAvailable(i)) continue;
+                    OptimizationAdvisor.StagedRequirementFor(i, ZoneHelpers.TitanVersion(i), pa, pd,
+                        out var ra, out var rd, out _, out _);
+                    if (pa < ra || pd < rd) continue;
+                    double upTo = GoldDropAdvisor.PredictedDrop(zone, true);
+                    if (upTo <= found.UpTo) continue;
+                    found.Known = true;
+                    found.Titan = i;
+                    found.UpTo = upTo;
+                }
+                found.Chase = found.Known && found.UpTo > bank && bank < found.UpTo * GoldDropAdvisor.BankSaturation;
+                string line = $"[LiveGoldDbg] pick={(found.Known ? "T" + (found.Titan + 1) + " v" + ZoneHelpers.TitanVersion(found.Titan) : "none")}"
+                            + $" upTo={NumberFormatter.Abbrev(found.UpTo)} bank={NumberFormatter.Abbrev(bank)}"
+                            + $" vsBank={GoldDropAdvisor.PctVsBank(found.UpTo, bank)} chase={found.Chase}";
+                if (line != _lastLiveGoldDbg) { _lastLiveGoldDbg = line; Main.LogDebug(line); }
+            }
+            catch (Exception e) { Main.LogDebug($"Live-fight gold: {e.Message}"); }
+            return found;
+        }
+
         // Why no gold gear on that autokill? Every input of the decision in one debug line, emitted only
         // when the answer changes — "the titan was auto-killed in the wrong gear" is otherwise invisible
         // after the fact: the deciding values (AK titan, ranked pick, done latch, predicted drop, TM bank)
@@ -494,6 +542,7 @@ namespace NGUAdvisor.Managers
             LogTitanGoldState(best, ver, predicted, worth, runnerUp, runnerUpPredicted);
             double bank = GoldDropAdvisor.Banked();
             _goldVerdict = new GoldTitanVerdict { Known = best >= 0, Worth = worth, Predicted = predicted, Banked = bank };
+            _liveGold = FindLiveFightGold(bank);
             if (best < 0) return;
 
             // The "already banked this run" latch does NOT survive here any more (user-reported: an
