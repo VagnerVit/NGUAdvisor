@@ -46,11 +46,9 @@ namespace NGUAdvisor.Managers
 
                 for (int lane = first; lane < lanes; lane++)
                 {
-                    while (ticks[lane] > 1 && Cost(bbAt, lane, ticks[lane] - 1) - amounts[lane] <= left)
-                    {
-                        left += amounts[lane];
-                        Fund(bbAt, lane, ticks[lane] - 1, ticks, amounts, ref left);
-                    }
+                    if (ticks[lane] <= 1) continue;
+                    left += amounts[lane];
+                    Fund(bbAt, lane, FastestWithin(bbAt, lane, left), ticks, amounts, ref left);
                 }
             }
 
@@ -68,19 +66,19 @@ namespace NGUAdvisor.Managers
         }
 
         // Smallest k whose cost fits the share; 0 when even one level per int.MaxValue ticks does not.
+        // Cost never rises with k (BB only shrinks as the lookahead does), so a bisection finds it: right
+        // after a rebirth k runs into the millions and every bbAt reads dozens of game getters.
         private static int FastestWithin(Func<int, int, double> bbAt, int lane, double share)
         {
-            if (share < 1) return 0;
-            double guess = Math.Ceiling(Math.Max(1.0, bbAt(lane, 1)) * RoundingHeadroom / share);
-            if (guess > int.MaxValue) return 0;
-            int k = Math.Max(1, (int)guess);
-            while (k > 1 && Cost(bbAt, lane, k - 1) <= share) k--;
-            while (Cost(bbAt, lane, k) > share)
+            if (share < 1 || Cost(bbAt, lane, int.MaxValue) > share) return 0;
+            int lo = 1, hi = int.MaxValue;
+            while (lo < hi)
             {
-                if (k == int.MaxValue) return 0;
-                k++;
+                int mid = lo + (hi - lo) / 2;
+                if (Cost(bbAt, lane, mid) <= share) hi = mid;
+                else lo = mid + 1;
             }
-            return k;
+            return lo;
         }
     }
 }

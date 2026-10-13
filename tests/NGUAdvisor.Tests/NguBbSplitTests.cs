@@ -64,6 +64,19 @@ namespace NGUAdvisor.Tests
         }
 
         [Fact]
+        public void PoolFarBelowBbFindsTheSpeedWithoutWalkingEveryTick()
+        {
+            // Right after a rebirth the pool is a sliver of BB, so lanes land at millions of ticks per
+            // level, and each bbAt call reads dozens of game getters.
+            int calls = 0;
+            System.Func<int, int, double> bb = (lane, k) => { calls++; return 1e12 * (1 + lane) * (1 + 500 / k); };
+            var plan = NguBbSplit.Plan(bb, 3, 1e7);
+            Assert.True(calls < 1000, $"{calls} bbAt calls");
+            Assert.All(plan.Ticks, k => Assert.True(k > 100000));
+            Assert.True(plan.Amounts.Sum() <= 1e7);
+        }
+
+        [Fact]
         public void EmptyPoolFundsNothing()
         {
             var plan = NguBbSplit.Plan(Flat(10e9, 10e9), 2, 0);
