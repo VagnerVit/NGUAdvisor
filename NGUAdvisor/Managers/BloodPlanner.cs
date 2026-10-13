@@ -371,6 +371,7 @@ namespace NGUAdvisor.Managers
 
         private static string IdleReason(RebirthOutlook o)
         {
+            if (NumberMode() == SinkMode.Off) return "blood idle — NUMBER is off, gold/loot at their share";
             switch (o)
             {
                 case RebirthOutlook.NoRebirthChallenge: return "blood idle — NORB: no rebirth to cash a NUMBER multi into";
@@ -397,7 +398,7 @@ namespace NGUAdvisor.Managers
                 Bps = bps,
                 CapGrowthPerSec = MagicGrowthPerSec(c),
                 HorizonSec = horizon,
-                NumberEligible = outlook == RebirthOutlook.Coming,
+                NumberEligible = outlook == RebirthOutlook.Coming && NumberMode() == SinkMode.On,
                 RebirthPower = Math.Max(1.0, c.bloodMagic.rebirthPower),
                 Gold = new SinkInput
                 {
@@ -495,6 +496,12 @@ namespace NGUAdvisor.Managers
             var s = Main.Settings;
             if (s == null) return SinkMode.On;
             return (gold ? s.BloodWantCounterfeit : s.BloodWantSpaghetti) ? SinkMode.On : SinkMode.Off;
+        }
+
+        public static SinkMode NumberMode()
+        {
+            var s = Main.Settings;
+            return s == null || s.BloodWantNumber ? SinkMode.On : SinkMode.Off;
         }
 
         // Compact investment status for the expanded detail row: each spell's bonus now against its plan.

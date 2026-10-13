@@ -30,7 +30,7 @@ namespace NGUAdvisor
         private Panel _card, _barOuter, _fill;
         private NumericUpDown _guffAThr, _guffBThr;
         // Whether a spell takes part in the equal split.
-        private LineComboBox _spagMode, _goldMode;
+        private LineComboBox _spagMode, _goldMode, _numMode;
         private Label _spagStat, _goldStat, _numStat;
         private Label _spagWhy, _goldWhy, _numWhy;   // WHY this sink is / isn't taking blood right now
         private Label _budgetLine;                   // the run's blood the plan splits
@@ -213,7 +213,8 @@ namespace NGUAdvisor
             UiLayout.HelpMark(this, spellsHead,
                 "This run's blood (in the spells, on hand, and the income still to come by the rebirth) is split " +
                 "equally between the enabled spells. Counterfeit and Spaghetti only take whole +1 % steps: blood " +
-                "pools until the next step is paid for, and what their share cannot turn into a step goes to NUMBER.");
+                "pools until the next step is paid for, and what their share cannot turn into a step goes to NUMBER " +
+                "(with NUMBER off it stays pooled until the rebirth casts it there).");
             y += UiTheme.HeadPitch;
             _budgetLine = new Label { Text = "", AutoSize = false, Size = new Size(_w - UiTheme.S(54), UiTheme.TextH), Font = UiTheme.Ui, ForeColor = UiTheme.Ink, BackColor = UiTheme.Ground, Location = new Point(UiTheme.S(10), y) };
             Controls.Add(_budgetLine);
@@ -233,9 +234,9 @@ namespace NGUAdvisor
             _goldStat = MkSinkStatus(y);
             _goldWhy = MkSinkWhy(y + UiTheme.LinePitch);
 
-            // NUMBER has no dropdown: it always takes its share whenever a rebirth will cash it.
             y += rowPitch;
             MkSinkCaption("NUMBER", y);
+            _numMode = MkMode(y, m => Settings.BloodWantNumber = m == SinkMode.On);
             _numStat = MkSinkStatus(y);
             _numWhy = MkSinkWhy(y + UiTheme.LinePitch);
         }
@@ -282,6 +283,7 @@ namespace NGUAdvisor
                 var goldMode = BloodPlanner.Mode(true);
                 _spagMode.SelectedIndex = (int)spagMode;
                 _goldMode.SelectedIndex = (int)goldMode;
+                _numMode.SelectedIndex = (int)BloodPlanner.NumberMode();
             }
             catch (Exception e) { LogDebug($"Blood sync: {e.Message}"); }
             finally { _syncing = false; }
@@ -346,7 +348,7 @@ namespace NGUAdvisor
                     UiLayout.FitInto(_goldWhy, "");
                     UiLayout.FitInto(_numStat, $"now x{Fmt(rp)}");
                 }
-                UiLayout.FitInto(_numWhy, plan.PoolForPill ? "paused for the Iron Pill" : plan.WantRebirth ? "receiving" : "");
+                UiLayout.FitInto(_numWhy, BloodPlanner.NumberMode() == SinkMode.Off ? "off" : plan.PoolForPill ? "paused for the Iron Pill" : plan.WantRebirth ? "receiving" : "");
 
             }
             catch (Exception e) { LogDebug($"Blood panel: {e.Message}"); }

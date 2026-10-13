@@ -60,6 +60,7 @@ namespace NGUAdvisor
         [SerializeField] private int _counterfeitThreshold;
         [SerializeField] private bool _bloodWantSpaghetti = true;
         [SerializeField] private bool _bloodWantCounterfeit = true;
+        [SerializeField] private bool _bloodWantNumber = true;
         // PUSH: the user states the bonus as a goal, not as a permission. It overrules the advisor's
         // discretionary gates (demand, cost-curve knee) up to the ceiling beside it — but never the
         // rebirth wipe, so the investment window still applies. Kept as a second bool rather than
@@ -424,6 +425,7 @@ namespace NGUAdvisor
             // false default would silently switch that sink off on upgrade.
             _bloodWantSpaghetti = other?.BloodWantSpaghetti ?? true;
             _bloodWantCounterfeit = other?.BloodWantCounterfeit ?? true;
+            _bloodWantNumber = other?.BloodWantNumber ?? true;
             _bloodPushSpaghetti = other?.BloodPushSpaghetti ?? false;
             _bloodPushCounterfeit = other?.BloodPushCounterfeit ?? false;
             _castBloodSpells = other?.CastBloodSpells ?? false;
@@ -1225,6 +1227,17 @@ namespace NGUAdvisor
             {
                 if (value == _bloodWantCounterfeit) return;
                 _bloodWantCounterfeit = value;
+                SaveSettings();
+            }
+        }
+
+        public bool BloodWantNumber
+        {
+            get => _bloodWantNumber;
+            set
+            {
+                if (value == _bloodWantNumber) return;
+                _bloodWantNumber = value;
                 SaveSettings();
             }
         }

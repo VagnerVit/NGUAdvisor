@@ -214,7 +214,7 @@ namespace NGUAdvisor.Managers
 
             e.Add(Sys(SystemIds.Blood, "Blood", Destinations.Blood,
                 "Iron pill timing and which spell the blood pool feeds.",
-                "CastBloodSpells AdvisorBlood AutoSpellSwap BloodNumberThreshold BloodWantSpaghetti BloodWantCounterfeit BloodPushSpaghetti BloodPushCounterfeit SpaghettiThreshold CounterfeitThreshold",
+                "CastBloodSpells AdvisorBlood AutoSpellSwap BloodNumberThreshold BloodWantSpaghetti BloodWantCounterfeit BloodWantNumberBloodPushSpaghetti BloodPushCounterfeit SpaghettiThreshold CounterfeitThreshold",
                 layers + " managed unmanaged cast blood spells blood magic iron pill spaghetti counterfeit number rituals push target sink"));
 
             e.Add(Sys(SystemIds.Gold, "Gold", Destinations.Gold,

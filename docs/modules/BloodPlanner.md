@@ -104,8 +104,10 @@ of the run. The two Systems > BLOOD fields are now that ceiling:
 - Superseded 2026-09-23: the numbers and Push are no longer read in advisor mode (see the budget).
 - Both defaults are **true**: a settings file written before these existed routed gold/loot freely,
   and a false default would silently switch a sink off on upgrade.
-- NUMBER carries no checkbox: it is the FALLBACK branch, so "off" is not a state it can be in, and
-  its number stays a FLOOR.
+- NUMBER has its own Off / Equal share dropdown (`BloodWantNumber`, default true, 2026-10-13): past
+  the last boss its next-run multi buys nothing. Off = `NumberEligible` false, so the split runs over
+  gold/loot only and the rest pools; the pre-rebirth top-up still casts that pool into NUMBER, since
+  the rebirth wipes it anyway.
 
 `CounterfeitPercentNow()` / `SpaghettiPercentNow()` read `bloodMagicController.goldBonus()` and
 `lootBonus()` — the same values Main's manual `AutoSpellSwap` path uses, so a target means the same
