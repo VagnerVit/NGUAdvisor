@@ -4,6 +4,13 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.7] - 2026-10-13
+
+### Fixed
+
+- **The game no longer freezes at a rebirth.** Splitting energy/magic between NGUs when the pool is far
+  below their BB (typically right after a rebirth) could hang the game indefinitely.
+
 ## [1.8.6] - 2026-10-13
 
 ### Added
