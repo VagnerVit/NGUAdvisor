@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-16
+
 ### Changed
 
 - **A new launcher.** `Run NGU Advisor.bat` now shows each step in colour: update check, NGU Idle
