@@ -7,7 +7,8 @@ launch. Three pieces, deliberately split across the process boundary:
 |---|---|---|
 | `Managers/UpdateChecker.cs` | inside the game | spawns the script every 6 h, reads `update.state`, exposes `Available` / `LatestVersion` |
 | `injector\update.ps1` (source: `build/update.ps1`) | Windows PowerShell | the only thing that touches the network; `-Check` reports, `-Apply` installs |
-| `Run NGU Advisor.bat` (source: `build/Run NGU Advisor.bat`) | before injection | writes `install.txt`, runs `-Apply`, then injects |
+| `Run NGU Advisor.bat` (source: `build/Run NGU Advisor.bat`) | player double-clicks it | one line: runs `injector\launch.ps1` |
+| `injector\launch.ps1` (source: `build/launch.ps1`) | before injection | writes `install.txt`, runs `-Apply`, starts the game through Steam if needed, offers to replace a running advisor (via `unload.request`), injects and confirms from `injected.txt` |
 
 ## Why the network lives outside the game
 
@@ -80,14 +81,17 @@ A failed check writes no `checkedUtc` (so the script's throttle never hides the 
 - **Back up before replacing, restore on throw.** A half-written DLL is an instant crash on inject.
 - **6-hour throttle**, matched on both sides. The unauthenticated GitHub API allows 60 requests/hour
   per IP and an idle game is left running for days.
-- **Only `NGUAdvisor.dll` and `update.ps1` are replaced.** `smi.exe` and `SharpMonoInjector.dll` are
+- **Only `NGUAdvisor.dll`, `update.ps1` and `launch.ps1` are replaced.** `smi.exe` and `SharpMonoInjector.dll` are
   third-party tools that ship only to make the zip runnable, and `sampleprofiles\` may have been
   edited in place.
 - **The release zip nests everything under `NGUAdvisor-<version>\`** (`tools.ps1 package` zips the
   stage FOLDER), so the DLL is located by recursive search rather than by an assumed path.
 - **`Run NGU Advisor.bat` is never refreshed by an update.** `cmd.exe` reads a batch file line by
   line as it executes and the script is running FROM that file; overwriting it mid-run jumps cmd into
-  garbage. A launcher change needs a manual re-download of the zip.
+  garbage. So since 1.10.0 the
+  `.bat` is a single line that calls `injector\launch.ps1`, and all launcher behaviour lives in that
+  script, which updates do replace. Installs from before 1.10.0 keep their old `.bat` (it still works:
+  update, then inject) until the zip is downloaded again.
 
 ## Not done, on purpose
 

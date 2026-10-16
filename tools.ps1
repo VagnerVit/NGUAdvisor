@@ -41,6 +41,7 @@ $Changelog     = Join-Path $Root 'CHANGELOG.md'
 $BuildOutput   = Join-Path $Root 'NGUAdvisor/bin/Release/net48'
 $Launcher      = Join-Path $Root 'build/Run NGU Advisor.bat'
 $Updater       = Join-Path $Root 'build/update.ps1'
+$LauncherScript = Join-Path $Root 'build/launch.ps1'
 $SampleProfiles = Join-Path $Root 'NGUAdvisor/SampleProfiles'
 $Dist          = Join-Path $Root 'dist'
 $InjectorTools = if ($env:NGU_TOOLS) { $env:NGU_TOOLS } else { Join-Path $Root 'tools/injector' }
@@ -86,7 +87,7 @@ function Assert-ZipContents([string]$Zip) {
     try { $entries = $archive.Entries | ForEach-Object { $_.FullName -replace '\\', '/' } }
     finally { $archive.Dispose() }
     $required = @('Run NGU Advisor.bat', 'injector/NGUAdvisor.dll', 'injector/smi.exe',
-                  'injector/SharpMonoInjector.dll', 'injector/update.ps1', 'sampleprofiles/')
+                  'injector/SharpMonoInjector.dll', 'injector/update.ps1', 'injector/launch.ps1', 'sampleprofiles/')
     foreach ($path in $required) {
         if (-not ($entries | Where-Object { $_ -like "*/$path*" })) { throw "zip is missing $path" }
     }
@@ -113,6 +114,7 @@ function Invoke-Package([switch]$SkipZip) {
     Copy-Item (Join-Path $InjectorTools 'smi.exe'), (Join-Path $InjectorTools 'SharpMonoInjector.dll') $injectorDir
     # The updater ships next to the DLL it replaces: $PSScriptRoot IS the injector folder.
     Copy-Item $Updater $injectorDir
+    Copy-Item $LauncherScript $injectorDir
     Copy-Item $SampleProfiles (Join-Path $stage 'sampleprofiles') -Recurse
 
     $forbidden = Get-ChildItem $stage -Recurse -File |

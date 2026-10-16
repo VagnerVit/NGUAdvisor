@@ -4,6 +4,13 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **A new launcher.** `Run NGU Advisor.bat` now shows each step in colour: update check, NGU Idle
+  (started through Steam when it is not running), the advisor already running (replace it or keep
+  it) and the inject, which it confirms before closing. Updates can now improve the launcher too;
+  download this zip once to get it.
+
 ## [1.9.0] - 2026-10-16
 
 ### Changed

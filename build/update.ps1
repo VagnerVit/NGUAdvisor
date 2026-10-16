@@ -205,6 +205,9 @@ try {
         # needs a manual re-download; see BUILD.md.
         $newScript = Get-ChildItem -Path $temp -Recurse -Filter 'update.ps1' | Select-Object -First 1
         if ($newScript) { Copy-Item -Path $newScript.FullName -Destination $PSCommandPath -Force }
+        # The launcher logic lives in launch.ps1 for the same reason: the .bat that calls it can never be replaced.
+        $newLauncher = Get-ChildItem -Path $temp -Recurse -Filter 'launch.ps1' | Select-Object -First 1
+        if ($newLauncher) { Copy-Item -Path $newLauncher.FullName -Destination (Join-Path $InjectorDir 'launch.ps1') -Force }
 
         # smi.exe and SharpMonoInjector.dll are third-party tools that ship with the zip only to make
         # it runnable; they are not ours to replace. Sample profiles are left alone too — they may

@@ -112,10 +112,12 @@ with NGU Idle open — it injects `NGUAdvisor.dll` directly (`NGUAdvisor.Loader.
 
 ### Auto-update
 
-The launcher (source: `build/Run NGU Advisor.bat`) also writes its own folder into
+The launcher (`injector\launch.ps1`) writes its own folder into
 `%LocalLow%\NGUAdvisor\install.txt` and runs `injector\update.ps1 -Apply`, which installs a release
 found by an earlier background check. The mechanism is documented in `docs/modules/UpdateChecker.md`;
 it always exits 0, so it can never stop the game from getting its advisor.
 
-**An update never replaces `Run NGU Advisor.bat`**: `cmd.exe` reads a batch file as it executes it,
-so a launcher change means re-downloading the zip.
+**An update never replaces `Run NGU Advisor.bat`**: `cmd.exe` reads a batch file as it executes it.
+That is why the `.bat` only calls `injector\launch.ps1` (source: `build/launch.ps1`), which updates do
+replace: change launcher behaviour there, never in the `.bat`. It runs under Windows PowerShell 5.1,
+so no PS7-only syntax, and it keeps its UTF-8 BOM (5.1 reads a BOM-less script as ANSI).
