@@ -4,6 +4,21 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The auto profile runs the guide's Evil day on your rebirth cadence, not from Boss 125.** A 24h
+  profile on Evil gets the TM half-hour, augments to 3 h, Normal NGUs + AT and the Evil NGU tail
+  (one hour plus one per T7 version) even while still climbing.
+- **Boss pushes on Evil wear resource gear** (E/M cap + power) instead of the Adventure set, as the
+  guide gears the Evil day. Titan fights keep their Adventure gear.
+
+### Fixed
+
+- **Challenges no longer leave NGUs unfunded with Auto profile on.** The generated allocation now
+  drives every challenge except 100 Level, whose level budget it cannot respect.
+- **An EvilStart rebirth (Number, no clock) no longer opens on TM HOUR.** It is treated as the climb,
+  not the Evil day.
+
 ## [1.8.7] - 2026-10-13
 
 ### Fixed
