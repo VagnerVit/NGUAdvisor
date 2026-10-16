@@ -66,7 +66,8 @@ EV (Evilverse) B58 → PPPL (Pretty Pink Princess Land) B100 → T7 (Greasy Nerd
 Meta Land B158 → T8 path + IDP B166. Snipe order: EV exploder → EV idle (accs) → PPPL exploder →
 PPPL idle (accs) → T7.
 
-**B. The 24h rebirth (once T7-capable) — four phases (REPLACES the Normal "1h TM / 1h AT / 22h NGU"):**
+**B. The 24h rebirth (after the 30-min climb stops, "while you're climbing up to Boss 125", and again
+post-T7) — four phases (REPLACES the Normal "1h TM / 1h AT / 22h NGU"):**
 1. **0:00–0:30 Time Machine** — optimize 2 respawn, lock Voodoo Doll, rest in TM ("as many TM levels as
    you can in 30 min"; 0–2 levels early).
 2. **0:30–3:00 Augmentation** — swap weapon to BDW gun; run best augment to the 3h mark (Gear Optimizer).
@@ -78,7 +79,7 @@ PPPL idle (accs) → T7.
    BB they're time-gated — only more run-time helps.)
 4. **23:00–24:00 Evil NGU** — switch to Evil NGUs (exploit temp Beard-Cage levels); focus NGU Augments +
    NGU Ygg/EXP toward T7; eat Fruit of Power A + stat digger to push bosses. **+1 extra hour of Evil NGU
-   per T7 version defeated** (1h post-T7v1, 2h post-T7v2…). Evil NGUs multiply Normal NGUs. (At Boss 124 at
+   per T7 version defeated** (1h pre-T7, 2h post-T7v1, 3h post-T7v2…). Evil NGUs multiply Normal NGUs. (At Boss 124 at
    RB end, dump FoK EXP on Rich Jerks.)
 
 **Ratios / spend:** pre-T7 buy ONLY Energy once you can consistently BB Normal NGU Ygg/EXP. Post-T7 back to

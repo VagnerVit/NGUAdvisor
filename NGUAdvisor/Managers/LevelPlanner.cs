@@ -194,36 +194,32 @@ namespace NGUAdvisor.Managers
         private static string StopText(long stop)
             => stop == long.MinValue ? "unknown" : stop < 0 ? "hold" : stop.ToString();
 
-        // Guide ch5 24h structure: Normal NGUs most of the run, EVIL NGUs the LAST N hours (N = T7 versions
-        // defeated; 1h post-T7v1, 2h post-T7v2 …). Replaces the profile's hardcoded ~22h NGUDiff switch with
-        // a dynamic one — but ONLY in the Ch.5 24h shape (T7-capable, Boss 125+) with a TIME-based rebirth
-        // target; elsewhere the profile's NGUDiff owns the track. UNTESTED until Boss 125+. The T7-version
-        // count is read from the bestiary (ZoneHelpers.TitanVersionsBeaten) — the earlier
+        // Guide ch5 Evil day: Normal NGUs most of the run, EVIL NGUs the last hour plus one per T7 version
+        // defeated (RunShape.EvilNguStartSec). Replaces the profile's hardcoded NGUDiff switch on the Evil day
+        // (long rebirths, the climb to Boss 125 included); elsewhere the profile's NGUDiff owns the track.
+        // The T7-version count is read from the bestiary (ZoneHelpers.TitanVersionsBeaten) — the earlier
         // `TitanVersion(6)-1` was the difficulty the player had SELECTED in the zone, not versions
         // defeated, so it granted Evil NGU hours for touching a dropdown and none for actual kills.
         private static void TickNguTrack(Character c)
         {
             try
             {
-                int chapter = 0;
-                try { chapter = StageDetector.Detect().Chapter; } catch { }
-                double target = -1;
-                try { target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1; } catch { }
-                if (chapter != 5 || ZoneHelpers.CurrentHighestBoss(c) < 125 || target <= 0) return;
+                double target = ChallengeOverlay.RebirthTargetSec();
+                if (!RunShape.IsEvilDay(ChallengeOverlay.Chapter(), target)) return;
 
                 int t7 = 0;
                 try { t7 = ZoneHelpers.TitanVersionsBeaten(6); } catch { }
-                if (t7 < 1) return; // no T7 version defeated → no Evil NGU hours (guide ch5 rule: N = versions defeated)
-                double evilHours = t7;
-                double switchAt = target - evilHours * 3600.0;
-                var want = c.rebirthTime.totalseconds >= switchAt ? difficulty.evil : difficulty.normal;
+                double switchAt = RunShape.EvilNguStartSec(target, t7);
+                double evilHours = 1 + t7;
+                var want = !double.IsNaN(switchAt) && c.rebirthTime.totalseconds >= switchAt
+                    ? difficulty.evil : difficulty.normal;
 
                 if (c.settings.nguLevelTrack != want)
                 {
                     c.settings.nguLevelTrack = want;
                     try { c.NGUController.refreshMenu(); } catch { }
                     ChallengeOverlay.Record("NGU track", $"→ {(want == difficulty.evil ? "EVIL" : "Normal")} NGUs",
-                        $"guide ch5: last {evilHours:0}h evil (T7 v{t7} done)");
+                        $"guide ch5: last {evilHours:0}h evil ({t7} T7 versions beaten)");
                 }
             }
             catch (Exception e) { Main.LogDebug($"LevelPlanner NGU track: {e.Message}"); }

@@ -88,11 +88,13 @@ All freezes snapshot the user's targets first and log via `ChallengeOverlay.Reco
 
 ## NGU track switch (`TickNguTrack`)
 
-Guide ch5 24 h structure: Normal NGUs most of the run, EVIL NGUs the LAST N hours where
-**N = T7 versions defeated** (1 h post-T7v1, 2 h post-v2 …). Applies ONLY in the Ch.5 24 h shape:
-`StageDetector.Chapter == 5` (the boss-anchored chapter — this is one of its two sanctioned
-consumers), boss ≥ 125, TIME-based rebirth target set. Elsewhere the profile's NGUDiff owns the
-track. Flagged UNTESTED until Boss 125+ (T7-version read is a first cut).
+Guide ch5 Evil day: Normal NGUs most of the run, EVIL NGUs the LAST N hours where
+**N = 1 + T7 versions defeated** ("run Evil NGUs for the last hour", "After v1, that means 2 hours";
+`RunShape.EvilNguStartSec`). Applies on `RunShape.IsEvilDay`: chapter 5 (read through
+`ChallengeOverlay.Chapter()`) and a TIME-based rebirth target over 2 h — the climb to Boss 125
+included, because the guide's 24 h schedule is written for that climb. The old gate (boss ≥ 125 and
+N = versions with no base hour) never switched before T7. Elsewhere the profile's NGUDiff owns the
+track; on the Evil day `CustomAllocation` skips the file's NGUDiff swap so the two do not fight.
 
 R11 note: no outer whole-Tick catch — AdvisorApply's `RunStep("Level planner")` owns the bounded
 fault report; only the narrow probes have their own catches.
