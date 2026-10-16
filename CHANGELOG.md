@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-16
+
 ### Changed
 
 - **The auto profile runs the guide's Evil day on your rebirth cadence, not from Boss 125.** A 24h
