@@ -1,0 +1,35 @@
+name: CI
+
+# Tests only: building the DLL needs NGU Idle's own assemblies, which are not in this repo.
+# Builds and releases run locally through tools.ps1.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Unit tests
+        run: dotnet test tests/NGUAdvisor.Tests -c Release
+
+      - name: CHANGELOG entry for advisor changes
+        shell: pwsh
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if (-not $env:BEFORE -or $env:BEFORE -match '^0+$') { exit 0 }
+          $changed = git diff --name-only $env:BEFORE $env:GITHUB_SHA
+          $advisor = $changed | Where-Object { $_ -like 'NGUAdvisor/*' -and $_ -notlike '*.md' }
+          if ($advisor -and $changed -notcontains 'CHANGELOG.md') {
+            Write-Output "::warning::NGUAdvisor/ changed without a CHANGELOG.md entry. Player-visible changes belong under [Unreleased]."
+          }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 using NGUAdvisor.AllocationProfiles;
@@ -40,9 +41,14 @@ namespace NGUAdvisor
         private static GUIStyle _overlayStyle;
         private static float _overlayStyleScale = -1f;
         public static SettingsForm settingsForm;
-        // NGU Advisor's own product version (SemVer). Bump by hand only at real milestones; the per-build
-        // identity is the auto BuildTag below, so this no longer needs touching every compile.
-        public const string Version = "1.8.7";
+        // NGU Advisor's own product version (SemVer), generated from <Version> in NGUAdvisor.csproj.
+        public static readonly string Version = ReadProductVersion();
+
+        private static string ReadProductVersion()
+        {
+            object[] attributes = typeof(Main).Assembly.GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false);
+            return attributes.Length > 0 ? ((AssemblyInformationalVersionAttribute)attributes[0]).InformationalVersion : "0.0.0";
+        }
         // Build stamp, derived automatically from the hot-reload assembly identity (NGUAdvisor.r<yyMMddHHmmss>,
         // the unique per-compile name that already exists for Mono byte-load dedup). Replaces the old
         // hand-bumped codename — every compile yields a unique, sortable id (yyMMdd-HHmm) with zero edits.

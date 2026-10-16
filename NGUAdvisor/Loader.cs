@@ -20,7 +20,7 @@ namespace NGUAdvisor
         // of that. (It only finds ACTIVE objects — fine: Unload deactivates and destroys the host.)
         //
         // There is deliberately no hot-reload in this project: to run a new build, restart NGU Idle and
-        // inject once. See package-release.sh.
+        // inject once (`tools.ps1 reload` does both).
         private const string HostName = "NGUAdvisorHost";
         private const string MarkerFile = "injected.txt";
 

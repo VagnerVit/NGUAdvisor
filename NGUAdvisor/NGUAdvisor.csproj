@@ -21,13 +21,17 @@
       LogicalName + RootNamespace-based preset names.
     -->
     <AssemblyName>NGUAdvisor.r$([System.DateTime]::Now.ToString(yyMMddHHmmss))</AssemblyName>
-    <!-- Properties/AssemblyInfo.cs provides the assembly attributes -->
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <!-- AssemblyVersion("1.0.*") wildcard requires non-deterministic builds -->
-    <Deterministic>false</Deterministic>
+    <!--
+      The ONE version source: Main.Version reads it back from AssemblyInformationalVersion, the
+      updater compares it with the release tag. Bumped only by `tools.ps1 release`.
+    -->
+    <Version>1.8.7</Version>
+    <Product>NGU Advisor</Product>
+    <AssemblyTitle>NGU Advisor</AssemblyTitle>
+    <Copyright>Copyright © 2026</Copyright>
+    <!-- The SDK would append "+<commit sha>", which the updater's [version] parse rejects. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <!-- Keep the stale committed copy of the game assembly and old release zip out of the build -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Assembly-CSharp.dll;dist_3.6.1.zip</DefaultItemExcludes>
   </PropertyGroup>
 
   <!--
@@ -65,10 +69,6 @@
     <None Include="SettingsForm.resx" />
     <None Include="..\build\convert-resx.ps1" />
     <_ResxSource Include="SettingsForm.resx" />
-    <!--
-      SettingsForm.dje.resx is a dead leftover (no code loads it; its ".dje." middle segment
-      is misread as the Zarma culture and would spawn a stray satellite assembly). Not embedded.
-    -->
   </ItemGroup>
 
   <ItemGroup>

@@ -15,12 +15,13 @@ Deploying therefore always means: **unload, then inject, then verify the build t
 ## The one command
 
 ```powershell
-pwsh build/reload-advisor.ps1              # unload the live build, rebuild, inject
-pwsh build/reload-advisor.ps1 -EjectOnly   # just unload
+pwsh ./tools.ps1 reload                   # unload the live build, rebuild, inject
+pwsh ./tools.ps1 reload -UnloadOnly       # just unload
 ```
 
-It asks the live advisor to unload (see below), waits for the acknowledgement, runs
-`./package-release.sh --inject`, and prints the build tag the game came back with.
+It asks the live advisor to unload (see below), waits for the acknowledgement, builds and stages
+the DLL, injects it, and prints the build tag the game came back with (retrying while the old host
+object lingers).
 
 ## Verify — never assume
 
@@ -89,8 +90,8 @@ unnecessary now that the unload request file exists.
 
 | Task | How |
 |---|---|
-| Reload a new build | `pwsh build/reload-advisor.ps1` |
-| Unload only | `pwsh build/reload-advisor.ps1 -UnloadOnly` |
+| Reload a new build | `pwsh ./tools.ps1 reload` |
+| Unload only | `pwsh ./tools.ps1 reload -UnloadOnly` |
 | What does the advisor see right now? | drop `state-export.request`, wait for it to vanish, read `state-export.txt` |
 | Which build is live? | first `writer alive` line in `debug.log`, or `injected.txt` |
 | Is it injected at all? | `injected.txt` exists AND its pid is a running NGUIdle |

@@ -22,7 +22,12 @@ dotnet build "NGUAdvisor/NGUAdvisor.csproj" -c Release
 
 ### Deploy / release
 
-Copy the built DLL over `injector/NGUAdvisor.dll` in a runnable folder and run `Run NGU Advisor.bat` with NGU Idle open (injects via `smi.exe`, entry point `NGUAdvisor.Loader.Init`). Release zips are produced by `package-release.sh` (maintainer machine only) — `./package-release.sh` to zip, `--inject` to build and inject into the running game without zipping, `--no-zip` to stage only. It needs no environment variables; injector tools live in the git-ignored `tools/injector/`. See BUILD.md.
+Everything goes through `./tools.ps1` (pwsh, maintainer machine only): `build`, `test`, `package [-NoZip]`, `reload` (unload the live advisor, build, inject, verify the build tag — see the `deploying-advisor` skill) and `release [-DryRun]` (see the `release` skill). Injector tools live in the git-ignored `tools/injector/`. See BUILD.md.
+
+### Versioning and CHANGELOG
+
+- **`<Version>` in `NGUAdvisor.csproj` is the only version.** `Main.Version` reads it back from the assembly; never edit it by hand — `tools.ps1 release` bumps it.
+- **Every player-visible change adds its CHANGELOG entry in the same commit**, under `## [Unreleased]` and one of `### Added` / `### Changed` / `### Fixed`. The headings decide the release number: only `Fixed` (or `Security`) → patch, anything else → minor. Internal refactors, docs and tooling get no entry.
 
 ## Tests
 

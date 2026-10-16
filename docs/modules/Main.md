@@ -90,11 +90,10 @@ progression-related must use `ZoneHelpers.CurrentHighestBoss` instead.
 
 - Log channels: `Log`/`LogLoot`/`LogCombat`/`LogPitSpin`/`LogCard`/`LogDebug`, each stamped with
   date + rebirth seconds. `LootFeed` is an in-memory newest-first ring (400) mirroring loot.log.
-- `Version` (hand-bumped SemVer) + `BuildTag` (parsed from the assembly name
-  `NGUAdvisor.r<yyMMddHHmmss>` → `yyMMdd-HHmm`). **`Version` is the ONLY trustworthy version in the
-  build** — the `AssemblyInfo.cs` attributes drifted to 1.2.2 and the assembly name is a build stamp,
-  not a version — so `Loader`'s `injected.txt` marker carries it as `version=` for the updater to
-  read when no advisor is running (UpdateChecker.md).
+- `Version` (SemVer read from `AssemblyInformationalVersion`, i.e. `<Version>` in the csproj, bumped
+  only by `tools.ps1 release`) + `BuildTag` (parsed from the assembly name
+  `NGUAdvisor.r<yyMMddHHmmss>` → `yyMMdd-HHmm`). `Loader`'s `injected.txt` marker carries `Version`
+  as `version=` for the updater to read when no advisor is running (UpdateChecker.md).
 - **Hotkeys** — F1 window, F2 pause, F3 quicksave, F5 dump gear, F7 quickload, F8 quick swap,
   F9 profile editor, F10 gear diagnostic; F11 is a reserved test stub. Plus the in-game overlay
   (`OnGUI`, `RefreshOverlayText`).

@@ -15,9 +15,9 @@
     PowerShell is outside that domain and has the host's real trust store, so no HTTPS client
     ever has to exist inside the game process.
 
-    VERSION TRUTH COMES FROM THE ADVISOR, NEVER FROM THE DLL ON DISK. Main.Version is the one
-    hand-bumped SemVer; the assembly attributes in Properties/AssemblyInfo.cs drifted long ago
-    (they still read 1.2.2) and the assembly NAME carries a build timestamp, not a version. So
+    VERSION TRUTH COMES FROM THE ADVISOR, NEVER FROM THE DLL ON DISK. Main.Version comes from the
+    csproj <Version>; DLLs released before 1.8.8 carry stale 1.2.2 file attributes and the
+    assembly NAME carries a build timestamp, not a version. So
     -Check is passed -CurrentVersion by the advisor and records it as installed= in update.state;
     -Apply reads that line back. The game's own version is irrelevant here and is never read.
 
@@ -36,7 +36,7 @@ param(
 )
 
 # This fork, NOT the upstream it was taken from: upstream moved on to a 2.x "Companion" that is a
-# different program. Hard-coded for the same reason package-release.sh hard-codes it.
+# different program. Hard-coded for the same reason tools.ps1 hard-codes it.
 $Repo = 'VagnerVit/NGUAdvisor'
 
 # Re-ask github at most this often. The unauthenticated API allows 60 requests/hour per IP and an
@@ -181,7 +181,7 @@ try {
             -Headers @{ 'User-Agent' = 'NGUAdvisor-Updater' } -UseBasicParsing
         Expand-Archive -Path $zip -DestinationPath $temp -Force
 
-        # package-release.sh zips the STAGE FOLDER, so the archive holds NGUAdvisor-<version>\injector\…
+        # tools.ps1 package zips the STAGE FOLDER, so the archive holds NGUAdvisor-<version>\injector\…
         # rather than injector\… at the root. Search instead of assuming either layout.
         $new = Get-ChildItem -Path $temp -Recurse -Filter 'NGUAdvisor.dll' |
                Where-Object { $_.Length -gt 0 } | Select-Object -First 1

@@ -10,8 +10,7 @@ $proj = Split-Path -Parent $PSScriptRoot   # ...\NGUAdvisor-src
 $proj = Join-Path $proj 'NGUAdvisor'
 
 $pairs = @(
-    @{ resx = 'SettingsForm.resx';     out = 'SettingsForm.resources' },
-    @{ resx = 'SettingsForm.dje.resx'; out = 'SettingsForm.dje.resources' }
+    @{ resx = 'SettingsForm.resx'; out = 'SettingsForm.resources' }
 )
 
 foreach ($p in $pairs) {

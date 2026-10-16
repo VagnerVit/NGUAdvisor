@@ -13,8 +13,8 @@ namespace NGUAdvisor.Managers
     // the answer back out of a file. Same shape as every other outside-the-game handshake here —
     // Loader's unload.request, StateExport's request file: one side drops a file, the other polls it.
     //
-    // THE ADVISOR OWNS THE VERSION. Main.Version is the only trustworthy SemVer in the build (the
-    // AssemblyInfo attributes drifted to 1.2.2 and the assembly name carries a build timestamp), so
+    // THE ADVISOR OWNS THE VERSION. Main.Version is the SemVer the updater trusts (DLLs before 1.8.8
+    // carry stale 1.2.2 file attributes and the assembly name carries a build timestamp), so
     // it is passed to the script on every check rather than sniffed off the DLL. The GAME's version
     // is never consulted: NGU Idle is done shipping updates and nothing here is gated on it.
     //
