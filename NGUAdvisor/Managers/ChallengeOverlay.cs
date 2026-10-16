@@ -213,14 +213,14 @@ namespace NGUAdvisor.Managers
             {
                 // LSC completes on the sword alone; bosses matter only until they open its aug/upgrade.
                 bool gated = LaserSwordBossGated(c);
-                want = gated ? "Adventure" : "Augments";
+                want = gated ? ChallengeDetector.BossPushObjective() : "Augments";
                 why = gated ? $"LSC: boss {boss} has not unlocked the laser sword upgrade yet"
                             : "LSC: the laser sword is the completion condition";
             }
             else
             {
                 bool pushing = Phase == "push";
-                want = pushing ? "Adventure" : "NGUs";
+                want = pushing ? ChallengeDetector.BossPushObjective() : "NGUs";
                 why = pushing ? $"push phase: boss {boss} within reach" : "growth phase: at the boss wall";
             }
             if (want != GearObjectiveOverride)
@@ -532,6 +532,12 @@ namespace NGUAdvisor.Managers
             catch { return -1; }
         }
 
+        private static bool RebirthsOnProgress()
+        {
+            try { return Main.Profile != null && Main.Profile.RebirthsOnProgress(); }
+            catch { return false; }
+        }
+
         private static void UpdateSegment(Character c)
         {
             bool tmEmpty = true;
@@ -552,6 +558,7 @@ namespace NGUAdvisor.Managers
                 Chapter = Chapter(),
                 RunSec = runSec,
                 RebirthTargetSec = RebirthTargetSec(),
+                RebirthsOnProgress = RebirthsOnProgress(),
                 TmUnlocked = tmUnlocked,
                 TmRelocked = !tmButton,
                 AtUnlocked = atUnlocked,
@@ -592,7 +599,7 @@ namespace NGUAdvisor.Managers
         {
             switch (Segment)
             {
-                case "EVIL CLIMB": return "Adventure";   // re-climb: adventure stats push the boss wall
+                case "EVIL CLIMB": return ChallengeDetector.EvilPushObjective;
                 case "AUGMENTATION": return "Augments";  // guide ch5 phase 2: gear for augment speed
                 case "TM HOUR": return "Time Machine";
                 case "RECOVERY": return "Adventure";

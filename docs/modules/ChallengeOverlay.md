@@ -30,7 +30,8 @@ profile-owned, so the profile's cadence decides which Evil shape runs.
 
 ```
 Ch.5 (Evil)
-EVIL CLIMB   → time target ≤ 2 h (the guide's 30-min rebirths) OR TM still re-locked (not NOTM)
+EVIL CLIMB   → climb cadence (time target ≤ 2 h, or a Number/Bosses rebirth with no clock —
+               EvilStart) OR TM still re-locked (not NOTM)
 TM HOUR      → run < 0.5 h and TM usable (NOTM goes straight to AUGMENTATION)
 AUGMENTATION → 0.5 h ≤ run < 3 h
 NGU MARATHON → after 3 h (Normal NGUs + AT ≤ 40 %; LevelPlanner switches to Evil NGUs for the tail)
@@ -60,7 +61,7 @@ AT P/T for the entire rebirth to prep for T7"); otherwise the hot NGU lanes firs
 divisor and halves the augment (the TM HOUR rule below), and in magic it halves `BR-30`. The guide
 runs the best augment and puts magic into blood for the whole phase.
 
-`SegmentGear()` → the gear objective per segment: EVIL CLIMB/RECOVERY "Adventure", AUGMENTATION
+`SegmentGear()` → the gear objective per segment: EVIL CLIMB "Time Machine", RECOVERY "Adventure", AUGMENTATION
 "Augments", TM HOUR "Time Machine", **AT HOUR "Advanced Training"** (user-compared vs the GO site:
 "Adventure" here wore Power/Toughness gear instead of AT-speed), NGU MARATHON "NGUs".
 
@@ -132,7 +133,13 @@ report:
   profile. The flag is NOT derivable from `ActiveChain`: after `GearBreakpoints`' smart default folds
   a challenge objective in, that chain is the ADVISOR's — see AllocationProfiles.md §GearBreakpoints,
   where the same report also stopped the smart default from outranking an explicit `ID` list.
-- **The rotation itself is push → "Adventure", growth → "NGUs", except in LSC**: LSC completes on
+- **On Evil a boss push wears resource gear, never Power/Toughness** (user rule 2026-10-16, "push
+  resources, follow the guide"): `ChallengeDetector.BossPushObjective()` is "Time Machine" (E/M cap +
+  power) on Evil and "Adventure" elsewhere, and EVIL CLIMB wears it too. Guide ch.5 says you "don't
+  need the adventure stats" on Evil entry and gears every phase of the Evil day for resources. Gear
+  Power/Toughness does multiply boss attack/defense (decomp `Character.totalAttack`: `1 +
+  attackBonus/100`), so this is the guide's choice, not a free win. Titan fights keep Adventure gear.
+- **The rotation itself is push → `BossPushObjective()`, growth → "NGUs", except in LSC**: LSC completes on
   the laser sword alone and does not reset the Number, so bosses fall continuously and "push" would
   hold Adventure gear for the whole challenge (user-reported 2026-10-04). LSC wears "Augments", and
   "Adventure" only while the controller's `augLocked()`/`upgradeLocked()` say the boss has not yet

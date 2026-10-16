@@ -46,22 +46,34 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // Guide ch.5: Evil climbs on resources ("you don't need the adventure stats"), and every phase of
+        // its Evil day wears resource gear — so an Evil boss push wears E/M cap + power, never Power/Toughness.
+        // Titan fights are not pushes and keep their own Adventure gear (GearOptimizer).
+        public const string EvilPushObjective = "Time Machine";
+
+        public static string BossPushObjective()
+        {
+            try { return Main.Character.settings.rebirthDifficulty == difficulty.evil ? EvilPushObjective : "Adventure"; }
+            catch { return "Adventure"; }
+        }
+
         // Built-in gear objective for a challenge when the profile has no challenge-specific gear defined.
-        // Most challenges just want to push power (Adventure) + a respawn item; NOTM leans on Gold (no TM);
-        // No-Equipment can't wear gear (null). Returns null => fall through to the profile's normal timeline.
+        // Most challenges just want to push power (BossPushObjective) + a respawn item; NOTM leans on Gold (no
+        // TM); No-Equipment can't wear gear (null). Returns null => fall through to the profile's timeline.
         public static GearDefault DefaultGear(string code)
         {
+            string push = BossPushObjective();
             switch (code)
             {
-                case "NORB": return new GearDefault("Adventure", true);
+                case "NORB": return new GearDefault(push, true);
                 case "NOTM": return new GearDefault("Gold Drops", true);
-                case "NOAUG": return new GearDefault("Adventure", true);
-                case "NONGU": return new GearDefault("Adventure", true);
-                case "BLIND": return new GearDefault("Adventure", true);
-                case "TC": return new GearDefault("Adventure", true);
-                case "LSC": return new GearDefault("Adventure", true);
-                case "100LC": return new GearDefault("Adventure", true);
-                case "BASIC": return new GearDefault("Adventure", true);
+                case "NOAUG": return new GearDefault(push, true);
+                case "NONGU": return new GearDefault(push, true);
+                case "BLIND": return new GearDefault(push, true);
+                case "TC": return new GearDefault(push, true);
+                case "LSC": return new GearDefault(push, true);
+                case "100LC": return new GearDefault(push, true);
+                case "BASIC": return new GearDefault(push, true);
                 // NOEC: no gear allowed. 24HR: normal timeline is fine.
                 default: return null;
             }

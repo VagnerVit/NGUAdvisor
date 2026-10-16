@@ -59,6 +59,22 @@ namespace NGUAdvisor.Tests
         }
 
         [Fact]
+        public void ANumberTargetWithoutAClockClimbs()
+        {
+            RunShape.Input i = Evil(5 * 60, -1);
+            i.RebirthsOnProgress = true;
+            Assert.Equal(RunShape.EvilClimb, RunShape.Segment(i, NoAtHour));
+        }
+
+        [Fact]
+        public void ANumberTargetUnderAOneDayClockRunsTheEvilDay()
+        {
+            RunShape.Input i = Evil(5 * 60, EvilDayTarget);
+            i.RebirthsOnProgress = true;
+            Assert.Equal(RunShape.TmHour, RunShape.Segment(i, NoAtHour));
+        }
+
+        [Fact]
         public void AnLrbWithoutATimeTargetRunsTheEvilDayShape()
         {
             Assert.Equal(RunShape.Augmentation, RunShape.Segment(Evil(Hour, -1), NoAtHour));

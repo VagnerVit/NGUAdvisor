@@ -27,5 +27,6 @@ Reads `challenges.<x>.inChallenge` flags (main thread, guarded). Check order is
 most-restrictive-first; only one challenge is active at a time.
 
 `DefaultGear(code)` — built-in gear objective when the profile has no challenge-specific gear:
-almost everything → "Adventure" + TopRespawn; NOTM → "Gold Drops" (no TM to make gold); NOEC →
+almost everything → `BossPushObjective()` ("Adventure", on Evil "Time Machine" — see
+ChallengeOverlay.md) + TopRespawn; NOTM → "Gold Drops" (no TM to make gold); NOEC →
 null (no gear allowed); 24HR → null (normal timeline fine). Null = fall through to the profile.

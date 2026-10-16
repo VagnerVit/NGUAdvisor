@@ -32,6 +32,7 @@ namespace NGUAdvisor.Managers
             public int Chapter;
             public double RunSec;
             public double RebirthTargetSec;   // the profile's time-based rebirth, <= 0 when none
+            public bool RebirthsOnProgress;   // a Number/Bosses rebirth is armed
             public bool TmUnlocked;           // usable now (false in NOTM)
             public bool TmRelocked;           // Evil has not re-unlocked it yet (progression, not a challenge)
             public bool AtUnlocked;
@@ -47,6 +48,11 @@ namespace NGUAdvisor.Managers
         public static bool IsShortRun(double rebirthTargetSec)
             => rebirthTargetSec > 0 && rebirthTargetSec <= ShortRunMaxSec;
 
+        // The guide's climb rebirths: a short clock, or no clock at all but a Number/Bosses target
+        // (EvilStart rebirths on Number 1000; "repeat until you stop gaining ~100x number").
+        public static bool IsClimbCadence(double rebirthTargetSec, bool rebirthsOnProgress)
+            => IsShortRun(rebirthTargetSec) || (rebirthTargetSec <= 0 && rebirthsOnProgress);
+
         // Guide ch.5: Evil NGUs for the last hour, plus one hour per T7 version defeated
         // ("After v1, that means 2 hours"). NaN when the run has no time target to count back from.
         public static double EvilNguStartSec(double rebirthTargetSec, int t7VersionsBeaten)
@@ -61,7 +67,7 @@ namespace NGUAdvisor.Managers
             if (i.Chapter == EvilChapter)
             {
                 // A re-locked TM means the climb is not past boss ~30 yet, whatever the rebirth length.
-                if (IsShortRun(i.RebirthTargetSec) || i.TmRelocked) return EvilClimb;
+                if (IsClimbCadence(i.RebirthTargetSec, i.RebirthsOnProgress) || i.TmRelocked) return EvilClimb;
                 if (i.RunSec < EvilTmEndSec && i.TmUnlocked) return TmHour;
                 if (i.RunSec < EvilAugEndSec) return Augmentation;
                 return Marathon;

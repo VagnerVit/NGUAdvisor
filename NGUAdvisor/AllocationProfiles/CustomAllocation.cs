@@ -243,6 +243,10 @@ namespace NGUAdvisor.AllocationProfiles
         // -1 disarms, the same filter DoRebirth applies.
         public bool RebirthArmed() => _wrapper != null && _wrapper.rebirth.Any(x => x.RebirthTime >= 0.0);
 
+        // A Number or Bosses rebirth is armed — the run ends on progress rather than (only) on the clock.
+        public bool RebirthsOnProgress() => _wrapper != null
+            && _wrapper.rebirth.Any(x => x.RebirthTime >= 0.0 && (x is NumberRebirth || x is BossNumRebirth));
+
         // Seconds of augment funding left on the energy timeline (see EnergyBreakpoints), -1 when the
         // phase is open-ended.
         public double AugmentPhaseSecondsLeft() => _wrapper?.energy?.AugmentPhaseSecondsLeft() ?? -1;
