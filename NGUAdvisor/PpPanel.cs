@@ -137,7 +137,7 @@ namespace NGUAdvisor
             _toggle.FlatAppearance.BorderColor = UiTheme.Border;
             _toggle.Click += ToggleClicked;
             Controls.Add(_toggle);
-            UiLayout.Tip(_toggle, "Combat off, a gear hunt, or an EVIL CLIMB segment can all override this.");
+            UiLayout.Tip(_toggle, "Combat off or a gear hunt can override this.");
 
             // Four lines reserved: the toggle can be gated, outranked, climb-overridden AND bypassing
             // the advisor all at once, and the whole point of the note is that none of the four ever
@@ -306,7 +306,7 @@ namespace NGUAdvisor
             bool on = FarmMode.Current() == FarmModeKind.Itopod;
             UiTheme.ApplyState(_toggle, on ? UiTheme.Cap : UiTheme.BtnFace, on ? Color.White : UiTheme.Ink);
 
-            // Four preconditions, all read from the routing code itself (Main.cs:1386-1404). A control
+            // Preconditions read from the routing code itself (Main.SnipeZone). A control
             // that silently fails to do what its caption says is worse than no control.
             var notes = new System.Collections.Generic.List<string>();
 
@@ -318,20 +318,11 @@ namespace NGUAdvisor
             if (hunting)
                 notes.Add("Gear hunt running — outranks ITOPOD, takes effect after.");
 
-            // Main.cs:1404 — an EVIL CLIMB segment farms the furthest clearable zone and ignores this
-            // toggle outright, because honoring it during a climb parked the run in the pod after one
-            // kill and collapsed gross gold, i.e. the digger budget (user-caught). ChallengeOverlay
-            // blanks the segment whenever AutoProfile is off, so this never fires on a manual profile.
-            bool evilClimb = false;
-            try { evilClimb = ChallengeOverlay.Segment == "EVIL CLIMB"; } catch { }
-            if (evilClimb)
-                notes.Add("EVIL CLIMB running — toggle ignored until it ends.");
-
             notes.Add(on
                 ? "ON — parked in ITOPOD, zone routing bypassed."
                 : "Off — turns this on to park in ITOPOD.");
 
-            _toggleNote.ForeColor = !Settings.CombatEnabled || hunting || evilClimb ? UiTheme.Danger : UiTheme.Muted;
+            _toggleNote.ForeColor = !Settings.CombatEnabled || hunting ? UiTheme.Danger : UiTheme.Muted;
             UiLayout.WrapInto(_toggleNote, string.Join(" ", notes.ToArray()), 4);
         }
 

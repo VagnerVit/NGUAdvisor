@@ -1583,27 +1583,6 @@ namespace NGUAdvisor
 
                 int tempZone = ResolveAdventureZone(out string resolvedBy);
 
-                // EVIL CLIMB pushes boss numbers to unlock T7 — that means adventuring the highest clearable
-                // zone (bosses + gold + the digger/aug income they feed), NEVER the ITOPOD, which pushes no
-                // boss and drops no gold. Target ITOPOD is a steady-state XP toggle and wrong during a climb:
-                // honoring it parked us in the ITOPOD after one kill and gross gold (the digger budget)
-                // collapsed (user-caught). Farm the furthest clearable zone for the whole climb; normal
-                // ITOPOD routing resumes automatically the moment the segment changes. Segment is only ever
-                // set under AutoProfile, so manual runs are untouched. Gear hunt (tempZone < 1000) still wins.
-                if (tempZone >= 1000 && ChallengeOverlay.Segment == "EVIL CLIMB")
-                {
-                    UpdateFurthestZone();
-                    if (_furthestZone >= 0)
-                    {
-                        CombatHelpers.IsCurrentlyAdventuring = true;
-                        CombatHelpers.NoteRoute(_furthestZone, "EVIL CLIMB — furthest clearable");
-                        CombatManager.DoZone(_furthestZone);
-                        return;
-                    }
-                    // Nothing clearable yet (fresh climb rebirth, stats too low) — fall through to normal
-                    // routing (ITOPOD) until stats support an idle zone.
-                }
-
                 // No Time Machine (locked early / TM challenge) and headed to the ITOPOD: ITOPOD enemies
                 // drop NO gold, and without gold the Augments that drive Power/Toughness stall. While we
                 // can't afford two of the cheapest augment upgrade, farm the best clearable gold zone
@@ -1644,8 +1623,8 @@ namespace NGUAdvisor
         // GEAR HUNT outranks ITOPOD targeting (user-reported: Target ITOPOD silently overrode the
         // hunted stage — the hunt toggle IS the routing intent while on).
         //
-        // The EVIL CLIMB and gold-starved detours in Update() sit AFTER this and are not modelled
-        // here: both resolve through UpdateFurthestZone(), which the logger must not drive.
+        // The gold-starved detour in Update() sits AFTER this and is not modelled here: it resolves
+        // through UpdateFurthestZone(), which the logger must not drive.
         // The INTENT layer of the rule above, split out because QuestManager needs exactly this and
         // nothing below it: which zone WOULD be adventured, before the locked-zone rewrite. Questing
         // sits ABOVE adventure routing, so it must not be handed the zone that actually routed — it

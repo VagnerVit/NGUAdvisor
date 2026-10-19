@@ -172,8 +172,8 @@ escape into the step it observes. Observation only: none of them changes a decis
   Target ITOPOD or the locked-zone fallback. Both callers ask that ONE method — the line used to
   re-derive nothing at all and reported the pick, so with Target ITOPOD on it named a farm zone
   nobody was in while the character sat in the pod (user-caught). When the two differ the line adds
-  `advised=<n> (<name>) overriddenBy=<gear hunt|Target ITOPOD|zone locked>`. The EVIL CLIMB and
-  gold-starved detours resolve through `UpdateFurthestZone()` and stay out of it — a logger must not
+  `advised=<n> (<name>) overriddenBy=<gear hunt|Target ITOPOD|zone locked>`. The gold-starved
+  detour resolves through `UpdateFurthestZone()` and stays out of it — a logger must not
   drive that. Carries the applied combat
   mode, the winner's rate, `beat=` (the runner-up and why it lost — the nearest non-viable gear zone
   with the drop chance it needs, or the ITOPOD's boost rate), `boostDemand=` (the

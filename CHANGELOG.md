@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Evil climb no longer picks your adventure zone.** With the auto profile in its EVIL CLIMB
+  segment the advisor used to farm the furthest clearable zone even with Target ITOPOD on. Your farm
+  mode now holds through the climb.
+
 ## [1.10.0] - 2026-10-16
 
 ### Changed

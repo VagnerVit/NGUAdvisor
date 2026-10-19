@@ -39,9 +39,9 @@ namespace NGUAdvisor.Managers
 
         // WHERE THE CHARACTER WAS ACTUALLY SENT, AND WHICH BRANCH DECIDED IT.
         //
-        // Main.SnipeZone() is a priority cascade and eight of its branches take control with a
-        // DoZone + return of their own: money pit (twice), gold snipe, titan, quest, GoldCBlockMode,
-        // the EVIL CLIMB override and the no-TM gold-starvation override. Main.ResolveAdventureZone
+        // Main.SnipeZone() is a priority cascade and seven of its branches take control with a
+        // DoZone + return of their own: money pit (twice), gold snipe, titan, quest, GoldCBlockMode
+        // and the no-TM gold-starvation override. Main.ResolveAdventureZone
         // models only the last three sources (gear hunt / Target ITOPOD / locked-zone fallback), so it
         // never sees any of them — and reporting used to RE-DERIVE the zone from that resolver, which
         // meant [ZoneDbg] could name the sniped zone while the character was gold-sniping or fighting

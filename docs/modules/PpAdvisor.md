@@ -140,8 +140,8 @@ pass reads it.
 ### The four preconditions, all read off the routing code itself
 
 A control that silently fails to do what its caption says is worse than no control. `RenderToggle()`
-therefore renders up to four notes into a **four-line reserved box** (all four can hold at once), and
-turns the box `UiTheme.Danger` whenever any of the three blocking conditions applies.
+therefore renders up to three notes into a **four-line reserved box** (all can hold at once), and
+turns the box `UiTheme.Danger` whenever either blocking condition (combat off, gear hunt) applies.
 
 1. **Combat off** — `Main.cs:1386` returns before any routing runs. The toggle changes nothing until
    combat is enabled. Shown regardless of the toggle's own state.
@@ -151,14 +151,9 @@ turns the box `UiTheme.Danger` whenever any of the three blocking conditions app
    hunted stage, when the hunt toggle *is* the routing intent while it is on. The panel reads the same
    predicate the router reads (in its own `try/catch`) and *surfaces* the precedence — it never works
    around it. Do not "simplify" the ordering at `Main.cs:1391`.
-3. **EVIL CLIMB ignores the toggle outright** — `Main.cs:1404`. **Also a fix for a user-caught bug**:
-   honoring Target ITOPOD during a climb parked the run in the pod after one kill and collapsed gross
-   gold, i.e. the digger budget (the reasoning is written out at `Main.cs:1397-1403`). A climb needs
-   bosses and gold, which the pod pays neither of. The warning is **conditional and cannot fire on a
-   manual profile** — `ChallengeOverlay` blanks `Segment` whenever AutoProfile is off
-   (`ChallengeOverlay.cs:142-143`) — and the wording says so in a parenthetical, so Evil players on a
-   manual profile are not warned that their toggle is dead when it is not. It is also bounded in time
-   ("until the segment ends"), so it reads as a pause rather than as breakage.
+3. **No segment overrides it.** EVIL CLIMB used to farm the furthest clearable zone over Target
+   ITOPOD; removed 2026-10-19 by user decision: the farm zone is the player's choice, and only titan
+   kills may move the character on their own. Do not re-add a segment detour to routing.
 4. **While it is ON it bypasses the advisor's zone routing** — `Main.cs:1393` prefers the ITOPOD flag
    while `ApplyZones` keeps writing `SnipeZone`, so **gear and boost farming stop**. This is the thing
    a user would otherwise spend days not understanding, and it is stated in **both** states: telling
