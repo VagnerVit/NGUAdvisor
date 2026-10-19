@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-19
+
 ### Changed
 
 - **The Yggdrasil harvest set only chases what fruits pay.** Gold Drops is gone from it, and EXP
