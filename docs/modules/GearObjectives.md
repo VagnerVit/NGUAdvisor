@@ -33,8 +33,12 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
 - **Beards / Wandoos** score raw speed only; the site mixes in E/M cap/power/bars. **Augments**
   matches the site's `AUGMENTATION` (`ECap × EPower × AugSpeed`) — the decomp's aug progress
   multiplies all three.
-- **Adventure** (`Power^1 × Toughness^0.5`) and **Yggdrasil** (descending-exponent harvest priority
-  4/4/3/2/1) are native extensions with no site counterpart. The 0.5 is deliberate: damage is
+- **Yggdrasil** (`Seed^4 × Yield^4 × EXP^3 × AP^1`) is a native extension: only the specs a fruit
+  payout reads (decomp `FruitController`, table in YggdrasilManager.md). No Gold Drops — no fruit
+  reads it (user-caught 2026-10-19: Ring of Greed, Van-Gogh and the Smiley Face held harvest slots).
+  `GearOptimizer.FindObjective` drops EXP once the Red Heart (119) is maxxed and AP once the Yellow
+  Heart (129) is, because `addExp`/`addAP` then apply a flat x1.1/x1.2 and ignore gear.
+- **Adventure** (`Power^1 × Toughness^0.5`) is a native extension with no site counterpart. The 0.5 is deliberate: damage is
   `(attack − enemyDefense/2) × multiplier`, so kill rate is linear in Power and Toughness adds
   nothing to it — Toughness only clears a survival threshold. The game's own bars agree (autokill
   gates UUG `800K/400K`, Walderp `13M/7M`; Beardverse manual gate `1.3M/550K` = 2.36:1). Equal

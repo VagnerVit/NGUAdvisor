@@ -6,6 +6,10 @@ All notable changes to NGU Advisor are documented in this file.
 
 ### Changed
 
+- **The Yggdrasil harvest set only chases what fruits pay.** Gold Drops is gone from it, and EXP
+  and AP drop out once the Red and Yellow Heart are maxxed, since those hearts then fix the bonus
+  regardless of gear.
+
 - **The Evil climb no longer picks your adventure zone.** With the auto profile in its EVIL CLIMB
   segment the advisor used to farm the furthest clearable zone even with Target ITOPOD on. Your farm
   mode now holds through the climb.

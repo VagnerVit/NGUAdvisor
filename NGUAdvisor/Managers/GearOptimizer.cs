@@ -74,8 +74,29 @@ namespace NGUAdvisor.Managers
 
         // Optimize for an objective by name (as stored in profiles/settings); null if unknown.
         public static GearObjectives.Objective FindObjective(string name)
-            => GearObjectives.Objectives.FirstOrDefault(o =>
+        {
+            var obj = GearObjectives.Objectives.FirstOrDefault(o =>
                 string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase));
+            return obj != null && obj.Name == GearObjectives.Yggdrasil ? WithoutMaxxedHearts(obj) : obj;
+        }
+
+        private const int RedHeartId = 119;
+        private const int YellowHeartId = 129;
+
+        // A maxxed heart replaces the gear spec with a flat factor (decomp Character.addExp: x1.1,
+        // addAP: x1.2), so gear EXP / AP then pays nothing at harvest.
+        private static GearObjectives.Objective WithoutMaxxedHearts(GearObjectives.Objective obj)
+        {
+            try
+            {
+                var maxxed = Main.Character.inventory.itemList.itemMaxxed;
+                var dropped = new List<string>();
+                if (maxxed[RedHeartId]) dropped.Add(GearObjectives.Stat.Experience);
+                if (maxxed[YellowHeartId]) dropped.Add(GearObjectives.Stat.AP);
+                return dropped.Count == 0 ? obj : obj.Without(dropped);
+            }
+            catch (Exception) { return obj; }
+        }
 
         // Resolve the gear a mode should equip: if objectiveName is set (and valid), optimize live for it
         // (route C3 3.2) so the mode's gear stays optimal; otherwise fall back to the static loadout IDs.

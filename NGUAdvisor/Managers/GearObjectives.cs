@@ -60,12 +60,23 @@ namespace NGUAdvisor.Managers
             // 0 None, 10 BoostRecycle, 46 Blood: not scored.
         };
 
+        public const string Yggdrasil = "Yggdrasil";
+
         public class Objective
         {
             public readonly string Name;
             public readonly string[] Stats;
             public readonly double[] Exponents;   // null => all weight 1
             public Objective(string name, string[] stats, double[] exponents = null) { Name = name; Stats = stats; Exponents = exponents; }
+
+            public Objective Without(ICollection<string> dropped)
+            {
+                var keep = new List<int>();
+                for (int i = 0; i < Stats.Length; i++)
+                    if (!dropped.Contains(Stats[i])) keep.Add(i);
+                return new Objective(Name, keep.ConvertAll(i => Stats[i]).ToArray(),
+                    Exponents == null ? null : keep.ConvertAll(i => Exponents[i]).ToArray());
+            }
         }
 
         // Selectable presets (the gear-optimizer's single_factors + multiple_factors, curated).
@@ -126,12 +137,11 @@ namespace NGUAdvisor.Managers
             new Objective("Experience", new[]{ Stat.Experience }),
             new Objective("Cooking", new[]{ Stat.Cooking }),
 
-            // Yggdrasil harvest set: priority Seeds > EXP > Gold > (PP) > AP. Seeds = Seed Gain + Yggdrasil
-            // Yield (both boost the harvest). PP has NO gear bonus spec in NGU (perk points come from
-            // rebirths, not gear) so it cannot be targeted and is omitted. Priority is expressed as
-            // descending exponents = weights in the product score (strong soft priority, not strict).
-            new Objective("Yggdrasil", new[]{ Stat.SeedGain, Stat.YggYield, Stat.Experience, Stat.GoldDrops, Stat.AP },
-                new[]{ 4.0, 4.0, 3.0, 2.0, 1.0 }),
+            // Yggdrasil harvest set: only specs a fruit payout reads (decomp FruitController): Seed Gain,
+            // Yggdrasil Yield, EXP (Knowledge) and AP (Arbitrariness). No fruit reads Gold Drops. EXP and
+            // AP drop out once their heart is maxxed — see GearOptimizer.FindObjective.
+            new Objective(Yggdrasil, new[]{ Stat.SeedGain, Stat.YggYield, Stat.Experience, Stat.AP },
+                new[]{ 4.0, 4.0, 3.0, 1.0 }),
         };
     }
 }
