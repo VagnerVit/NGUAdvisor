@@ -9,6 +9,14 @@ All notable changes to NGU Advisor are documented in this file.
 - **The Evil climb no longer picks your adventure zone.** With the auto profile in its EVIL CLIMB
   segment the advisor used to farm the furthest clearable zone even with Target ITOPOD on. Your farm
   mode now holds through the climb.
+- **NGU and Wandoos diggers follow what their lane holds.** The advisor ranks them by how much of
+  your energy or magic the lane actually uses, so the Magic NGU digger runs while magic feeds NGUs
+  and an empty lane gives up its slot.
+
+### Fixed
+
+- **A titan you cannot reach no longer benches the PP digger.** A locked titan (T7 before its zone
+  opens) kept the drop-chance digger in the PP digger's slot for the whole run, ITOPOD included.
 
 ## [1.10.0] - 2026-10-16
 

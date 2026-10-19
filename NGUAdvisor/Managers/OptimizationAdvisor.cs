@@ -955,8 +955,11 @@ namespace NGUAdvisor.Managers
                 bool titanWindow = false;
                 try
                 {
+                    // A locked titan's spawn timer still runs out, so without the zone gate the window
+                    // never closes (user-caught: T7 at boss 105 benched the PP digger in the ITOPOD).
                     var o = NextObjective();
-                    if (o.Known)
+                    if (o.Known && o.Index < ZoneHelpers.TitanZones.Length
+                        && ZoneHelpers.TitanZones[o.Index] <= ZoneHelpers.GetMaxReachableZone(true))
                     {
                         float? t = ZoneHelpers.TimeTillTitanSpawn(o.Index);
                         titanWindow = t.HasValue && t.Value < 60;
@@ -992,6 +995,10 @@ namespace NGUAdvisor.Managers
                         if (c.bloodMagic.ritual[i].magic > 0) ritualsFunded = true;
                 }
                 catch (Exception) { }   // no blood magic yet: leave it false, the digger stays at the tail
+
+                // LAW: the speed diggers follow their lane. Each multiplies what its lane holds, so they
+                // rank by that share of the pool; an empty lane has nothing to multiply and goes last.
+                ApplyLaneLaw(c, order);
 
                 // LAW: Stats digger earns priority while stats gate progress; else it drops to the tail.
                 order.Remove(2);
@@ -1071,6 +1078,48 @@ namespace NGUAdvisor.Managers
                 return ranked.Take(slots).ToArray();
             }
             catch { return null; }
+        }
+
+        private const int WandoosDigger = 1;
+        private const int EnergyNguDigger = 4;
+        private const int MagicNguDigger = 5;
+
+        // The lane diggers keep the slot of the first one in the order, re-ranked among themselves.
+        private static void ApplyLaneLaw(Character c, List<int> order)
+        {
+            var lanes = new[] { WandoosDigger, EnergyNguDigger, MagicNguDigger }.Where(order.Contains).ToList();
+            if (lanes.Count == 0) return;
+            int at = lanes.Min(d => order.IndexOf(d));
+            var read = lanes.ToDictionary(d => d, d => LaneShare(c, d));
+            if (read.Values.Any(s => !s.HasValue)) return;
+            var share = read.ToDictionary(p => p.Key, p => p.Value.Value);
+            foreach (int d in lanes) order.Remove(d);
+            var live = lanes.Where(d => share[d] > 0).OrderByDescending(d => share[d]).ToList();
+            order.InsertRange(Math.Min(at, order.Count), live);
+            order.AddRange(lanes.Where(d => share[d] <= 0));
+        }
+
+        // Fraction of the pool the digger's lane holds right now; Wandoos averages its two pools.
+        // Null when unreadable, which leaves the order as it was.
+        private static double? LaneShare(Character c, int digger)
+        {
+            try
+            {
+                double capE = c.totalCapEnergy(), capM = c.totalCapMagic();
+                switch (digger)
+                {
+                    case WandoosDigger:
+                        return ((capE > 0 ? c.wandoos98.wandoosEnergy / capE : 0)
+                              + (capM > 0 ? c.wandoos98.wandoosMagic / capM : 0)) / 2;
+                    case EnergyNguDigger:
+                        return capE > 0 ? c.NGU.skills.Sum(s => (double)s.energy) / capE : 0;
+                    case MagicNguDigger:
+                        return capM > 0 ? c.NGU.magicSkills.Sum(s => (double)s.magic) / capM : 0;
+                    default:
+                        return 0;
+                }
+            }
+            catch (Exception) { return null; }
         }
 
         // Locate a digger by the game's own bonus label (names live in runtime lists).

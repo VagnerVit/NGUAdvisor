@@ -78,7 +78,16 @@ order:
   exception was granted for the boost farm and was not widened on its own.
 - **Titan window = 60 s** — sized to the machinery, not the event: digger applier ticks every
   30 s, titan gear lock engages < 20 s before spawn; 60 s guarantees exactly one swap pass lands
-  ahead of the lock (user-reported: diggers swapped ~8 min early and lingered).
+  ahead of the lock (user-reported: diggers swapped ~8 min early and lingered). **Only for a titan
+  whose zone is reachable** (`TitanZones[i] <= GetMaxReachableZone(true)`): a locked titan's spawn
+  timer still runs down to 0, so the window never closed and DC held PP's slot in the ITOPOD for a
+  whole Evil climb (user-caught 2026-10-19, T7 at boss 105).
+- **Lane law — Wandoos(1), E-NGU(4), M-NGU(5) follow what their lane holds** (user rule 2026-10-19).
+  Each multiplies its lane's speed, so they keep the slot of the first of them in the order and
+  re-rank among themselves by the share of the pool the lane holds now (NGU allocation / total cap;
+  Wandoos averages its energy and magic shares). An empty lane goes to the tail. It replaced id-order
+  filling, which ran E-NGU over 1.2 % of energy while M-NGU sat out over 71 % of magic. Unreadable
+  allocation leaves the order untouched.
 - Challenges: with AutoProfile the advisor drives diggers/beards even in challenges (profile's
   one-shot at rebirth hit 0 gold and never retried — user-caught in a BASIC challenge on the
   Evil climb); with a manual profile, challenge mode returns null (profile owns the set).
