@@ -29,6 +29,25 @@ namespace NGUAdvisor.Tests
             }
         }
 
+        [Fact]
+        public void WithRespawnReserve_KeepsMainSlotsOnTheObjectiveAndReservesRespawnAccessories()
+        {
+            var chain = GearChain.WithRespawnReserve(GearChain.Resolve("NGUs"), 2);
+
+            Assert.Equal(new[] { "NGUs", "Respawn", "NGUs" }, chain.Select(p => p.Objective.Name));
+            Assert.Equal(new[] { 0, 2, GearChain.Unlimited }, chain.Select(p => p.MaxAccessorySlots));
+        }
+
+        [Fact]
+        public void WithRespawnReserve_LeavesPresetsAndRespawnItselfAlone()
+        {
+            var preset = GearChain.Resolve("ITOPOD Push");
+            var respawn = GearChain.Resolve("Respawn");
+
+            Assert.Same(preset, GearChain.WithRespawnReserve(preset, 2));
+            Assert.Same(respawn, GearChain.WithRespawnReserve(respawn, 2));
+        }
+
         private static IEnumerable<GearChain.Preset> EveryPreset()
             => GearChain.Presets.Concat(new[] { GearChain.ItopodPush });
 

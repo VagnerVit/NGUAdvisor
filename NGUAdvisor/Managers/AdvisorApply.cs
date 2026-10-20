@@ -1189,6 +1189,41 @@ namespace NGUAdvisor.Managers
         // re-optimize the same objective and re-equip if a new drop/merge made a meaningfully better
         // loadout available. Optimize is heavy, so this is throttled well beyond the 30s tick.
         private const double GearReequipBar = 1.02;
+        private const int SegmentRespawnSlots = 2;
+
+        // Respawn joins segment gear only when it pays and costs nothing measurable (user rule
+        // 2026-10-20): the fight is on, the gear-free respawn still outlasts the global cooldown, and
+        // the reserved set scores within the re-equip bar of the plain one. There is no exchange rate
+        // between kills and the segment's resource, so the bar is the only honest price.
+        private static IReadOnlyList<GearPriority> SegmentChainWithRespawn(IReadOnlyList<GearPriority> chain, bool forceRespawn,
+                                                                  out GearOptimizer.Result best, out string why)
+        {
+            best = null;
+            if (!Main.Settings.CombatEnabled) { why = "off (combat off)"; return chain; }
+            float respawn = CombatHelpers.NonGearRespawnTime(), gcd = CombatHelpers.BaseGlobalCooldown();
+            if (respawn <= gcd) { why = $"off (respawn {respawn:0.00}s <= gcd {gcd:0.0}s)"; return chain; }
+            var objective = chain.Count == 1 ? chain[0].Objective : null;
+            best = GearOptimizer.Optimize(chain, null, forceRespawn);
+            if (objective == null || best == null) { why = "off (preset or no plain set)"; return chain; }
+            double plain = GearOptimizer.ScoreOf(best, objective);
+            for (int slots = SegmentRespawnSlots; slots >= 1; slots--)
+            {
+                var reserved = GearChain.WithRespawnReserve(chain, slots);
+                var candidate = GearOptimizer.Optimize(reserved, null, forceRespawn);
+                if (candidate == null) continue;
+                double ratio = GearOptimizer.ScoreOf(candidate, objective) / plain;
+                if (ratio * GearReequipBar >= 1)
+                {
+                    best = candidate;
+                    why = $"{slots} slot(s) (segment x{ratio:0.###})";
+                    return reserved;
+                }
+                why = $"off (1 slot costs segment x{ratio:0.###})";
+                if (slots == 1) return chain;
+            }
+            why = "off";
+            return chain;
+        }
         private static DateTime _lastGearCheck = DateTime.MinValue;
         private static string _lastGearOverride;
         // What the last resolved pass equipped for: the rendered chain (GearChain.Describe) on the
@@ -1355,9 +1390,15 @@ namespace NGUAdvisor.Managers
             // absence of an override and NOT a name comparison: no name can tell "the override asked for
             // Adventure" apart from "the profile's chain happens to lead with Adventure".
             var activeChain = AllocationProfiles.Breakpoints.GearBreakpoints.ActiveChain;
+            bool segmentGear = overrideName != null && overrideName == ChallengeOverlay.GearObjectiveOverride;
             var chain = overrideName == null && activeChain != null
                 ? activeChain
                 : GearChain.Resolve(objName);
+            bool forceRespawn = AllocationProfiles.Breakpoints.GearBreakpoints.ActiveForceRespawn;
+            GearOptimizer.Result best = null;
+            string respawnWhy = "n/a";
+            if (segmentGear && chain != null)
+                chain = SegmentChainWithRespawn(chain, forceRespawn, out best, out respawnWhy);
             if (chain == null || chain.Count == 0)
             {
                 LogGearDbg("HELD", () => $"obj='{objName}' why=name resolved to no chain (refused, not guessed)");
@@ -1379,7 +1420,8 @@ namespace NGUAdvisor.Managers
             bool objectiveChanged = chainKey != _lastGearObjective;
             // Lead-step scores, as before: the chain's own lead objective on both sides.
             double cur = GearOptimizer.CurrentScore(chain);
-            var best = GearOptimizer.Optimize(chain, null, AllocationProfiles.Breakpoints.GearBreakpoints.ActiveForceRespawn);
+            if (best == null)
+                best = GearOptimizer.Optimize(chain, null, forceRespawn);
             if (best == null)
             {
                 LogGearDbg("HELD", () => $"obj='{objName}' chain='{chainKey}' switch={objectiveChanged}"
@@ -1411,7 +1453,8 @@ namespace NGUAdvisor.Managers
               + $" ratio={StepRatio(cur, best.Score)}"
               + $" steps=[{string.Join(" | ", stepObjectives.Select((o, k) => $"{o.Name} x{StepRatio(wornScores[k], bestScores[k])}").ToArray())}]"
               + $" decided={(decidingStep >= 0 ? $"{decidingStep}:{decidingName}" : "none")}"
-              + $" bar=x{GearReequipBar.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} why={why}";
+              + $" bar=x{GearReequipBar.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}"
+              + $" respawn={respawnWhy} why={why}";
             if (_gearAsserted)
             {
                 if (!objectiveChanged && !(decidingStep >= 0 && stepImproves))

@@ -176,6 +176,23 @@ namespace NGUAdvisor.Managers
                 : new List<GearPriority> { new GearPriority { Objective = objective, MaxAccessorySlots = Unlimited } };
         }
 
+        // Respawn accessories reserved ahead of a plain objective (AdvisorApply decides when). The
+        // objective leads at budget 0 so it keeps the main slots — no main-slot item scores on Respawn,
+        // and a Respawn lead would leave them to wherever the ascent started (see the Drop Chance
+        // presets). Presets keep their own shape; a lone Respawn objective has nothing to reserve.
+        public static IReadOnlyList<GearPriority> WithRespawnReserve(IReadOnlyList<GearPriority> chain, int slots)
+        {
+            var respawn = FindObjective(GearObjectives.Stat.Respawn);
+            if (chain == null || chain.Count != 1 || respawn == null || chain[0].Objective == respawn) return chain;
+            var objective = chain[0].Objective;
+            return new List<GearPriority>
+            {
+                new GearPriority { Objective = objective, MaxAccessorySlots = 0 },
+                new GearPriority { Objective = respawn, MaxAccessorySlots = slots },
+                new GearPriority { Objective = objective, MaxAccessorySlots = Unlimited },
+            };
+        }
+
         // The chain's objectives in step order, through the same Take(MaxPriorities) + non-null filter
         // GearOptimizer applies when it builds its step list -- so "step k" means the same entry everywhere.
         public static List<GearObjectives.Objective> StepObjectives(IReadOnlyList<GearPriority> chain)

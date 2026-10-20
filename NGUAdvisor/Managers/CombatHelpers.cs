@@ -77,6 +77,10 @@ namespace NGUAdvisor.Managers
 
         public static float BaseRespawnTime() => _ac.respawnTime();
 
+        // The respawn with gear's share divided out (decomp respawnTime: x max(0.2, 1 - bonuses[Respawn])).
+        public static float NonGearRespawnTime()
+            => BaseRespawnTime() / Mathf.Max(0.2f, 1f - _character.inventoryController.bonuses[specType.Respawn]);
+
         public static float RemainingRespawnTime() => _ac.fightInProgress ? 0f : Mathf.Max(0f, BaseRespawnTime() - _ac.respawnTimer);
 
         #region Unlocked Moves

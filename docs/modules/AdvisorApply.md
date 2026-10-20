@@ -60,7 +60,17 @@ not a framework:
   fell through (user-reported). The profile's `ActiveChain` is used **iff no override is in play**,
   which is a flag and deliberately NOT a name comparison: `ActiveObjective` is a chain's lead
   objective, so an override asking for "Adventure" used to inherit the profile's
-  "Adventure + Respawn" chain. Three anti-churn rules, each from a real bug:
+  "Adventure + Respawn" chain. **Segment gear takes respawn only when it is free**
+  (`SegmentChainWithRespawn`, user rule 2026-10-20). When the override is
+  `ChallengeOverlay.GearObjectiveOverride` and resolves to a plain objective, the chain becomes
+  `objective(0) > Respawn(n) > objective(all)` (`GearChain.WithRespawnReserve`, n = 2, then 1) only
+  if combat is on, the gear-free respawn (`CombatHelpers.NonGearRespawnTime`) is longer than the
+  gcd, and the reserved set scores the segment objective within `GearReequipBar` of the plain set.
+  A fixed two-slot reserve was measured on 2026-10-20 in the Evil NGU marathon: +37 % ITOPOD kills
+  (0.44 → 0.60/s, save counter) against energy NGUs at x0.645 and energy cap at x0.86. Kills and NGU
+  levels have no exchange rate, so the bar is the price. `respawn=` on the `[GearDbg]` line says
+  which rule decided. Mode gear (titan, gold, quest, Ygg, cooking) keeps its own
+  `…ObjectiveRespawn` toggles. Three anti-churn rules, each from a real bug:
   1. `_gearAsserted=false` on every payload load → first pass equips UNCONDITIONALLY (a reload
      can leave a lock's TEMP loadout worn with the restore set lost — statics wipe).
   2. Objective CHANGES bypass the 2 % improvement bar (`GearReequipBar`; "wrong gear within the bar

@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **The auto profile's gear wears respawn items when they cost nothing.** A segment loadout (Time
+  Machine, augments, NGUs, …) takes up to two respawn items when you are fighting, respawn still
+  slows your kills, and the loadout loses less than 2 % for them.
+
 ## [1.11.0] - 2026-10-19
 
 ### Changed
