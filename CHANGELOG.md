@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-10-20
+
 ### Changed
 
 - **The auto profile's gear wears respawn items when they cost nothing.** A segment loadout (Time
