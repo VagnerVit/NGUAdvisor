@@ -882,8 +882,9 @@ namespace NGUAdvisor
             Controls.Add(l);
             var cb = new LineComboBox { Width = UiTheme.S(90), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(x + UiTheme.S(104), y) };
             UiTheme.StyleCombo(cb);
-            UiLayout.Tip(cb, tip);
-            Reg(id, group, l, cb);
+            // The help sits on a "?" beside the caption: a tooltip on the drop-down itself covered its list.
+            var mark = UiLayout.HelpMark(this, l, tip);
+            Reg(id, group, l, mark, cb);
             Action refill = () =>
             {
                 string[] items; string cur;
