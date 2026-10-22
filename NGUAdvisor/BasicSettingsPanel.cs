@@ -159,9 +159,13 @@ namespace NGUAdvisor
                 Mk("ManageDiggers", "Diggers", () => Settings.ManageDiggers, v => Settings.ManageDiggers = v),
                 Mk("ManageBeards", "Beards", () => Settings.ManageBeards, v => Settings.ManageBeards = v),
                 Mk("ManageWandoos", "Wandoos", () => Settings.ManageWandoos, v => Settings.ManageWandoos = v),
-                Mk("ManageNGUDiff", "NGU Diff", () => Settings.ManageNGUDiff, v => Settings.ManageNGUDiff = v),
                 Mk("ManageConsumables", "Consumables", () => Settings.ManageConsumables, v => Settings.ManageConsumables = v),
             });
+
+            y0 = MkChoice(x0, y0 + UiTheme.S(2), "NguTrack", "AUTOMATION", "NGU track", NguTrackOptions,
+                () => Settings.NguTrack, v => Settings.NguTrack = v,
+                "Advisor: the profile's NGU difficulty timeline and the auto profile's Evil day decide. "
+                + "Normal / Evil / Sadistic: always that track, capped at the current run's difficulty.");
 
             int y1 = Build(x1, UiTheme.S(44), "AUTO", new[]
             {
@@ -867,6 +871,51 @@ namespace NGUAdvisor
                 if (!t.Focused && t.Text != txt) t.Text = txt;
             });
             return y + UiTheme.S(28);
+        }
+
+        // A pick-one setting: label + drop-down. The items are re-read on every sync and every time the
+        // list opens, because they can follow the game (the NGU tracks grow with the run's difficulty).
+        private int MkChoice(int x, int y, string id, string group, string label, Func<string[]> options,
+                             Func<string> get, Action<string> set, string tip)
+        {
+            var l = new Label { Text = label, AutoSize = true, Font = UiTheme.Ui, ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground, Location = new Point(x, y + UiTheme.S(4)) };
+            Controls.Add(l);
+            var cb = new LineComboBox { Width = UiTheme.S(90), DropDownStyle = ComboBoxStyle.DropDownList, Font = UiTheme.Ui, Location = new Point(x + UiTheme.S(104), y) };
+            UiTheme.StyleCombo(cb);
+            UiLayout.Tip(cb, tip);
+            Reg(id, group, l, cb);
+            Action refill = () =>
+            {
+                string[] items; string cur;
+                try { items = options(); cur = get(); } catch { return; }
+                bool same = cb.Items.Count == items.Length;
+                for (int i = 0; same && i < items.Length; i++) same = (string)cb.Items[i] == items[i];
+                if (!same) { cb.Items.Clear(); cb.Items.AddRange(items); }
+                if ((string)cb.SelectedItem != cur) cb.SelectedItem = cur;
+            };
+            cb.DropDown += (s, e) => { bool was = _syncing; _syncing = true; try { refill(); } finally { _syncing = was; } };
+            cb.SelectedIndexChanged += (s, e) =>
+            {
+                if (_syncing || Settings == null || cb.SelectedItem == null) return;
+                try { set((string)cb.SelectedItem); } catch (Exception ex) { LogDebug($"Basic choice '{label}': {ex.Message}"); }
+            };
+            Controls.Add(cb);
+            _numSyncs.Add(refill);
+            return y + UiTheme.S(28);
+        }
+
+        // Advisor, then every track the current run allows (the game caps nguLevelTrack at the run's
+        // difficulty). A pin left above it stays listed so the drop-down still shows what is saved.
+        private static string[] NguTrackOptions()
+        {
+            var list = new List<string> { SavedSettings.NguTrackAdvisor, "Normal" };
+            var run = difficulty.normal;
+            try { run = Main.Character.settings.rebirthDifficulty; } catch (Exception) { }
+            if (run >= difficulty.evil) list.Add("Evil");
+            if (run >= difficulty.sadistic) list.Add("Sadistic");
+            var saved = Settings?.NguTrack;
+            if (!string.IsNullOrEmpty(saved) && !list.Contains(saved)) list.Add(saved);
+            return list.ToArray();
         }
 
         // The KeyValuePair's key used to be the label and nothing read it. It is now the catalogue ID, which

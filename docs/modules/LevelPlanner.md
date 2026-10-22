@@ -96,6 +96,13 @@ included, because the guide's 24 h schedule is written for that climb. The old g
 N = versions with no base hour) never switched before T7. Elsewhere the profile's NGUDiff owns the
 track; on the Evil day `CustomAllocation` skips the file's NGUDiff swap so the two do not fight.
 
+**Settings › NGU track** (`SavedSettings.NguTrack`, user rule 2026-10-22) sits above both. "Advisor"
+is the rule above. "Normal" / "Evil" / "Sadistic" (`PinnedNguTrack`) skips `TickNguTrack` and the
+profile's NGUDiff; `CustomAllocation` writes the pin each pass through `ApplyPinnedNguTrack`, capped
+at `rebirthDifficulty` — the game clamps the track there on every rebirth (decomp
+`Rebirth.startNormalRebirth`/`startHardRebirth`). It replaced the `ManageNGUDiff` checkbox, which
+the Evil-day switch ignored; a settings file that still carries it reads as "Advisor".
+
 R11 note: no outer whole-Tick catch — AdvisorApply's `RunStep("Level planner")` owns the bounded
 fault report; only the narrow probes have their own catches.
 

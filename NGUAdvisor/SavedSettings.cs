@@ -105,7 +105,7 @@ namespace NGUAdvisor
         [SerializeField] private bool _beastMode;
         [SerializeField] private int _cubePriority;
         [SerializeField] private int _favoredMacguffin;
-        [SerializeField] private bool _manageNguDiff;
+        [SerializeField] private string _nguTrack;
         [SerializeField] private string _allocationFile;
         [SerializeField] private bool _manageGoldLoadouts;
         [SerializeField] private int _resnipeTime;
@@ -401,7 +401,7 @@ namespace NGUAdvisor
             _manageMagic = other?.ManageMagic ?? false;
             _manageR3 = other?.ManageR3 ?? false;
             _manageWandoos = other?.ManageWandoos ?? false;
-            _manageNguDiff = other?.ManageNGUDiff ?? false;
+            _nguTrack = other?.NguTrack ?? NguTrackAdvisor;
             _manageBeards = other?.ManageBeards ?? false;
             _manageDiggers = other?.ManageDiggers ?? false;
             _upgradeDiggers = other?.UpgradeDiggers ?? false;
@@ -1547,13 +1547,18 @@ namespace NGUAdvisor
             }
         }
 
-        public bool ManageNGUDiff
+        public const string NguTrackAdvisor = "Advisor";
+
+        // Which NGU level track runs: "Advisor" lets the profile's NGUDiff timeline and the auto
+        // profile's Evil day decide; "Normal" / "Evil" / "Sadistic" pin it (LevelPlanner.PinnedNguTrack).
+        public string NguTrack
         {
-            get => _manageNguDiff;
+            get => string.IsNullOrEmpty(_nguTrack) ? NguTrackAdvisor : _nguTrack;
             set
             {
-                if (value == _manageNguDiff) return;
-                _manageNguDiff = value;
+                var v = string.IsNullOrEmpty(value) ? NguTrackAdvisor : value;
+                if (v == NguTrack) return;
+                _nguTrack = v;
                 SaveSettings();
             }
         }

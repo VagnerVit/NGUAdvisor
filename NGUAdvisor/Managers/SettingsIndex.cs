@@ -322,7 +322,7 @@ namespace NGUAdvisor.Managers
             e.Add(Set("ManageDiggers", "Diggers", gAutomation, "The tool may manage diggers.", "ManageDiggers", ""));
             e.Add(Set("ManageBeards", "Beards", gAutomation, "The tool may manage beards.", "ManageBeards", ""));
             e.Add(Set("ManageWandoos", "Wandoos", gAutomation, "The tool may manage Wandoos.", "ManageWandoos", "os"));
-            e.Add(Set("ManageNGUDiff", "NGU difficulty", gAutomation, "The tool may switch NGU difficulty.", "ManageNGUDiff", "difficulty"));
+            e.Add(Set("NguTrack", "NGU track", gAutomation, "Which NGU difficulty levels: Advisor decides, or pin Normal / Evil / Sadistic.", "NguTrack", "difficulty ngu diff evil sadistic"));
             // Wishes, Cooking and Cards left in 7.6C3 — their dedicated pages own them now, and they live at
             // the bottom of this catalogue as References.
             e.Add(Set("ManageConsumables", "Consumables", gAutomation, "The tool may use consumables.", "ManageConsumables", ""));

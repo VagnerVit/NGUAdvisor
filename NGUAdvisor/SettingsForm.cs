@@ -1517,7 +1517,6 @@ namespace NGUAdvisor
                 ManageMagic.Checked = newSettings.ManageMagic;
                 ManageR3.Checked = newSettings.ManageR3;
                 ManageWandoos.Checked = newSettings.ManageWandoos;
-                ManageNGUDiff.Checked = newSettings.ManageNGUDiff;
                 ManageBeards.Checked = newSettings.ManageBeards;
                 ManageDiggers.Checked = newSettings.ManageDiggers;
                 UpgradeDiggers.Checked = newSettings.UpgradeDiggers;
@@ -2345,12 +2344,6 @@ namespace NGUAdvisor
         {
             if (_initializing) return;
             Settings.FavoredMacguffin = ((KeyValuePair<int, string>)FavoredMacguffin.SelectedItem).Key;
-        }
-
-        private void ManageNGUDiff_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_initializing) return;
-            Settings.ManageNGUDiff = ManageNGUDiff.Checked;
         }
 
         // The advisor parses profiles with SimpleJSON, which silently misparses malformed JSON

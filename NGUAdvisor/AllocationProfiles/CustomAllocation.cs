@@ -168,11 +168,18 @@ namespace NGUAdvisor.AllocationProfiles
                 long originalInput = Main.Character.energyMagicPanel.energyMagicInput;
                 IsAllocationRunning = true;
 
-                // On the Evil day LevelPlanner owns the NGU track; a file switch would fight it.
+                // A track pinned in Settings beats both; otherwise on the Evil day LevelPlanner owns the
+                // NGU track and a file switch would fight it.
+                var pinnedTrack = Managers.LevelPlanner.PinnedNguTrack();
                 bool advisorOwnsTrack = Settings.AutoProfile
                     && Managers.RunShape.IsEvilDay(Managers.ChallengeOverlay.Chapter(), NextRebirthTargetSeconds());
-                if (Settings.ManageNGUDiff && !advisorOwnsTrack && Main.Character.buttons.ngu.interactable)
-                    _wrapper.ngus.Swap();
+                if (Main.Character.buttons.ngu.interactable)
+                {
+                    if (pinnedTrack.HasValue)
+                        Managers.LevelPlanner.ApplyPinnedNguTrack(Main.Character, pinnedTrack.Value);
+                    else if (!advisorOwnsTrack)
+                        _wrapper.ngus.Swap();
+                }
                 // ADVISOR OWNERSHIP (user-reported: every advisor reload re-applied the PROFILE's
                 // wandoos breakpoint, and the OS change WIPES wandoos levels — hours of progress
                 // gone). Systems the advisor owns are exempt from profile re-application; the

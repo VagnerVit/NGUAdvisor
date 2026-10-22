@@ -819,7 +819,6 @@ namespace NGUAdvisor
             resources.ApplyResources(this.ManageNGUDiff, "ManageNGUDiff");
             this.ManageNGUDiff.Name = "ManageNGUDiff";
             this.ManageNGUDiff.UseVisualStyleBackColor = true;
-            this.ManageNGUDiff.CheckedChanged += new System.EventHandler(this.ManageNGUDiff_CheckedChanged);
             // 
             // ManageConsumables
             // 

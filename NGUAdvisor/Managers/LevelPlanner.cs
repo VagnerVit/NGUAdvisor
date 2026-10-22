@@ -200,8 +200,32 @@ namespace NGUAdvisor.Managers
         // The T7-version count is read from the bestiary (ZoneHelpers.TitanVersionsBeaten) — the earlier
         // `TitanVersion(6)-1` was the difficulty the player had SELECTED in the zone, not versions
         // defeated, so it granted Evil NGU hours for touching a dropdown and none for actual kills.
+        // The NGU track the user pinned in Settings, or null for "Advisor" (profile + Evil day decide).
+        public static difficulty? PinnedNguTrack()
+        {
+            switch (Main.Settings?.NguTrack)
+            {
+                case "Normal": return difficulty.normal;
+                case "Evil": return difficulty.evil;
+                case "Sadistic": return difficulty.sadistic;
+                default: return null;
+            }
+        }
+
+        // The game never runs a track above the run's difficulty (decomp Rebirth.startNormalRebirth /
+        // startHardRebirth clamp nguLevelTrack), so a pin above it runs at the run's difficulty.
+        public static void ApplyPinnedNguTrack(Character c, difficulty pinned)
+        {
+            var want = pinned > c.settings.rebirthDifficulty ? c.settings.rebirthDifficulty : pinned;
+            if (c.settings.nguLevelTrack == want) return;
+            c.settings.nguLevelTrack = want;
+            try { c.NGUController.refreshMenu(); } catch (Exception e) { Main.LogDebug($"NGU menu refresh: {e.Message}"); }
+            ChallengeOverlay.Record("NGU track", $"→ {want} NGUs", "pinned in Settings");
+        }
+
         private static void TickNguTrack(Character c)
         {
+            if (PinnedNguTrack().HasValue) return;
             try
             {
                 double target = ChallengeOverlay.RebirthTargetSec();

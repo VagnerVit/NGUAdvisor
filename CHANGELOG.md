@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Choose your NGU track in Settings.** "NGU track" replaces the NGU Diff checkbox: Advisor (your
+  profile's timeline and the auto profile's Evil day decide), or pin Normal, Evil or Sadistic. It
+  only offers the tracks the current run allows. If you had NGU Diff off, it now starts on Advisor.
+
 ## [1.11.1] - 2026-10-20
 
 ### Changed
