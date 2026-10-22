@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-10-22
+
 ### Changed
 
 - **Choose your NGU track in Settings.** "NGU track" replaces the NGU Diff checkbox: Advisor (your
