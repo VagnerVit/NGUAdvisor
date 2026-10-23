@@ -101,9 +101,15 @@ namespace NGUAdvisor.Managers
             }),
         };
 
+        // The push's Move Cooldown accessory, with Respawn deciding between equal cooldowns (user rule
+        // 2026-10-23: Ring of Might, cooldown + respawn, over The Sands of Time, cooldown only). Respawn
+        // is base-zero, so in this product an item without it scores 0 — that is the intent here.
+        private static readonly GearObjectives.Objective MoveCooldownWithRespawn = new GearObjectives.Objective(
+            "Move Cooldown + Respawn", new[] { GearObjectives.Stat.MoveCooldown, GearObjectives.Stat.Respawn }, new[] { 1.0, 0.1 });
+
         // ITOPOD floor push (user request): the floor a push reaches is the one the rotation still
         // one-shots, and that solve reads totalAdvAttack — so everything goes to Power. Move Cooldown
-        // gets ONE accessory: it brings the ultimate and the buffs round more often, and the push
+        // gets ONE accessory (the respawn ring, see above): it brings the ultimate and the buffs round more often, and the push
         // target is priced with the whole buff stack. Past the first item it is weaker than Power.
         //
         // Not in Presets: the ITOPOD floor mode "Push" equips it, so it is not offered as a gear
@@ -111,7 +117,7 @@ namespace NGUAdvisor.Managers
         public static readonly Preset ItopodPush = new Preset("ITOPOD Push", new List<GearPriority>
         {
             Step("Power", 0),
-            Step("Move Cooldown", 1),
+            new GearPriority { Objective = MoveCooldownWithRespawn, MaxAccessorySlots = 1 },
             Step("Power", Unlimited),
         });
 

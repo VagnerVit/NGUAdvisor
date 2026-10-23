@@ -48,6 +48,22 @@ namespace NGUAdvisor.Tests
             Assert.Same(respawn, GearChain.WithRespawnReserve(respawn, 2));
         }
 
+        [Fact]
+        public void ItopodPush_MoveCooldownStepPrefersTheRingWithRespawn()
+        {
+            var step = GearChain.ItopodPush.Priorities[1];
+            var ringOfMight = new GearScorer.Item();
+            ringOfMight.Stats["Move Cooldown"] = 20; ringOfMight.Stats["Respawn"] = 4;
+            var sandsOfTime = new GearScorer.Item();
+            sandsOfTime.Stats["Move Cooldown"] = 20;
+
+            double ring = GearScorer.ScoreRaw(new[] { ringOfMight }, step.Objective.Stats, step.Objective.Exponents, 100);
+            double sands = GearScorer.ScoreRaw(new[] { sandsOfTime }, step.Objective.Stats, step.Objective.Exponents, 100);
+
+            Assert.Equal(1, step.MaxAccessorySlots);
+            Assert.True(ring > sands);
+        }
+
         private static IEnumerable<GearChain.Preset> EveryPreset()
             => GearChain.Presets.Concat(new[] { GearChain.ItopodPush });
 
@@ -197,7 +213,7 @@ namespace NGUAdvisor.Tests
         {
             var preset = GearChain.FindPreset("ITOPOD Push");
             Assert.NotNull(preset);
-            Assert.Equal("Power(0) > Move Cooldown(1) > Power(all)",
+            Assert.Equal("Power(0) > Move Cooldown + Respawn(1) > Power(all)",
                          GearChain.Describe(preset.Priorities));
         }
 
