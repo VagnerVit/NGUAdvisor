@@ -1189,39 +1189,58 @@ namespace NGUAdvisor.Managers
         // re-optimize the same objective and re-equip if a new drop/merge made a meaningfully better
         // loadout available. Optimize is heavy, so this is throttled well beyond the 30s tick.
         private const double GearReequipBar = 1.02;
-        private const int SegmentRespawnSlots = 2;
+        private const int MaxSegmentRespawnItems = 3;
 
-        // Respawn joins segment gear only when it pays and costs nothing measurable (user rule
-        // 2026-10-20): the fight is on, the gear-free respawn still outlasts the global cooldown, and
-        // the reserved set scores within the re-equip bar of the plain one. There is no exchange rate
-        // between kills and the segment's resource, so the bar is the only honest price.
+        // The last segment-respawn decision in player words, for COMBAT › Adventure's price line.
+        public static string SegmentRespawnStatus { get; private set; } = "";
+
+        // Respawn in segment gear, sized by Settings.SegmentRespawnItems (user rules 2026-10-20/22).
+        // Nothing while respawn cannot pay: combat off, or the gear-free respawn already within the gcd.
+        // A number reserves that many slots whatever the segment pays for them — the user's call, priced
+        // on the line (Evil NGU marathon: two cost the NGUs set x0.735 for +37 % ITOPOD kills). "Auto"
+        // takes the most slots whose set stays within the re-equip bar of the plain one: kills and the
+        // segment's resource have no exchange rate, so the bar is the only honest price.
         private static IReadOnlyList<GearPriority> SegmentChainWithRespawn(IReadOnlyList<GearPriority> chain, bool forceRespawn,
                                                                   out GearOptimizer.Result best, out string why)
         {
             best = null;
-            if (!Main.Settings.CombatEnabled) { why = "off (combat off)"; return chain; }
+            string setting = Main.Settings.SegmentRespawnItems;
+            bool auto = setting == SavedSettings.SegmentRespawnAuto;
+            int.TryParse(setting, out int wanted);
+            wanted = auto ? MaxSegmentRespawnItems : Math.Max(0, Math.Min(MaxSegmentRespawnItems, wanted));
+            if (wanted == 0) { why = "off (set to 0)"; SegmentRespawnStatus = "0 items — set to 0"; return chain; }
+            if (!Main.Settings.CombatEnabled) { why = "off (combat off)"; SegmentRespawnStatus = "0 items — combat is off"; return chain; }
             float respawn = CombatHelpers.NonGearRespawnTime(), gcd = CombatHelpers.BaseGlobalCooldown();
-            if (respawn <= gcd) { why = $"off (respawn {respawn:0.00}s <= gcd {gcd:0.0}s)"; return chain; }
+            if (respawn <= gcd)
+            {
+                why = $"off (respawn {respawn:0.00}s <= gcd {gcd:0.0}s)";
+                SegmentRespawnStatus = $"0 items — respawn {respawn:0.00} s is already within the {gcd:0.0} s attack";
+                return chain;
+            }
             var objective = chain.Count == 1 ? chain[0].Objective : null;
-            best = GearOptimizer.Optimize(chain, null, forceRespawn);
-            if (objective == null || best == null) { why = "off (preset or no plain set)"; return chain; }
-            double plain = GearOptimizer.ScoreOf(best, objective);
-            for (int slots = SegmentRespawnSlots; slots >= 1; slots--)
+            if (objective == null) { why = "off (preset chain)"; SegmentRespawnStatus = "0 items — the segment gear is a preset chain"; return chain; }
+
+            var plain = GearOptimizer.Optimize(chain, null, forceRespawn);
+            double plainScore = plain == null ? 0 : GearOptimizer.ScoreOf(plain, objective);
+            for (int slots = wanted; slots >= 1; slots--)
             {
                 var reserved = GearChain.WithRespawnReserve(chain, slots);
                 var candidate = GearOptimizer.Optimize(reserved, null, forceRespawn);
                 if (candidate == null) continue;
-                double ratio = GearOptimizer.ScoreOf(candidate, objective) / plain;
-                if (ratio * GearReequipBar >= 1)
-                {
-                    best = candidate;
-                    why = $"{slots} slot(s) (segment x{ratio:0.###})";
-                    return reserved;
-                }
-                why = $"off (1 slot costs segment x{ratio:0.###})";
-                if (slots == 1) return chain;
+                double ratio = plainScore > 0 ? GearOptimizer.ScoreOf(candidate, objective) / plainScore : double.NaN;
+                if (auto && !(ratio * GearReequipBar >= 1)) continue;
+                best = candidate;
+                string price = double.IsNaN(ratio) ? "" : $" x{ratio.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}";
+                why = $"{slots} slot(s) ({setting}; segment{price})";
+                // A lone Respawn objective scores the set's gear respawn as a fraction (ScoreVals divides by 100).
+                double gearRespawn = GearOptimizer.ScoreOf(candidate, GearChain.FindObjective(GearObjectives.Stat.Respawn));
+                double after = respawn * Math.Max(0.2, 1 - gearRespawn);
+                SegmentRespawnStatus = $"{slots} item(s) — {objective.Name} set{price} · respawn {respawn:0.00} s → {after:0.00} s";
+                return reserved;
             }
-            why = "off";
+            best = plain;
+            why = auto ? "off (Auto: every slot costs more than the bar)" : "off (no reserved set)";
+            SegmentRespawnStatus = auto ? $"0 items — Auto: even one costs {objective.Name} more than 2 %" : "0 items — no respawn set found";
             return chain;
         }
         private static DateTime _lastGearCheck = DateTime.MinValue;

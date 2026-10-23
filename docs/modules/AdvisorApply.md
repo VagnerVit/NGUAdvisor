@@ -60,16 +60,18 @@ not a framework:
   fell through (user-reported). The profile's `ActiveChain` is used **iff no override is in play**,
   which is a flag and deliberately NOT a name comparison: `ActiveObjective` is a chain's lead
   objective, so an override asking for "Adventure" used to inherit the profile's
-  "Adventure + Respawn" chain. **Segment gear takes respawn only when it is free**
-  (`SegmentChainWithRespawn`, user rule 2026-10-20). When the override is
-  `ChallengeOverlay.GearObjectiveOverride` and resolves to a plain objective, the chain becomes
-  `objective(0) > Respawn(n) > objective(all)` (`GearChain.WithRespawnReserve`, n = 2, then 1) only
-  if combat is on, the gear-free respawn (`CombatHelpers.NonGearRespawnTime`) is longer than the
-  gcd, and the reserved set scores the segment objective within `GearReequipBar` of the plain set.
-  A fixed two-slot reserve was measured on 2026-10-20 in the Evil NGU marathon: +37 % ITOPOD kills
-  (0.44 → 0.60/s, save counter) against energy NGUs at x0.645 and energy cap at x0.86. Kills and NGU
-  levels have no exchange rate, so the bar is the price. `respawn=` on the `[GearDbg]` line says
-  which rule decided. Mode gear (titan, gold, quest, Ygg, cooking) keeps its own
+  "Adventure + Respawn" chain. **Segment gear reserves `Settings.SegmentRespawnItems` respawn accessories** (COMBAT › Adventure ›
+  RESPAWN ITEMS: AUTO / 0–3, default 2; `SegmentChainWithRespawn`, user rules 2026-10-20 and
+  2026-10-22). When the override is `ChallengeOverlay.GearObjectiveOverride` and resolves to a plain
+  objective, combat is on and the gear-free respawn (`CombatHelpers.NonGearRespawnTime`) is longer than
+  the gcd, the chain becomes `objective(0) > Respawn(n) > objective(all)` (`GearChain.WithRespawnReserve`).
+  A number is reserved whatever the segment pays; AUTO takes the most slots (≤ 3) whose set stays within
+  `GearReequipBar` of the plain one, because kills and the segment's resource have no exchange rate.
+  Measured 2026-10-20 in the Evil NGU marathon: two slots cost the NGUs set x0.735 (one x0.867) for
+  +37 % ITOPOD kills (0.44 → 0.60/s, save counter). `SegmentRespawnStatus` carries the pass's price to the
+  panel's line (set ratio, respawn without gear → with the set, the set's respawn read as
+  `ScoreOf(set, Respawn)` = capped fraction, 0.28 for 28 %); `respawn=` on `[GearDbg]` says the same. The panel calls
+  `GearRestored()` on a change so the set swaps on the next tick. Mode gear (titan, gold, quest, Ygg, cooking) keeps its own
   `…ObjectiveRespawn` toggles. Three anti-churn rules, each from a real bug:
   1. `_gearAsserted=false` on every payload load → first pass equips UNCONDITIONALLY (a reload
      can leave a lock's TEMP loadout worn with the restore set lost — statics wipe).

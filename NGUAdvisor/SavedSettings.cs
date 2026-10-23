@@ -106,6 +106,7 @@ namespace NGUAdvisor
         [SerializeField] private int _cubePriority;
         [SerializeField] private int _favoredMacguffin;
         [SerializeField] private string _nguTrack;
+        [SerializeField] private string _segmentRespawnItems;
         [SerializeField] private string _allocationFile;
         [SerializeField] private bool _manageGoldLoadouts;
         [SerializeField] private int _resnipeTime;
@@ -402,6 +403,7 @@ namespace NGUAdvisor
             _manageR3 = other?.ManageR3 ?? false;
             _manageWandoos = other?.ManageWandoos ?? false;
             _nguTrack = other?.NguTrack ?? NguTrackAdvisor;
+            _segmentRespawnItems = other?.SegmentRespawnItems ?? SegmentRespawnDefault;
             _manageBeards = other?.ManageBeards ?? false;
             _manageDiggers = other?.ManageDiggers ?? false;
             _upgradeDiggers = other?.UpgradeDiggers ?? false;
@@ -1543,6 +1545,23 @@ namespace NGUAdvisor
             {
                 if (value == _favoredMacguffin) return;
                 _favoredMacguffin = value;
+                SaveSettings();
+            }
+        }
+
+        public const string SegmentRespawnAuto = "Auto";
+        public const string SegmentRespawnDefault = "2";
+
+        // Respawn accessories the auto profile's segment gear reserves: "0".."3", or "Auto" (only while
+        // free — AdvisorApply.SegmentChainWithRespawn). A file without the key reads as the default.
+        public string SegmentRespawnItems
+        {
+            get => string.IsNullOrEmpty(_segmentRespawnItems) ? SegmentRespawnDefault : _segmentRespawnItems;
+            set
+            {
+                var v = string.IsNullOrEmpty(value) ? SegmentRespawnDefault : value;
+                if (v == SegmentRespawnItems) return;
+                _segmentRespawnItems = v;
                 SaveSettings();
             }
         }

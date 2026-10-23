@@ -884,6 +884,7 @@ namespace NGUAdvisor
             UiTheme.StyleCombo(cb);
             // The help sits on a "?" beside the caption: a tooltip on the drop-down itself covered its list.
             var mark = UiLayout.HelpMark(this, l, tip);
+            mark.Height = Math.Max(mark.Height, UiTheme.TextH);   // the AutoSize caption it copies is a px short
             Reg(id, group, l, mark, cb);
             Action refill = () =>
             {

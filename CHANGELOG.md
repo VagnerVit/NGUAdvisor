@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Choose how many respawn items the auto profile's gear keeps.** COMBAT › Adventure › RESPAWN
+  ITEMS: AUTO, 0, 1, 2 (default) or 3. A line below shows what the current loadout pays for them and
+  how much faster respawn gets. With combat off, or respawn already within one attack, none go in.
+
 ## [1.11.2] - 2026-10-22
 
 ### Changed
