@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-10-23
+
 ### Changed
 
 - **Choose how many respawn items the auto profile's gear keeps.** COMBAT › Adventure › RESPAWN
