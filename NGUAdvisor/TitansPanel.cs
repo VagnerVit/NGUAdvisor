@@ -75,6 +75,11 @@ namespace NGUAdvisor
         private Button _beast;
         private Label _modeLbl;
         private Label _combatSummary;
+        private RespawnItemsBlock _respawnBlock;
+
+        public int ContentHeight { get; private set; }
+
+        public void TickRespawnLine() => _respawnBlock?.Tick();
 
         private bool _syncing;
 
@@ -201,6 +206,11 @@ namespace NGUAdvisor
             Controls.Add(_beast);
             Controls.Add(_combatSummary);
             UiLayout.Row(UiTheme.S(10), modeRowY, UiTheme.S(8), _modeLbl, _combatMode, _beast);
+
+            // Kill-rate tuning sits with the rest of the combat posture, under both views.
+            _respawnBlock = new RespawnItemsBlock(W - UiTheme.S(20)) { Location = new Point(UiTheme.S(10), modeRowY + UiTheme.SCtl(24) + UiTheme.S(20)) };
+            Controls.Add(_respawnBlock);
+            ContentHeight = _respawnBlock.Bottom + UiTheme.S(8);
 
             SyncFromSettings();
         }
@@ -430,6 +440,7 @@ namespace NGUAdvisor
                     _combatSummary.Text = $"Combat: {mode} · Beast {(Settings.TitanBeastMode ? "on" : "off")} — advisor-managed";
                 }
 
+                _respawnBlock?.SyncFromSettings();
                 if (advisor) RefreshHero();
                 else RefreshManual();
             }

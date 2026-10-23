@@ -60,8 +60,8 @@ not a framework:
   fell through (user-reported). The profile's `ActiveChain` is used **iff no override is in play**,
   which is a flag and deliberately NOT a name comparison: `ActiveObjective` is a chain's lead
   objective, so an override asking for "Adventure" used to inherit the profile's
-  "Adventure + Respawn" chain. **Segment gear reserves `Settings.SegmentRespawnItems` respawn accessories** (COMBAT › Adventure ›
-  RESPAWN ITEMS: AUTO / 0–3, default 2; `SegmentChainWithRespawn`, user rules 2026-10-20 and
+  "Adventure + Respawn" chain. **Segment gear reserves `Settings.SegmentRespawnItems` respawn accessories** (COMBAT, titans column ›
+  RESPAWN ITEMS: Auto or a 0–3 counter, default 2 — `RespawnItemsBlock`; `SegmentChainWithRespawn`, user rules 2026-10-20 and
   2026-10-22). When the override is `ChallengeOverlay.GearObjectiveOverride` and resolves to a plain
   objective, combat is on and the gear-free respawn (`CombatHelpers.NonGearRespawnTime`) is longer than
   the gcd, the chain becomes `objective(0) > Respawn(n) > objective(all)` (`GearChain.WithRespawnReserve`).

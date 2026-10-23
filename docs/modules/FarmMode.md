@@ -79,6 +79,3 @@ ADVISOR/MANUAL bit, because advisor-vs-manual was only one row of a five-way cho
   false` when they are not in play. Hiding them reflowed the page on every mode click, and a
   control that vanishes reads as "this setting is gone".
 * The ITOPOD page is **HOW** the pod is farmed, never **WHETHER**.
-* **RESPAWN ITEMS** sits right under FARM MODE (same button row pattern) because it is the other
-  panel-level kill-rate choice. It writes `Settings.SegmentRespawnItems` only; what it does to segment
-  gear lives in AdvisorApply.md, and its price line reads `AdvisorApply.SegmentRespawnStatus`.

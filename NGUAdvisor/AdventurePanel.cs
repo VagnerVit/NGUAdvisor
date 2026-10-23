@@ -29,11 +29,6 @@ namespace NGUAdvisor
         private readonly List<FarmModeKind> _modeOrder = new List<FarmModeKind>();
         private Label _modeLine;
 
-        // RESPAWN ITEMS — how many respawn accessories the auto profile's segment gear keeps
-        // (Settings.SegmentRespawnItems, AdvisorApply.SegmentChainWithRespawn).
-        private static readonly string[] RespawnChoices = { SavedSettings.SegmentRespawnAuto, "0", "1", "2", "3" };
-        private readonly List<Button> _respawnButtons = new List<Button>();
-        private Label _respawnLine;
 
         // ZONES view
         private ComboBox _zoneCombo;
@@ -153,38 +148,6 @@ namespace NGUAdvisor
             _modeLine.Size = new Size(_w - UiTheme.S(44), UiTheme.TextH);
             Controls.Add(_modeLine);
             _modeLine.Location = new Point(UiTheme.S(10), my);
-            my += UiTheme.LinePitch * 2 + UiTheme.S(6);
-
-            var respawnCap = MkHead("RESPAWN ITEMS");
-            Controls.Add(respawnCap);
-            respawnCap.Location = new Point(UiTheme.S(10), my);
-            UiLayout.HelpMark(this, respawnCap, "How many respawn accessories the auto profile's segment gear "
-                + "(Time Machine, augments, NGUs, ...) keeps while you fight. AUTO takes them only while the set "
-                + "loses less than 2 %. None go in with combat off or once respawn is within one attack. "
-                + "Titan, gold, quest, Yggdrasil and hunt gear keep their own respawn switches.");
-            my += UiTheme.HeadPitch;
-            foreach (var choice in RespawnChoices)
-            {
-                var b = MkBtn(choice == SavedSettings.SegmentRespawnAuto ? "AUTO" : choice);
-                var value = choice;
-                b.Click += (s, e) =>
-                {
-                    if (Settings == null) return;
-                    Settings.SegmentRespawnItems = value;
-                    AdvisorApply.GearRestored();   // re-equip on the next tick, not after the 120 s throttle
-                    SyncFromSettings();
-                };
-                Controls.Add(b);
-                _respawnButtons.Add(b);
-            }
-            my = UiLayout.WrapRow(UiTheme.S(10), my, UiTheme.S(6), _w - UiTheme.S(34),
-                Math.Max(UiTheme.S(30), UiTheme.SCtl(24) + UiTheme.S(6)), _respawnButtons.ToArray()) + UiTheme.S(4);
-
-            _respawnLine = MkLbl("");
-            _respawnLine.AutoSize = false;
-            _respawnLine.Size = new Size(_w - UiTheme.S(44), UiTheme.TextH);
-            Controls.Add(_respawnLine);
-            _respawnLine.Location = new Point(UiTheme.S(10), my);
             my += UiTheme.LinePitch * 2 + UiTheme.S(6);
 
             _pageTop = my;
@@ -605,13 +568,6 @@ namespace NGUAdvisor
                 }
                 UiLayout.FitOrGrow(_modeLine, FarmMode.Explain(mode), 2);
 
-                string respawnChoice = Settings.SegmentRespawnItems;
-                for (int i = 0; i < _respawnButtons.Count; i++)
-                {
-                    bool on = RespawnChoices[i] == respawnChoice;
-                    UiTheme.ApplyState(_respawnButtons[i], on ? UiTheme.Accent : UiTheme.BtnFace, on ? Color.White : UiTheme.Ink);
-                }
-                RefreshRespawnLine();
 
                 // Both parameter pickers stay VISIBLE in every mode and only lose focus when they are
                 // not the one in play. Hiding them reflowed the page on every mode click, and a control
@@ -736,28 +692,6 @@ namespace NGUAdvisor
         // settings write, so the ITOPOD page re-reads it while it is on screen.
         private DateTime _floorInfoAt = DateTime.MinValue;
         private const double FloorInfoRefreshSeconds = 5;
-
-        private DateTime _respawnLineAt = DateTime.MinValue;
-
-        // The price line follows AdvisorApply's gear pass (every 2 min), so a 5 s re-read is plenty.
-        public void TickRespawnLine()
-        {
-            if (!Visible) return;
-            DateTime now = DateTime.UtcNow;
-            if ((now - _respawnLineAt).TotalSeconds < FloorInfoRefreshSeconds) return;
-            _respawnLineAt = now;
-            RefreshRespawnLine();
-        }
-
-        private void RefreshRespawnLine()
-        {
-            string text = Settings == null || !Settings.AutoProfile
-                ? "Applies to the auto profile's segment gear — the auto profile is off."
-                : string.IsNullOrEmpty(AdvisorApply.SegmentRespawnStatus)
-                    ? "Decided on the next gear check."
-                    : AdvisorApply.SegmentRespawnStatus;
-            UiLayout.FitOrGrow(_respawnLine, text, 2);
-        }
 
         public void TickFloorInfo()
         {

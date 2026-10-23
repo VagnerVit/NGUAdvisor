@@ -687,7 +687,7 @@ namespace NGUAdvisor
             if (_profilePanel != null) Place(profileSec, _profilePanel, UiTheme.S(20), UiTheme.S(12), CanvasW - UiTheme.S(40), _profilePanel.Height);
 
             var combat = NewSection("Combat");
-            if (_titansPanel != null) Place(combat, _titansPanel, UiTheme.S(20), UiTheme.S(12), UiTheme.S(505), UiTheme.S(500));
+            if (_titansPanel != null) Place(combat, _titansPanel, UiTheme.S(20), UiTheme.S(12), UiTheme.S(505), Math.Max(UiTheme.S(500), _titansPanel.ContentHeight));
             // Adventure asks for its own height: it has no scrollbar of its own by design, so a tuned 580
             // clips whichever page is tallest. The sliver below then chains off the taller column.
             // Adventure is 80px taller than Titans: the two-layer control bar cost it 72px and its content
@@ -1882,7 +1882,7 @@ namespace NGUAdvisor
             _growthPanel?.TickGrowth();
             _bloodPanel?.RefreshStatus();    // no-ops unless the Blood page is visible
             _boostsPanel?.RefreshBoostingNow();   // no-ops unless the Boosts page is visible; 1s throttle
-            _adventurePanel?.TickRespawnLine();
+            _titansPanel?.TickRespawnLine();
             _adventurePanel?.TickFloorInfo();     // no-ops unless the ITOPOD page is visible; 5s throttle
         }
 

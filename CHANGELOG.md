@@ -4,6 +4,10 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **RESPAWN ITEMS moved under the titans in COMBAT** and is now an Auto checkbox plus a 0–3 counter.
+
 ## [1.11.3] - 2026-10-23
 
 ### Changed
