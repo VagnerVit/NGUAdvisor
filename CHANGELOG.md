@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.5] - 2026-10-23
+
 ### Changed
 
 - **ITOPOD Push wears the Move Cooldown ring that also has respawn** (Ring of Might) rather than an
