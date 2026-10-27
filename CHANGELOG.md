@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-10-27
+
 ### Fixed
 
 - **Auto profile funds the NGU lanes to their BB before AT and augments** during the NGU marathon,
