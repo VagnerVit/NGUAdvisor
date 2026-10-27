@@ -74,7 +74,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         protected override bool CorrectResourceType() => Type == ResourceType.Energy || Type == ResourceType.Magic;
 
         // Re-splits what the equal-share NGU lanes hold, plus the idle pool, along BB breakpoints
-        // (NguBbSplit). Runs after the whole walk, so every other token keeps what it took.
+        // (NguBbSplit). Runs where NguBbSplit.RebalanceAfter puts it; every token walked before keeps what it took.
         public static void Rebalance(IEnumerable<ResourceBreakpoint> walked)
         {
             List<NGUBP> lanes = walked.OfType<NGUBP>().Where(x => !x.IsCap)

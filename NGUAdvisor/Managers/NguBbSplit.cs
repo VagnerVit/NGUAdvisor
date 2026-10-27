@@ -55,6 +55,19 @@ namespace NGUAdvisor.Managers
             return new Result { Ticks = ticks, Amounts = amounts };
         }
 
+        // Where in a priority walk the equal-share NGU lanes are re-split: right after the last non-cap
+        // token when that token is an NGU lane, so the CAP tokens behind it (AT, warm NGUs, augments) get
+        // what the lanes leave at BB instead of the quantisation leftover. -1: after the whole walk.
+        public static int RebalanceAfter(int count, Func<int, bool> isCap, Func<int, bool> isNguLane)
+        {
+            for (int i = count - 1; i >= 0; i--)
+            {
+                if (isCap(i)) continue;
+                return isNguLane(i) ? i : -1;
+            }
+            return -1;
+        }
+
         private static long Cost(Func<int, int, double> bbAt, int lane, int k)
             => (long)Math.Ceiling(Math.Max(1.0, bbAt(lane, k)) / k * RoundingHeadroom);
 

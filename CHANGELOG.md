@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Auto profile funds the NGU lanes to their BB before AT and augments** during the NGU marathon,
+  the lower-value NGUs (such as Magic NGU) included; AT's 40 % share used to take energy a lane such
+  as PP or Magic NGU needed to reach BB.
+
 ## [1.11.5] - 2026-10-23
 
 ### Changed

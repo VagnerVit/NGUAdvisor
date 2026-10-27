@@ -73,8 +73,11 @@ the re-split 12.6B / 13.0B (one per 2 ticks), 34M idle. The rule follows the gui
 into that NGU", ch.6 "Aim to BB", and only as the fallback "split Magic into Ygg/EXP": lanes reach BB in
 token order while the pool covers them, the rest is split equally, and the split's quantisation
 leftover lifts lanes to their next breakpoint in token order. Only the non-cap NGU lanes' own holdings
-plus the idle pool are re-split, so every other token keeps what it took; `CAPNGU` absorbers therefore
-still drink the leftover before the re-split sees it.
+plus the idle pool are re-split, so every token walked before keeps what it took. **When only CAP tokens
+follow the last non-cap NGU lane, the re-split runs right there** (`NguBbSplit.RebalanceAfter`), so
+`CAPNGU`, `CAPALLAT:40` and `CAPBESTAUG` drink what the lanes leave at BB, not the quantisation leftover
+(user 2026-10-27: PP short of BB while AT held energy — guide ch.5 "Prioritize NGUs first"). With a
+non-cap token behind the lanes (`BESTAUG`, `BR-30`) it still runs after the whole walk.
 
 `ParseBreakpointArray` deliberately takes **no rebirthTime parameter** — the rebirth deadline is a
 property of the RUN, not of a parsed breakpoint.

@@ -50,16 +50,20 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
                 return false;
 
             var shouldRetry = true;
+            bool rebalanced = false;
             while (shouldRetry)
             {
                 var successList = new List<ResourceBreakpoint>();
                 shouldRetry = false;
+                rebalanced = false;
                 var prioCount = temp.Count(x => !x.IsCap);
+                int rebalanceAt = Managers.NguBbSplit.RebalanceAfter(temp.Count, i => temp[i].IsCap, i => temp[i] is NGUBP);
 
                 RemoveEnergy(temp.Exists(x => x is BasicTrainingBP));
 
-                foreach (var prio in temp)
+                for (int i = 0; i < temp.Count; i++)
                 {
+                    var prio = temp[i];
                     prio.UpdateMaxAllocation(prioCount);
                     if (prio.Allocate())
                         successList.Add(prio);
@@ -68,12 +72,19 @@ namespace NGUAdvisor.AllocationProfiles.Breakpoints
 
                     if (!prio.IsCap)
                         prioCount--;
+
+                    if (i == rebalanceAt)
+                    {
+                        NGUBP.Rebalance(successList);
+                        rebalanced = true;
+                    }
                 }
                 temp = successList;
                 shouldRetry &= temp.Count > 0;
             }
 
-            NGUBP.Rebalance(temp);
+            if (!rebalanced)
+                NGUBP.Rebalance(temp);
 
             _character.NGUController.refreshMenu();
             _character.wandoos98Controller.refreshMenu();

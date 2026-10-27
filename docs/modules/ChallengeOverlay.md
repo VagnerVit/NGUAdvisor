@@ -54,8 +54,11 @@ below Boss 125, so a 24 h profile at Boss 70 got a 24-hour climb: no TM half-hou
 no Evil NGU tail. AT HOUR and RECOVERY are Normal-shape segments and do not exist on the Evil day.
 
 **Ch.5 NGU MARATHON energy**: `CAPALLAT` ahead of the NGU lanes while pre-T7 at Boss 115+ (guide: "BB
-AT P/T for the entire rebirth to prep for T7"); otherwise the hot NGU lanes first, then `CAPALLAT:40`
-("run AT with <40% of your Energy cap. Prioritize NGUs first"), then the surplus absorbers.
+AT P/T for the entire rebirth to prep for T7"); otherwise the hot NGU lanes first, then the warm
+`CAPNGU-*` lanes, then `CAPALLAT:40` ("run AT with <40% of your Energy cap. Prioritize NGUs first" —
+user 2026-10-27: Magic NGU sat at one level per 3 ticks while AT held 142B), then `CAPALLAT` and
+`CAPBESTAUG`. As NGU BB grows with level, warm lanes can squeeze AT toward nothing; that is the
+chosen trade.
 
 **AUGMENTATION's NGU tail is `CAPNGU-*`**: a plain `NGU-*` after `BESTAUG` joins the equal-share
 divisor and halves the augment (the TM HOUR rule below), and in magic it halves `BR-30`. The guide

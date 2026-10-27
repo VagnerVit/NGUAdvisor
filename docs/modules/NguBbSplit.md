@@ -1,8 +1,10 @@
 # NguBbSplit
 
 Splits an energy/magic pool between the equal-share NGU lanes along BB breakpoints. Called from
-`NGUBP.Rebalance` after every Energy/Magic breakpoint walk (`Main.QuickStuff` → `DoAllocations`), so
-it runs on the Unity main thread every allocation tick.
+`NGUBP.Rebalance` in every Energy/Magic breakpoint walk (`Main.QuickStuff` → `DoAllocations`), so
+it runs on the Unity main thread every allocation tick. `RebalanceAfter` picks the point: right after
+the last non-cap token when it is an NGU lane (the CAP tokens behind it get only what is left at BB),
+otherwise after the whole walk.
 
 ## Game truth
 

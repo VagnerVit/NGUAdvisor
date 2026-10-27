@@ -758,9 +758,6 @@ namespace NGUAdvisor.Managers
                     // for T7" — AT ahead of the NGUs until T7 falls.
                     if (e && evilDay && PrepsT7()) list.Add("CAPALLAT");
                     foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
-                    // Guide ch.5: "run AT with <40% of your Energy cap. Prioritize NGUs first" — AT gets
-                    // what the hot lanes leave, up to 40 %, before the warm surplus lanes.
-                    if (e && evilDay) list.Add("CAPALLAT:40");
                     // SURPLUS ABSORBERS (user 2026-07-11: 4.7B of a 5.4B pool sat idle once the
                     // hot lanes took their caps — the game hard-caps each NGU at ONE level per
                     // tick, decomp NGUController.updateNGU resets progress to 0 on level-up, so
@@ -769,6 +766,9 @@ namespace NGUAdvisor.Managers
                     // Value order: warm NGU lanes (any growth beats idle), AT (costs only energy),
                     // then the aug pair last (aug levels also drain gold).
                     foreach (var t in ChapterNgusSurplus(type)) if (!list.Contains(t)) list.Add(t);
+                    // Guide ch.5: "run AT with <40% of your Energy cap. Prioritize NGUs first" — AT gets
+                    // what every NGU lane, warm ones included, leaves at BB, up to 40 %.
+                    if (e && evilDay) list.Add("CAPALLAT:40");
                     if (e)
                     {
                         if (!list.Contains("CAPALLAT")) list.Add("CAPALLAT");

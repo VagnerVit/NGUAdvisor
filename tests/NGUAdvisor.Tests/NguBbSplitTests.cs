@@ -76,6 +76,27 @@ namespace NGUAdvisor.Tests
             Assert.True(plan.Amounts.Sum() <= 1e7);
         }
 
+        private static int RebalanceAfter(string tokens)
+        {
+            string[] t = tokens.Split(' ');
+            return NguBbSplit.RebalanceAfter(t.Length, i => t[i].StartsWith("CAP"), i => t[i].StartsWith("NGU") || t[i].StartsWith("CAPNGU"));
+        }
+
+        [Fact]
+        public void MarathonLanesAreRebalancedBeforeTheCapAbsorbersDrinkTheRest()
+        {
+            // ChallengeOverlay's NGU MARATHON energy list: AT and augments only get what the hot lanes leave at BB.
+            Assert.Equal(4, RebalanceAfter("CAPALLBT CAPTM CAPWAN NGU-8 NGU-7 CAPNGU-3 CAPALLAT:40 CAPALLAT CAPBESTAUG"));
+        }
+
+        [Fact]
+        public void ANonCapTokenAfterTheLanesKeepsTheRebalanceAtTheEnd()
+        {
+            Assert.Equal(-1, RebalanceAfter("CAPWAN NGU-0 NGU-1 BESTAUG"));
+            Assert.Equal(-1, RebalanceAfter("NGU-0 CAPNGU-1 BR-30"));
+            Assert.Equal(-1, RebalanceAfter("CAPALLBT BESTAUG CAPNGU-1"));
+        }
+
         [Fact]
         public void EmptyPoolFundsNothing()
         {
