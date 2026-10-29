@@ -48,6 +48,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\BloodRouter.cs" Link="Linked\BloodRouter.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguGuidePriority.cs" Link="Linked\NguGuidePriority.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguBbSplit.cs" Link="Linked\NguBbSplit.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NguBbCoverage.cs" Link="Linked\NguBbCoverage.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguGain.cs" Link="Linked\NguGain.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\RunShape.cs" Link="Linked\RunShape.cs" />
   </ItemGroup>

@@ -65,8 +65,19 @@ not a framework:
   2026-10-22). When the override is `ChallengeOverlay.GearObjectiveOverride` and resolves to a plain
   objective, combat is on and the gear-free respawn (`CombatHelpers.NonGearRespawnTime`) is longer than
   the gcd, the chain becomes `objective(0) > Respawn(n) > objective(all)` (`GearChain.WithRespawnReserve`).
-  A number is reserved whatever the segment pays; AUTO takes the most slots (≤ 3) whose set stays within
-  `GearReequipBar` of the plain one, because kills and the segment's resource have no exchange rate.
+  A number is reserved whatever the segment pays; AUTO takes the most slots (≤ 3) whose set costs the
+  segment nothing: within `GearReequipBar` of the plain one, or — for an objective with NGU speed —
+  keeping every NGU level the plain set earns (`NguBbGear`, user rule 2026-10-29: "1 respawn item on,
+  energy NGU still capped" while Auto chose 0). Per pool: the set is no weaker in power, cap and NGU
+  speed, or every lane the auto walk funds still reaches BB under it. Gear enters each game total as
+  `(1 + Σ bonuses)` (decomp `Character.totalEnergyPower/totalCapEnergy/totalNGUSpeedBonus`), so the set's
+  factors are the scorer-fraction swap against the worn gear (`NguBbCoverage.SwapFactor`) and the lane BB
+  is `NGUBP.EnergyBb` with power × NGU speed scaled. The pool is idle + lanes + the AT/augment/ritual
+  tokens behind the first lane (lanes come first); tokens ahead keep theirs, a lower cap is charged to the
+  lanes and a higher one not credited (`CAPTM`/`CAPWAN` take their share first). Coverage needs
+  `GearReequipBar` headroom so a lane levelling toward its BB doesn't flip the set every pass. Not modelled:
+  set bonuses changing with the swap (the scorer has none). Each priced pool logs `[GearDbg] NGU BB <pool>:`
+  with the three factors, available vs. Σ BB and the verdict (once per distinct line).
   Measured 2026-10-20 in the Evil NGU marathon: two slots cost the NGUs set x0.735 (one x0.867) for
   +37 % ITOPOD kills (0.44 → 0.60/s, save counter). `SegmentRespawnStatus` carries the pass's price to the
   panel's line (set ratio, respawn without gear → with the set, the set's respawn read as

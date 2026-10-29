@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **RESPAWN ITEMS on Auto keeps respawn items in the NGU marathon while every NGU stays at BB.** Auto
+  used to drop to 0 items whenever a respawn item lowered the NGU set's score by more than 2 %, even
+  when the remaining gear still capped every NGU lane, so the item cost no NGU levels.
+
 ## [1.11.6] - 2026-10-27
 
 ### Fixed

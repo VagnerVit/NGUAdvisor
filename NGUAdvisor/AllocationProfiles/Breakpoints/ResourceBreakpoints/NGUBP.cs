@@ -102,6 +102,14 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             }
         }
 
+        public int LaneIndex => Index;
+
+        public long HeldNow => Held();
+
+        // BB at one level per tick with every NGU-speed term scaled by speedScale: the BB this lane
+        // would face under another gear set (NguBbGear).
+        public double BbWithSpeed(double speedScale) => Type == ResourceType.Magic ? MagicBb(500, speedScale) : EnergyBb(500, speedScale);
+
         private long Held() => Type == ResourceType.Magic
             ? _character.NGU.magicSkills[Index].magic
             : _character.NGU.skills[Index].energy;
@@ -163,7 +171,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return ret;
         }
 
-        private double EnergyBb(int offset)
+        private double EnergyBb(int offset, double speedScale = 1)
         {
             var num1 = 0.0f;
             if (_character.settings.nguLevelTrack == difficulty.normal)
@@ -173,7 +181,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             else if (_character.settings.nguLevelTrack == difficulty.sadistic)
                 num1 = _character.NGU.skills[Index].sadisticLevel + 1L + offset;
 
-            var num2 = _character.totalEnergyPower() * (double)_character.totalNGUSpeedBonus();
+            var num2 = _character.totalEnergyPower() * (double)_character.totalNGUSpeedBonus() * speedScale;
             num2 *= _character.adventureController.itopod.totalEnergyNGUBonus() * _character.inventory.macguffinBonuses[4];
             num2 *= _character.NGUController.energyNGUBonus() * _character.allDiggers.totalEnergyNGUBonus();
             num2 *= _character.hacksController.totalEnergyNGUBonus() * _character.beastQuestPerkController.totalEnergyNGUSpeed();
@@ -204,7 +212,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return ret;
         }
 
-        private double MagicBb(int offset)
+        private double MagicBb(int offset, double speedScale = 1)
         {
             var num1 = 0.0f;
             if (_character.settings.nguLevelTrack == difficulty.normal)
@@ -214,7 +222,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             else if (_character.settings.nguLevelTrack == difficulty.sadistic)
                 num1 = _character.NGU.magicSkills[Index].sadisticLevel + 1L + offset;
 
-            var num2 = _character.totalMagicPower() * (double)_character.totalNGUSpeedBonus();
+            var num2 = _character.totalMagicPower() * (double)_character.totalNGUSpeedBonus() * speedScale;
             num2 *= _character.adventureController.itopod.totalMagicNGUBonus() * _character.inventory.macguffinBonuses[5];
             num2 *= _character.NGUController.magicNGUBonus() * _character.allDiggers.totalMagicNGUBonus();
             num2 *= _character.hacksController.totalMagicNGUBonus() * _character.beastQuestPerkController.totalMagicNGUSpeed();

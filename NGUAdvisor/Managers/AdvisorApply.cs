@@ -1198,8 +1198,8 @@ namespace NGUAdvisor.Managers
         // Nothing while respawn cannot pay: combat off, or the gear-free respawn already within the gcd.
         // A number reserves that many slots whatever the segment pays for them — the user's call, priced
         // on the line (Evil NGU marathon: two cost the NGUs set x0.735 for +37 % ITOPOD kills). "Auto"
-        // takes the most slots whose set stays within the re-equip bar of the plain one: kills and the
-        // segment's resource have no exchange rate, so the bar is the only honest price.
+        // takes the most slots whose set costs the segment nothing: an NGU set that keeps every funded
+        // lane at BB (NguBbGear, user rule 2026-10-29), otherwise one within the re-equip bar of the plain set.
         private static IReadOnlyList<GearPriority> SegmentChainWithRespawn(IReadOnlyList<GearPriority> chain, bool forceRespawn,
                                                                   out GearOptimizer.Result best, out string why)
         {
@@ -1228,9 +1228,12 @@ namespace NGUAdvisor.Managers
                 var candidate = GearOptimizer.Optimize(reserved, null, forceRespawn);
                 if (candidate == null) continue;
                 double ratio = plainScore > 0 ? GearOptimizer.ScoreOf(candidate, objective) / plainScore : double.NaN;
-                if (auto && !(ratio * GearReequipBar >= 1)) continue;
+                bool withinBar = ratio * GearReequipBar >= 1;
+                bool keepsBb = auto && !withinBar && KeepsNguLevels(objective, candidate, plain);
+                if (auto && !withinBar && !keepsBb) continue;
                 best = candidate;
                 string price = double.IsNaN(ratio) ? "" : $" x{ratio.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}";
+                if (keepsBb) price += ", NGUs stay at BB";
                 why = $"{slots} slot(s) ({setting}; segment{price})";
                 // A lone Respawn objective scores the set's gear respawn as a fraction (ScoreVals divides by 100).
                 double gearRespawn = GearOptimizer.ScoreOf(candidate, GearChain.FindObjective(GearObjectives.Stat.Respawn));
@@ -1239,9 +1242,17 @@ namespace NGUAdvisor.Managers
                 return reserved;
             }
             best = plain;
-            why = auto ? "off (Auto: every slot costs more than the bar)" : "off (no reserved set)";
-            SegmentRespawnStatus = auto ? $"0 items — Auto: even one costs {objective.Name} more than 2 %" : "0 items — no respawn set found";
+            string bbClause = objective.Stats.Contains(GearObjectives.Stat.NGUSpeed) ? " and drops an NGU below BB" : "";
+            why = auto ? $"off (Auto: every slot costs more than the bar{bbClause})" : "off (no reserved set)";
+            SegmentRespawnStatus = auto ? $"0 items — Auto: even one costs {objective.Name} more than 2 %{bbClause}" : "0 items — no respawn set found";
             return chain;
+        }
+
+        private static bool KeepsNguLevels(GearObjectives.Objective objective, GearOptimizer.Result candidate, GearOptimizer.Result plain)
+        {
+            if (plain == null || !objective.Stats.Contains(GearObjectives.Stat.NGUSpeed)) return false;
+            try { return NguBbGear.KeepsNguLevels(candidate, plain, GearReequipBar); }
+            catch (Exception e) { Main.LogDebug($"[GearDbg] NGU BB check failed: {e.Message}"); return false; }
         }
         private static DateTime _lastGearCheck = DateTime.MinValue;
         private static string _lastGearOverride;
