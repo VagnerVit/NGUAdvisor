@@ -4,8 +4,34 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **ITOPOD climbs for the one-time "first time reached" Perk point bonus** (every 10th floor; 70 PP
+  at 700, 100 at 1000) when the floors on the way are won and the climb out-earns farming, then
+  returns to the optimal floor.
+- **State export lists R3 and every hack** (level, R3, milestone, bonus), the titan fights still
+  being pushed (T7, T8, …), and the Infinity Cube tier with the distance to the next one.
+
+### Changed
+
+- **Auto profile runs hacks in the guide's order**: Attack/Defense until CBlock 3, then Adventure,
+  plus the first milestone on the Time Machine through Magic NGU hacks once Incriminating Evidence
+  is maxed.
+- **Auto profile funds the cheapest NGUs to BB first.** A short pool (early marathon, after a
+  rebirth) now BBs the ~64M lanes before a 688B one; a pool that covers every lane allocates as
+  before.
+- **Perk plan buys E/M Power, Cap and NGU-speed II perks in a 2:2:1 ratio until CBlock 3 and until
+  the Normal NGUs BB easily**, as the guide's ch.5 order says, instead of banking for Fib 34.
+
 ### Fixed
 
+- **Titan fights price the Greasy Nerd's Power Glove (5× plus a regular hit) and the Godmother's
+  explosions (25× each)**, so the fatal-blow guard blocks them; titan growth is read one step
+  ahead, as the game applies it.
+- **Boost drops credit the Infinity Cube at its real intake** (boost bonus ÷ 50 or 100, Special
+  split into Power and Toughness) and measure cube headroom against the titan gear's softcap.
+- **Gear projections no longer count the worn set twice.** The optimizer's nude base used the worn
+  gear's attack/defense, which skewed the titan-push and AT projections.
 - **RESPAWN ITEMS on Auto keeps respawn items in the NGU marathon while every NGU stays at BB.** Auto
   used to drop to 0 items whenever a respawn item lowered the NGU set's score by more than 2 %, even
   when the remaining gear still capped every NGU lane, so the item cost no NGU levels.

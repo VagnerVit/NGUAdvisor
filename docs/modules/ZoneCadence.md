@@ -179,9 +179,22 @@ A flat "tier value" over-priced high tiers badly. `Equipment.boostEquip` decides
   hungriest item needs 300 is worth 300.
 - **Special** CASCADES spec1 → spec2 → spec3 on one item, so its usable headroom is the **sum** of the
   three slots (which is what `GetNeededBoosts().special` already returns).
+- **Intake differs per sink.** Gear takes `value × boostBonus()` (`Equipment.boostEquip(boost,
+  allItemList.boostBonus())`). The cube takes `value × boostBonus() / num`, `num = 100`, `50` with
+  ITOPOD perk 26, then `/ wishes.totalBoostRatioDivider()` (`InventoryController.infinityCubeBoost`) —
+  a 10K boost is ~200·bb raw in the cube, not 10K. A Special into the cube splits `/(num × 2)` into
+  BOTH Power and Toughness. `BoostValueMath.CubeIntake` / `Delivered` / `DeliveredSpecial`.
 - The **Infinity Cube** is a SOFT sink, not a capped one: `InventoryController.cubePower()` returns
   `softcap + sqrt(raw − softcap)` past the cap. It never becomes worthless, only sharply diminishing.
   The old binary "cube under softcap" demand gate threw that gradient away.
+- **The softcap is the kill loadout's** (`BoostSinks.CubeSoftcaps`). The game re-reads
+  `adventure.attack + attackBonus()` of the WORN gear every time `totalAdvAttack()` evaluates, so the
+  cube is worth what it is under the set that fights. Titans and pushes wear the Adventure set
+  (`OptimizationAdvisor.ProjectedKillGear`). Never below the live cap; 0 (No Equipment) stays 0.
+- **Cube tier is read-out only.** `infinityCubeTier()` = `(int)(log10(rawP + rawT) − 1)` on the raw,
+  un-softcapped sum (0 below 100, max 10); each step adds drop chance / gold, hack speed from 8, wish
+  speed from 9. None of those converts into adventure-stat points, so `ValueOfDrop` carries no weight
+  for it; `BoostSinks.CubeTierText` (state export) shows the distance to the next tier instead.
 - A boost goes wherever it helps most, hence `Delivered` takes the `max` of the gear and cube deliveries
   (both are adventure-stat points, so they are directly comparable).
 - **Recycling**: `InventoryController.boostRecycle` returns the next tier DOWN with probability

@@ -149,6 +149,18 @@ namespace NGUAdvisor.Managers
             return perSlot / f.GlobalCooldownSeconds;
         }
 
+        // Mean seconds per kill on `floor` with the sustained manual rotation: respawn, then whole swings
+        // until the mob (mean jitter) is down net of its regen. +inf when the regen outpaces us.
+        public static double ExpectedKillSeconds(Fighter f, int floor, double respawnSeconds)
+        {
+            if (f == null || f.GlobalCooldownSeconds <= 0.0) return double.PositiveInfinity;
+            double scale = Math.Pow(FloorGrowthBase, floor);
+            double netDps = RotationDps(f, BaseDefense * scale) - BaseRegen * scale;
+            if (netDps <= 0.0) return double.PositiveInfinity;
+            double hits = Math.Max(1.0, Math.Ceiling(BaseHp * scale / (netDps * f.GlobalCooldownSeconds)));
+            return BoostValueMath.CycleSeconds(false, respawnSeconds, f.GlobalCooldownSeconds, hits);
+        }
+
         // Action-by-action replay of one fight against `ai` on `floor`. Enemy stats and its damage roll
         // take the WORST side for us (1.02 jitter, 1.2 roll): a push death ends the push.
         public static bool WinsFight(Fighter f, int floor, PodAi ai)

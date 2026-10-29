@@ -87,13 +87,15 @@ namespace NGUAdvisor.Managers
             return item;
         }
 
-        // The character's nude adventure Power/Toughness (base with no gear) - a fixed "item".
+        // The character's nude adventure Power/Toughness - a fixed "item". Game: totalAdvAttack sums
+        // adventure.attack + adventureAttackBonus() (= the WORN gear's attack) + cubePower(), so the nude
+        // base is adventure.attack alone; the bonus getter would count the worn set into every candidate.
         public static GearScorer.Item BuildBaseItem()
         {
-            var ic = Main.InventoryController;
+            Character c = Main.Character;
             var item = new GearScorer.Item { IsWeapon = false };
-            Add(item, GearObjectives.Stat.Power, ic.adventureAttackBonus());
-            Add(item, GearObjectives.Stat.Toughness, ic.adventureDefenseBonus());
+            Add(item, GearObjectives.Stat.Power, c.adventure.attack);
+            Add(item, GearObjectives.Stat.Toughness, c.adventure.defense);
             return item;
         }
 

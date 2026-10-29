@@ -26,6 +26,10 @@ consumed without the gear). The trailing `HasCookingLock → TryCookingSwap` is 
 Reads `challenges.<x>.inChallenge` flags (main thread, guarded). Check order is
 most-restrictive-first; only one challenge is active at a time.
 
+`CBlock3Complete()` — guide ch.5's CBlock 3 from the `allChallenges` controllers' `evilCompletions()` /
+`completions()` (never `currentCompletions()`, which follows the rebirth difficulty); the rule itself is
+`ChallengeGates.CBlock3Complete` (tested). Read by ChallengeOverlay's hack plan and SpendPlanner.
+
 `DefaultGear(code)` — built-in gear objective when the profile has no challenge-specific gear:
 almost everything → `BossPushObjective()` ("Adventure", on Evil "Time Machine" — see
 ChallengeOverlay.md) + TopRespawn; NOTM → "Gold Drops" (no TM to make gold); NOEC →

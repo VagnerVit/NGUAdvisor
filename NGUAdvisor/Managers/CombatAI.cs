@@ -306,7 +306,8 @@ namespace NGUAdvisor.Managers
         {
             float damage = Mathf.Max(_eai.minDamage(), _eai.baseDamage());
             if (ZoneHelpers.ZoneIsTitan(_zone))
-                damage *= 1 + _eai.growCount / 100f;
+                damage *= 1 + NextAttackGrowCount() / 100f;
+            damage *= TitanSpecialFactor();
             if (BeastModeActive())
                 damage *= 3f;
             if (block)
@@ -337,6 +338,45 @@ namespace NGUAdvisor.Managers
                     return damage;
             }
             return damage;
+        }
+
+        // Titan AIs bump growCount before scaling the hit (decomp EnemyAI.nerdAI/beastAI/exileAI…); Jake and
+        // Tippi scale first and bump later, and the Godmother's explosions do not bump it at all.
+        private int NextAttackGrowCount()
+        {
+            if (_enemy.enemyType == enemyType.bigBoss3 || _enemy.enemyType == enemyType.finalBoss)
+                return _eai.growCount;
+            if (ZoneHelpers.ZoneIsGodmother(_zone) && EAIField<bool>("explosionMode"))
+                return _eai.growCount;
+            return _eai.growCount + 1;
+        }
+
+        private const float NerdPowerGloveFactor = 5f;
+        private const float GodmotherExplosionFactor = 25f;
+
+        // Damage of the whole enemy tick relative to one plain hit (decomp EnemyAI.nerdAI/godmotherAI). The
+        // Nerd's scripted hits on 3, 4 and 7 have no return, so the tick's random 1x/1.5x hit lands on top.
+        private float TitanSpecialFactor()
+        {
+            if (ZoneHelpers.ZoneIsNerd(_zone))
+            {
+                switch (NextAttackGrowCount() % 8)
+                {
+                    case 4: return NerdPowerGloveFactor + 1f;
+                    case 3:
+                    case 7: return 2f;
+                    default: return 1f;
+                }
+            }
+            if (ZoneHelpers.ZoneIsGodmother(_zone))
+            {
+                if (EAIField<bool>("explosionMode"))
+                    return GodmotherExplosionFactor;
+                // The tick on 4 only arms explosion mode, but the explosions follow at rate/5 — faster than a
+                // block can be raised after it — so the block decision has to price them now.
+                return NextAttackGrowCount() % 9 == 4 ? GodmotherExplosionFactor : 1f;
+            }
+            return 1f;
         }
 
         private bool WalderpPreCombat()

@@ -12,7 +12,8 @@ namespace NGUAdvisor.Managers
     //                       clamps curAttack at floor(capAttack * (1 + level/100))), plus the
     //                       Infinity Cube as a soft sink.
     //   Special          -> CASCADES spec1 -> spec2 -> spec3 on one item, so its usable headroom is
-    //                       the sum of the three slots. The cube has no special channel.
+    //                       the sum of the three slots. In the cube it splits half into Power,
+    //                       half into Toughness (InventoryController.infinityCubeBoost).
     //
     // Because overflow is destroyed, the value of a boost is min(tierValue, best SINGLE item's
     // headroom) -- not the total headroom across the whole loadout. That is the correction that
@@ -29,7 +30,30 @@ namespace NGUAdvisor.Managers
             public double CubeToughnessRaw;
             public double CubeToughnessSoftcap;
             public bool CubeUsable;
+            public double GearIntake = 1.0;
+            public double CubeIntake = BoostValueMath.CubeIntake(1.0, false, 1.0);
             public double RecycleChance;
+        }
+
+        // CUBE SOFTCAP AT THE KILL LOADOUT. cubePower() re-reads the softcap (base attack + WORN gear
+        // attack) on every stat evaluation, so the cube's stats are only worth what they are under the
+        // set that fights. Titans and pushes wear the Adventure set; NGU/Ygg/gold gear lowers the cap
+        // while worn but no kill hinges on those minutes. Never below the live cap.
+        public static void CubeSoftcaps(out double power, out double toughness)
+        {
+            Character c = Main.Character;
+            InventoryController ic = Main.InventoryController;
+            power = ic.cubePowerSoftcap();
+            toughness = ic.cubeToughnessSoftcap();
+            // 0 = No Equipment challenge: the cube is off, keep it that way.
+            if (power <= 0.0 && toughness <= 0.0) return;
+            try
+            {
+                OptimizationAdvisor.ProjectedKillGear(out double killAttack, out double killDefense);
+                power = Math.Max(power, c.adventure.attack + killAttack);
+                toughness = Math.Max(toughness, c.adventure.defense + killDefense);
+            }
+            catch (Exception e) { Main.LogDebug($"BoostSinks.CubeSoftcaps: {e.Message}"); }
         }
 
         // A SINK IS SOMEWHERE A BOOST CAN ACTUALLY GO. Equipped gear is taken independently of the
@@ -77,11 +101,15 @@ namespace NGUAdvisor.Managers
 
                 s.CubePowerRaw = c.inventory.cubePower;
                 s.CubeToughnessRaw = c.inventory.cubeToughness;
-                s.CubePowerSoftcap = ic.cubePowerSoftcap();
-                s.CubeToughnessSoftcap = ic.cubeToughnessSoftcap();
+                CubeSoftcaps(out s.CubePowerSoftcap, out s.CubeToughnessSoftcap);
                 // cubePower()/cubeToughness() return 0 flat inside the No Equipment challenge, which
                 // is exactly when the softcaps read 0 too.
                 s.CubeUsable = s.CubePowerSoftcap > 0.0 || s.CubeToughnessSoftcap > 0.0;
+                double boostBonus = c.allItemList.boostBonus();
+                s.GearIntake = boostBonus;
+                s.CubeIntake = BoostValueMath.CubeIntake(boostBonus,
+                    c.adventure.itopod.perkLevel[ImprovedCubeBoostingPerk] >= 1,
+                    c.wishesController.totalBoostRatioDivider());
                 s.RecycleChance = c.totalRecycleBonus();
             }
             catch (Exception e) { Main.LogDebug($"BoostSinks.Current: {e.Message}"); }
@@ -93,19 +121,29 @@ namespace NGUAdvisor.Managers
         public static double ValueOfDrop(int tier, Sinks s)
         {
             if (s == null || tier < 1) return 0.0;
+            double[] scores = ScoresAt(tier, s, s.CubeUsable);
+            return (scores[0] + scores[1] + scores[2]) / 3.0;
+        }
 
-            double power = BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.PowerGearHeadroom,
-                    s.CubePowerRaw, s.CubePowerSoftcap, s.CubeUsable));
+        // InventoryController.infinityCubeBoost: ITOPOD perk 26 halves the cube's boost divider.
+        private const int ImprovedCubeBoostingPerk = 26;
 
-            double toughness = BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.ToughnessGearHeadroom,
-                    s.CubeToughnessRaw, s.CubeToughnessSoftcap, s.CubeUsable));
-
-            double special = BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.SpecialGearHeadroom, 0.0, 0.0, false));
-
-            return (power + toughness + special) / 3.0;
+        // Delivered value of one boost of `tier` per type, recycling chain included: [power, toughness, special].
+        private static double[] ScoresAt(int tier, Sinks s, bool withCube)
+        {
+            bool cube = withCube && s.CubeUsable;
+            return new[]
+            {
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.GearIntake, s.PowerGearHeadroom,
+                        s.CubeIntake, s.CubePowerRaw, s.CubePowerSoftcap, cube)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.GearIntake, s.ToughnessGearHeadroom,
+                        s.CubeIntake, s.CubeToughnessRaw, s.CubeToughnessSoftcap, cube)),
+                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
+                    BoostValueMath.DeliveredSpecial(BoostValueMath.ValueOfTier(t), s.GearIntake, s.SpecialGearHeadroom,
+                        s.CubeIntake, s.CubePowerRaw, s.CubePowerSoftcap, s.CubeToughnessRaw, s.CubeToughnessSoftcap, cube)),
+            };
         }
 
         // Game's autoTransform values: 0 none, 1 power, 2 toughness, 3 special.
@@ -126,38 +164,11 @@ namespace NGUAdvisor.Managers
         // that never fully saturates, so as long as it is usable, Power or Toughness beats None.
         // Delivered value of one TOP-tier boost per type: [power, toughness, special].
         public static double[] TypeScores(Sinks s)
-        {
-            if (s == null) return new double[3];
-            int tier = BoostValueMath.Ladder.Length;
-
-            return new[]
-            {
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.PowerGearHeadroom,
-                        s.CubePowerRaw, s.CubePowerSoftcap, s.CubeUsable)),
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.ToughnessGearHeadroom,
-                        s.CubeToughnessRaw, s.CubeToughnessSoftcap, s.CubeUsable)),
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.SpecialGearHeadroom, 0.0, 0.0, false)),
-            };
-        }
+            => s == null ? new double[3] : ScoresAt(BoostValueMath.Ladder.Length, s, true);
 
         // Same three numbers with the cube EXCLUDED — what the gear alone can absorb.
         public static double[] GearScores(Sinks s)
-        {
-            if (s == null) return new double[3];
-            int tier = BoostValueMath.Ladder.Length;
-            return new[]
-            {
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.PowerGearHeadroom, 0.0, 0.0, false)),
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.ToughnessGearHeadroom, 0.0, 0.0, false)),
-                BoostValueMath.WithRecycling(tier, s.RecycleChance, t =>
-                    BoostValueMath.Delivered(BoostValueMath.ValueOfTier(t), s.SpecialGearHeadroom, 0.0, 0.0, false)),
-            };
-        }
+            => s == null ? new double[3] : ScoresAt(BoostValueMath.Ladder.Length, s, false);
 
         // GEAR DECIDES THE TYPE; the cube only breaks a tie.
         //
@@ -169,8 +180,8 @@ namespace NGUAdvisor.Managers
         // Toughness, the one type the gear could not use at all.
         //
         // The cube cannot tell P from T, so it must not be what picks between them. Gear can — and
-        // Special exists ONLY in gear (the cube has no special channel), so pricing it against a cube
-        // that eats everything guarantees it never wins.
+        // a Special is only worth its type in gear (the cube just splits it into P and T), so pricing
+        // it against a cube that eats everything guarantees it never wins.
         public static int BestType(Sinks s)
         {
             double[] gear = GearScores(s);
@@ -182,14 +193,35 @@ namespace NGUAdvisor.Managers
                 return TypeToughness;
             }
 
-            // Gear is saturated: the cube is the only sink left, and it takes just P and T.
+            // Gear is saturated: the cube is the only sink left. A Special there is half P + half T,
+            // never better than the better of the two.
             if (s == null || !s.CubeUsable) return TypeNone;
-            double top = BoostValueMath.ValueOfTier(BoostValueMath.Ladder.Length);
+            double top = BoostValueMath.ValueOfTier(BoostValueMath.Ladder.Length) * s.CubeIntake;
             double cubePower = BoostValueMath.CubeGain(s.CubePowerRaw, s.CubePowerSoftcap, top);
             double cubeToughness = BoostValueMath.CubeGain(s.CubeToughnessRaw, s.CubeToughnessSoftcap, top);
             if (cubePower <= 0.0 && cubeToughness <= 0.0) return TypeNone;
             // Below both softcaps the two price equal; that tie goes to Power (user rule, TransformManager.md).
             return cubeToughness > cubePower ? TypeToughness : TypePower;
+        }
+
+        // The tier step is READ-OUT ONLY: it pays drop chance / gold / hack / wish speed, none of which
+        // converts into the adventure-stat points this module prices, so it carries no weight here.
+        public static string CubeTierText(Sinks s)
+        {
+            if (s == null) return "unknown";
+            double raw = s.CubePowerRaw + s.CubeToughnessRaw;
+            int tier = BoostValueMath.CubeTier(raw);
+            if (tier >= BoostValueMath.MaxCubeTier) return $"{tier} (max) · raw P+T {NumberFormatter.Abbrev(raw)}";
+            int next = tier + 1;
+            double toGo = BoostValueMath.NextCubeTierAt(tier) - raw;
+            double perTopBoost = BoostValueMath.ValueOfTier(BoostValueMath.Ladder.Length) * s.CubeIntake;
+            string boosts = perTopBoost > 0 ? $" ≈ {NumberFormatter.Abbrev(toGo / perTopBoost)} 10K boosts" : "";
+            return $"{tier} · raw P+T {NumberFormatter.Abbrev(raw)} · tier {next} at {NumberFormatter.Abbrev(BoostValueMath.NextCubeTierAt(tier))}"
+                 + $" ({NumberFormatter.Abbrev(toGo)} raw to go{boosts})"
+                 + $" · adds drop {(BoostValueMath.CubeLootBonus(next) - BoostValueMath.CubeLootBonus(tier)) * 100:0.##}%"
+                 + $" gold {(BoostValueMath.CubeGoldBonus(next) - BoostValueMath.CubeGoldBonus(tier)) * 100:0.##}%"
+                 + $" hack {(BoostValueMath.CubeHackBonus(next) - BoostValueMath.CubeHackBonus(tier)) * 100:0.##}%"
+                 + $" wish {(BoostValueMath.CubeWishBonus(next) - BoostValueMath.CubeWishBonus(tier)) * 100:0.##}%";
         }
 
         // Boost items are ids 1-39: 13 value tiers per type, Power then Toughness then Special

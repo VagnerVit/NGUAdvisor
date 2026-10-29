@@ -338,6 +338,12 @@ namespace NGUAdvisor.Managers
                 // Have died - turn Auto Push off
                 else
                 {
+                    if (bonusClaimTarget > 0)
+                    {
+                        bonusClaimBlockedAtReach = bonusClaimReach;
+                        LogBonusClaim($"died climbing to {bonusClaimTarget}; no new claim until fights are won above {bonusClaimReach}");
+                        bonusClaimTarget = 0;
+                    }
                     Settings.ITOPODAutoPush = false;
                     // Max mode is nothing BUT the push, so leaving it selected would show a mode that
                     // no longer does anything. A fixed target survives — it just stops climbing and
@@ -388,7 +394,89 @@ namespace NGUAdvisor.Managers
                 }
             }
 
+            if (TryStartBonusClaim())
+                return;
+
             mode = CombatMode.Farm;
+        }
+
+        // First-reach bonus climb (ItopodPerkController.awardHighestLevelPP). Optimal mode is capped at
+        // highestItopodLevel − 1, so without this the bonus is never collected.
+        private static int bonusClaimTarget;
+        private static int bonusClaimReach;
+        private static int bonusClaimBlockedAtReach = -1;
+        private static DateTime bonusClaimNextCheck = DateTime.MinValue;
+        private static string bonusClaimLastLog;
+        private static readonly TimeSpan BonusClaimCheckEvery = TimeSpan.FromSeconds(60);
+
+        private static bool TryStartBonusClaim()
+        {
+            int highest = Adventure.highestItopodLevel;
+            if (bonusClaimTarget > 0)
+            {
+                LogBonusClaim(highest >= bonusClaimTarget
+                    ? $"claimed floor {bonusClaimTarget} — back to the optimal floor"
+                    : $"climb to {bonusClaimTarget} interrupted at floor {highest} (left the pod)");
+                bonusClaimTarget = 0;
+            }
+
+            if (Settings.ITOPODFloorMode != FloorModeOptimal || Settings.ITOPODAutoPush)
+                return false;
+            if (ZoneCadence.IsIdle(Settings.ITOPODCombatMode))
+            {
+                LogBonusClaim("skip: idle combat — the climb is priced on the manual rotation");
+                return false;
+            }
+            if (DateTime.UtcNow < bonusClaimNextCheck)
+                return false;
+            bonusClaimNextCheck = DateTime.UtcNow + BonusClaimCheckEvery;
+
+            ItopodConstants.Fighter fighter = PushFighter();
+            int reach = Math.Min(_ac.maxItopodLevel(),
+                Math.Max(ItopodConstants.BestWinnableFloor(fighter), SolvedMaxFloor()));
+            int next = ItopodRewards.NextBonusFloor(highest);
+            if (reach < next)
+            {
+                LogBonusClaim($"skip: next bonus floor {next} (+{ItopodRewards.FirstReachBonusPp(next)} PP) is above the won fights ({reach})");
+                return false;
+            }
+            if (reach <= bonusClaimBlockedAtReach)
+            {
+                LogBonusClaim($"skip: died on a climb; waiting for fights won above {bonusClaimBlockedAtReach}");
+                return false;
+            }
+
+            ItopodRewards.Difficulty diff = ItopodFarmAdvisor.CurrentDifficulty();
+            ItopodPerkController perks = _ac.itopod;
+            double ppBonus = perks.totalPPBonus(false);
+            double sadisticBase = diff == ItopodRewards.Difficulty.Sadistic ? perks.totalBasePPBonus() : 0.0;
+            double respawn = BaseRespawnTime();
+            double farmPps = ItopodFarmAdvisor.ForMode(Settings.ITOPODCombatMode).PpPerSecond;
+
+            ItopodRewards.BonusClaim claim = ItopodRewards.BestBonusClaim(highest, reach, farmPps,
+                floor => ItopodConstants.ExpectedKillSeconds(fighter, floor, respawn),
+                floor => ItopodRewards.PpPerKill(floor, diff, ppBonus, sadisticBase),
+                _ac.maxItopodLevel());
+            if (claim == null)
+            {
+                LogBonusClaim($"skip: climbing to {next} (+{ItopodRewards.FirstReachBonusPp(next)} PP) costs more farm PP than it pays");
+                return false;
+            }
+
+            bonusClaimTarget = claim.Target;
+            bonusClaimReach = reach;
+            SetFloor(highest - 1, claim.Target);
+            mode = CombatMode.Push;
+            LogBonusClaim($"climb {highest - 1}->{claim.Target}: +{claim.BonusPp:0} PP bonus +{claim.ClimbPp:0.#} PP kills "
+                + $"vs {claim.FarmPp:0.#} PP farmed in {claim.Seconds / 60.0:0.#} min ({claim.Kills} kills, fights won to {reach})");
+            return true;
+        }
+
+        private static void LogBonusClaim(string line)
+        {
+            if (line == bonusClaimLastLog) return;
+            bonusClaimLastLog = line;
+            Main.LogDebug($"[ItopodBonusDbg] {line}");
         }
 
         // Highest floor the strongest owned attack one-shots with every unlocked buff stacked, on the

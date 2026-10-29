@@ -113,6 +113,7 @@ namespace NGUAdvisor.Managers
             Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
             Section(sb, "QUESTS", () => Quests(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
+            Section(sb, "R3 / HACKS", () => Hacks(sb, c));
             Section(sb, "TITAN FIGHT INPUTS", () => TitanFightInputs(sb, c));
             return sb.ToString();
         }
@@ -192,8 +193,30 @@ namespace NGUAdvisor.Managers
                 if (f.Name.EndsWith("Multi") || f.Name.EndsWith("Cooldown") || f.Name.EndsWith("Time") || f.Name.EndsWith("Duration"))
                     sb.AppendLine($"  {f.Name} = {((float)f.GetValue(c.adventureController)).ToString(CultureInfo.InvariantCulture)}");
             }
-            foreach (Enemy e in c.adventureController.enemyList[19])
-                sb.AppendLine($"  enemy {e.name}: rate {e.attackRate} atk {e.attack:E3} def {e.defense:E3} regen {e.regen:E3} hp {e.maxHP:E3} ai {e.AI}");
+            // From the Beast (T6) up to the first titan not yet killed: the fights still being pushed.
+            for (int t = 5; t < ZoneHelpers.TitanZones.Length; t++)
+            {
+                foreach (Enemy e in c.adventureController.enemyList[ZoneHelpers.TitanZones[t]])
+                    sb.AppendLine($"  enemy {e.name}: rate {e.attackRate} atk {e.attack:E3} def {e.defense:E3} regen {e.regen:E3} hp {e.maxHP:E3} ai {e.AI}");
+                if (ZoneHelpers.TitanKills(t) < 1) break;
+            }
+        }
+
+        private static void Hacks(StringBuilder sb, Character c)
+        {
+            if (!c.res3.res3On || !c.hacks.hacksOn)
+            {
+                sb.AppendLine("  locked");
+                return;
+            }
+            sb.AppendLine($"  R3 cap {c.totalCapRes3()} · power {c.totalRes3Power():0.###} · bars {c.totalRes3Bar()} · idle {c.res3.idleRes3}");
+            HacksController hc = c.hacksController;
+            for (int id = 0; id < c.hacks.hacks.Count && id < hc.properties.Count; id++)
+            {
+                Hack h = c.hacks.hacks[id];
+                sb.AppendLine($"  [{id}] {hc.properties[id].hackName?.Trim(),-24} L{h.level,-8} R3 {h.res3,-10} target {h.target,-8}"
+                            + $" milestone every {hc.milestoneThreshold(id)} · bonus x{hc.hackBonus(id):0.####}");
+            }
         }
 
         private static void Resources(StringBuilder sb, Character c)
@@ -315,6 +338,10 @@ namespace NGUAdvisor.Managers
             var ic = c.inventoryController;
             sb.AppendLine($"  cube          Power {c.inventory.cubePower:0.##} / softcap {ic.cubePowerSoftcap():0.##}"
                         + $" · Toughness {c.inventory.cubeToughness:0.##} / softcap {ic.cubeToughnessSoftcap():0.##}");
+            BoostSinks.Sinks sinks = BoostSinks.Current();
+            sb.AppendLine($"  cube priced   softcap at kill set P {sinks.CubePowerSoftcap:0.##} / T {sinks.CubeToughnessSoftcap:0.##}"
+                        + $" · raw per boost point {sinks.CubeIntake:0.####} (gear {sinks.GearIntake:0.####})");
+            sb.AppendLine($"  cube tier     {BoostSinks.CubeTierText(sinks)}");
 
             foreach (ih item in c.inventory.GetConvertedEquips())
             {

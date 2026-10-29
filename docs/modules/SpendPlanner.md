@@ -67,6 +67,16 @@ while the guide still had buys queued (user-reported).
   needs achievement 145, Quirks needs `beastOn`, the six mayo fruits need `cardsOn`, and Numbers is
   never unlockable with seeds (`upgrade()` refuses it at tier 0; Troll Challenge #5 grants it).
 
+## Ch.5 "EM Pow/Cap/NGU until …" stages
+
+Guide ch.5 Perk Order puts two open-ended stages before Fib 34: "EM Pow/Cap/NGU until CBlock 3" and
+"EM Pow/Cap/NGU until easy normal NGU BB (level in ratio 2:2:1)". Both are generated ratio stages
+(`EmRatioStage`): Generic E/M Power II and Cap II climb two levels per Faster NGU E/M II level, from
+the L10 the earlier step leaves them at. A `Step.While` gate retires a stage: the first ends on
+`ChallengeDetector.CBlock3Complete()`, the second when both caps hold every unlocked Normal NGU at
+BB at once (`NGUBP.BbWithSpeed(1)` summed, read on the Normal track only). Without them the plan went
+straight from Fib 3 to banking ~12K PP for Fib 34 while 50-PP E/M II levels sat unbought.
+
 ## Buy execution mirrors the game's own click path (verified vs Assembly-CSharp)
 
 `BuyPerks/BuyQuirks` replicate `doLevelUp(id)`: deduct points → increment level → `doEffect(id)`

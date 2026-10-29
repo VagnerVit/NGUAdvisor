@@ -767,7 +767,7 @@ namespace NGUAdvisor
 
         public void LateUpdate() => SnipeZone();
 
-        public float NakedAdventurePower() => InventoryController.adventureAttackBonus();
+        public float NakedAdventurePower() => Character.adventure.attack;
 
         public float CubePower() => InventoryController.cubePower();
 

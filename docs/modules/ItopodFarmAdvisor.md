@@ -24,6 +24,7 @@ halves were wrong:
 | AP | 1 AP every `max(40−T, 20)` kills | **saturates at T=20 = floor 950** |
 | EXP | every `max(40−T, 20)` kills, award `T<3 ? T : (T−1)(T−2)+2` | **quadratic in T, never saturates** |
 | PP | EVERY kill: `(200 \| 700 \| 2000 + floor) × totalPPBonus()`, threshold `1e6` per point | linear in the floor |
+| PP, first reach | ONCE per lifetime per floor `B % 10 == 0`: `ceil((B/10)/10)`, ×10 when `B % 100 == 0` (`awardHighestLevelPP`; 630 → 7, 700 → 70) | not a rate — priced as a climb in `ITOPODManager.md` |
 | Macguffin | every `killsPerMacguffin()` (5000 × perks 69/70/71 × Purple Heart) | flat — not modelled |
 
 Three consequences the old model could not see:

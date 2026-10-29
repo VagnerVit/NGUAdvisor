@@ -54,5 +54,43 @@ namespace NGUAdvisor.Managers
             }
             return best;
         }
+
+        public struct Completions
+        {
+            public int Evil;     // the controller's evilCompletions()
+            public int Normal;   // the controller's completions()
+            public int Max;      // the controller's maxCompletions
+        }
+
+        // Guide ch.5 "CBlock 3" challenge list, Evil counts; Full = "All 100 Level, No Aug, and Basic".
+        private const int Full = -1;
+        private static readonly KeyValuePair<string, int>[] CBlock3Evil =
+        {
+            new KeyValuePair<string, int>("100LC", Full),
+            new KeyValuePair<string, int>("NOAUG", Full),
+            new KeyValuePair<string, int>("BASIC", Full),
+            new KeyValuePair<string, int>("TC", 1),
+            new KeyValuePair<string, int>("NONGU", 1),
+            new KeyValuePair<string, int>("NOTM", 1),
+            new KeyValuePair<string, int>("NORB", 6),
+            new KeyValuePair<string, int>("BLIND", 1),
+        };
+
+        // CBlock 3 = the Evil list above AND "Finish all Normal challenges": every challenge in `all` at its
+        // maximum on Normal. A listed challenge missing from `all`, or an unread max (0), is not complete.
+        public static bool CBlock3Complete(IDictionary<string, Completions> all)
+        {
+            if (all == null || all.Count == 0) return false;
+            foreach (KeyValuePair<string, int> need in CBlock3Evil)
+            {
+                Completions c;
+                if (!all.TryGetValue(need.Key, out c) || c.Max <= 0) return false;
+                int target = need.Value == Full ? c.Max : System.Math.Min(need.Value, c.Max);
+                if (c.Evil < target) return false;
+            }
+            foreach (Completions c in all.Values)
+                if (c.Max <= 0 || c.Normal < c.Max) return false;
+            return true;
+        }
     }
 }

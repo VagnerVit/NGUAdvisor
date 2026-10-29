@@ -75,5 +75,80 @@ namespace NGUAdvisor.Tests
                 Assert.True(g.Needed > 0);
             }
         }
+
+        private static readonly string[] AllCodes = { "BASIC", "NOAUG", "24HR", "100LC", "NOEC", "TC", "NORB", "LSC", "BLIND", "NONGU", "NOTM" };
+
+        // Every challenge maxed on Normal, the guide's CBlock 3 Evil list met exactly.
+        private static Dictionary<string, ChallengeGates.Completions> CBlock3Done()
+        {
+            Dictionary<string, ChallengeGates.Completions> all = new Dictionary<string, ChallengeGates.Completions>();
+            foreach (string code in AllCodes)
+                all[code] = new ChallengeGates.Completions { Evil = 0, Normal = 10, Max = 10 };
+            foreach (string code in new[] { "BASIC", "NOAUG", "100LC" }) Set(all, code, 10);
+            Set(all, "TC", 1);
+            Set(all, "NONGU", 1);
+            Set(all, "NOTM", 1);
+            Set(all, "NORB", 6);
+            Set(all, "BLIND", 1);
+            return all;
+        }
+
+        private static void Set(Dictionary<string, ChallengeGates.Completions> all, string code, int evil)
+        {
+            ChallengeGates.Completions c = all[code];
+            c.Evil = evil;
+            all[code] = c;
+        }
+
+        [Fact]
+        public void CBlock3_CompleteWhenTheGuideListIsMet()
+        {
+            Assert.True(ChallengeGates.CBlock3Complete(CBlock3Done()));
+        }
+
+        [Theory]
+        [InlineData("BASIC", 9)]
+        [InlineData("100LC", 9)]
+        [InlineData("NOAUG", 9)]
+        [InlineData("TC", 0)]
+        [InlineData("NORB", 5)]
+        [InlineData("BLIND", 0)]
+        [InlineData("NONGU", 0)]
+        [InlineData("NOTM", 0)]
+        public void CBlock3_IncompleteWhenAnEvilRowIsShort(string code, int evil)
+        {
+            Dictionary<string, ChallengeGates.Completions> all = CBlock3Done();
+            Set(all, code, evil);
+            Assert.False(ChallengeGates.CBlock3Complete(all));
+        }
+
+        [Fact]
+        public void CBlock3_IncompleteWhileANormalChallengeIsUnfinished()
+        {
+            Dictionary<string, ChallengeGates.Completions> all = CBlock3Done();
+            all["LSC"] = new ChallengeGates.Completions { Evil = 0, Normal = 9, Max = 10 };
+            Assert.False(ChallengeGates.CBlock3Complete(all));
+        }
+
+        [Fact]
+        public void CBlock3_UnreadMaxOrMissingRowIsIncomplete()
+        {
+            Dictionary<string, ChallengeGates.Completions> unread = CBlock3Done();
+            unread["24HR"] = new ChallengeGates.Completions { Evil = 0, Normal = 0, Max = 0 };
+            Assert.False(ChallengeGates.CBlock3Complete(unread));
+
+            Dictionary<string, ChallengeGates.Completions> missing = CBlock3Done();
+            missing.Remove("NORB");
+            Assert.False(ChallengeGates.CBlock3Complete(missing));
+            Assert.False(ChallengeGates.CBlock3Complete(null));
+        }
+
+        [Fact]
+        public void CBlock3_FixedCountIsClampedToTheChallengeMax()
+        {
+            Dictionary<string, ChallengeGates.Completions> all = CBlock3Done();
+            all["NORB"] = new ChallengeGates.Completions { Evil = 4, Normal = 4, Max = 4 };
+            Assert.True(ChallengeGates.CBlock3Complete(all));
+        }
     }
 }

@@ -107,18 +107,17 @@ namespace NGUAdvisor.Managers
         }
 
         // Farm Best Boost demand gate: boosts only pay while something consumes them — equipped or
-        // priority-listed gear still missing boosts, or an Infinity Cube under its softcap. The
-        // game CLAMPS effective cube power/toughness at base + gear attack/defense (decompile:
-        // InventoryController.cubePower()/cubeToughness()), so feeding a capped cube adds nothing
-        // until other stats grow — ITOPOD PP/EXP beats boost farming then.
+        // priority-listed gear still missing boosts, or an Infinity Cube under its softcap at the kill
+        // loadout (BoostSinks.CubeSoftcaps). Past it the cube adds only sqrt(raw − softcap), so the
+        // gate calls it done — ITOPOD PP/EXP beats boost farming then.
         public static bool BoostDemandExists(out string why)
         {
             try
             {
                 var c = Main.Character;
-                var ic = Main.InventoryController;
-                if (c.inventory.cubePower < ic.cubePowerSoftcap()) { why = "cube power under softcap"; return true; }
-                if (c.inventory.cubeToughness < ic.cubeToughnessSoftcap()) { why = "cube toughness under softcap"; return true; }
+                BoostSinks.CubeSoftcaps(out double powerSoftcap, out double toughnessSoftcap);
+                if (c.inventory.cubePower < powerSoftcap) { why = "cube power under softcap"; return true; }
+                if (c.inventory.cubeToughness < toughnessSoftcap) { why = "cube toughness under softcap"; return true; }
 
                 // Blacklisted ids are not demand: they never receive a boost, so "it needs boosts" is
                 // not a reason to keep farming them. Checked here rather than in the two loops below

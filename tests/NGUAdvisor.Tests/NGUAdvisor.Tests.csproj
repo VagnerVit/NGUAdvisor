@@ -42,6 +42,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\PpEta.cs" Link="Linked\PpEta.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\AtMath.cs" Link="Linked\AtMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\HackPlan.cs" Link="Linked\HackPlan.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestZoneItems.cs" Link="Linked\QuestZoneItems.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ChallengeGates.cs" Link="Linked\ChallengeGates.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\QuestStandDown.cs" Link="Linked\QuestStandDown.cs" />
@@ -50,6 +51,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\NguBbSplit.cs" Link="Linked\NguBbSplit.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguBbCoverage.cs" Link="Linked\NguBbCoverage.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguGain.cs" Link="Linked\NguGain.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\NguLaneRank.cs" Link="Linked\NguLaneRank.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\RunShape.cs" Link="Linked\RunShape.cs" />
   </ItemGroup>
 

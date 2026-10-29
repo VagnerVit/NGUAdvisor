@@ -86,6 +86,8 @@ Naming: a doc matches its `.cs` file name. Exceptions (grouped docs):
 | `ItopodFarmAdvisor.md` | ItopodFarmAdvisor + ItopodRewards (**the pod's four currencies and where each one saturates — read before pricing ITOPOD against anything**) |
 | `ITOPODManager.md` | ITOPODManager + ItopodConstants (**the one-shot floor solve; the defense term is NOT divided by the multiplier**) |
 | `ExpBalancer.md` | ExpBalancer + ExpRatioTables (guide EXP-ratio phase table) |
+| `NGUAdvisors.md` | NGUAdvisors + NguLaneRank (lane order by value per BB unit) |
+| `ChallengeOverlay.md` | also HackPlan (the auto profile's R3 hack order) |
 | `GoldDropAdvisor.md` | GoldDropAdvisor + GoldDropTables (gold-kill payoff vs. the TM's banked drop) |
 | `ApPurchaseAdvisor.md` | ApPurchaseAdvisor + ApTierTable + ApPanel (**AP = "Arbitrary Points"; ownership is the game's own `shouldDisableBuyButton`, the ordering is one player's opinion — advise-only, never buys**) |
 | `SpendOverview.md` | SpendOverview + SpendPanel (**the cross-currency "next buy" rail — it owns NO ordering; every row is fetched from the module that decides, and the owner column is the point**) |

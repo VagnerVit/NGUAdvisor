@@ -51,6 +51,9 @@ have the numbers in hand. `Character == null` is the one early return.
 - **NGU levels follow the track being leveled** (evil/sadistic/normal columns are separate fields),
   and each lane prints its **allocation** — a zero there is *why* a lane is not moving, the same
   fact `NGUAdvisors.Diagnose` reports.
+- **Cube** prints the game's live softcap (worn gear) AND the one boosts are priced at (kill set,
+  `BoostSinks.CubeSoftcaps`), the raw stat one boost point buys, and the tier distance
+  (`BoostSinks.CubeTierText`).
 - **Boss** prints `ZoneHelpers.CurrentHighestBoss` AND the raw `stats.highestBoss` beside it: they
   diverge on Evil and a state dump should show both (the repo's standing rule is that progression
   reads use the former).
@@ -75,6 +78,11 @@ all four were wrong.
 - **Drop-chance saturation line** follows the routed zone (`Main.ResolveIntentZone`), not
   `SnipeZone`. For the pod it prints that boost rolls are a flat 14 % and drop chance does not apply
   (`ItopodRewards.BoostDropChance`, ItopodFarmAdvisor.md).
+
+- **R3 / HACKS**: R3 cap/power/bars/idle and, per hack, the scene name (`HacksController.properties`),
+  level, allocated R3, target, the game's `milestoneThreshold(id)` and current `hackBonus(id)`.
+- **TITAN FIGHT INPUTS** prints the enemy entries from the Beast (T6) up to and including the first
+  titan with no kill — the fights still being pushed, not a fixed zone.
 
 ## Fields that exist because they were once invisible
 

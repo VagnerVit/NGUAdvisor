@@ -38,6 +38,11 @@ See gear-optimizer-comparison.md §Objective-set divergences for the full table.
   reads it (user-caught 2026-10-19: Ring of Greed, Van-Gogh and the Smiley Face held harvest slots).
   `GearOptimizer.FindObjective` drops EXP once the Red Heart (119) is maxxed and AP once the Yellow
   Heart (129) is, because `addExp`/`addAP` then apply a flat x1.1/x1.2 and ignore gear.
+- **NGUs** keeps the site's `EC^½·EP^½·MC^½·MP^½·Speed`. Game: lane progress ∝ `totalEnergyPower ×
+  allocated × totalNGUSpeedBonus` (`NGUController` energy/magic progress), so the product is the
+  log-weighted sum with energy and magic lanes at ½ each. Re-weighting by resource share is not
+  "exact": E and M progress feed different NGUs, and the right weight is their marginal value, which
+  the scorer is never told. Not a divergence to make until something supplies per-NGU value.
 - **Adventure** (`Power^1 × Toughness^0.5`) is a native extension with no site counterpart. The 0.5 is deliberate: damage is
   `(attack − enemyDefense/2) × multiplier`, so kill rate is linear in Power and Toughness adds
   nothing to it — Toughness only clears a survival threshold. The game's own bars agree (autokill

@@ -20,7 +20,8 @@ namespace NGUAdvisor.Managers
     // Selection: iterative equal-share prune. Split the pool over the kept set, drop NGUs whose
     // ratio at their ACTUAL share is under 1.05x/hr (1.04 for a lane already in the plan),
     // re-split (survivors' shares grow), repeat.
-    // The survivors are the lanes worth running; nothing hot -> deepen the top two by rating.
+    // The survivors are the lanes worth running; nothing hot -> deepen the two best by value per
+    // BB unit (NguLaneRank). Targets and surplus are ordered the same way, cheap lanes first.
     // Chapter 4 selects by the guide's own per-NGU priority instead (NguGuidePriority).
     public static class NGUAdvisors
     {
@@ -33,6 +34,8 @@ namespace NGUAdvisor.Managers
             public double Ratio;      // x/hr at the equal share it actually gets when running
             public double Lph;        // levels gained in an hour at that share (GrowthPanel's predicted rate)
             public double LphPerUnit; // levels/hr per allocated unit at the current level, uncapped
+            public double BbCost;     // allocation that levels it once per tick (NGUBP's BB)
+            public double RatioAtBb;  // x/hr while held at that BB
         }
 
         public class Plan
@@ -47,6 +50,9 @@ namespace NGUAdvisor.Managers
             // drink more than its cap amount; leftovers belong in additional lanes, not deeper).
             public int[] EnergySurplus = new int[0];
             public int[] MagicSurplus = new int[0];
+            // Targets and surplus together, in the order a short pool should fund them.
+            public int[] EnergyLaneOrder = new int[0];
+            public int[] MagicLaneOrder = new int[0];
             public string Summary = "";
         }
 
@@ -79,8 +85,8 @@ namespace NGUAdvisor.Managers
 
         // A lane joins the hot set at HotEnterRatio but leaves only below HotExitRatio — it must lose a
         // fifth of its growth, not a rounding error, so a wobbling pool does not flip it between calls.
-        private const double HotEnterRatio = 1.05;
-        internal const double HotExitRatio = 1.04;
+        private const double HotEnterRatio = NguLaneRank.HotEnterRatio;
+        internal const double HotExitRatio = NguLaneRank.HotExitRatio;
 
         private static double Mul(Func<double> f)
         {
@@ -242,6 +248,8 @@ namespace NGUAdvisor.Managers
                     p.MagicTargets = GuidePick(c, p.Magic, true, mPool, prev?.MagicTargets);
                     p.EnergySurplus = GuideSurplus(p.Energy, false, p.EnergyTargets);
                     p.MagicSurplus = GuideSurplus(p.Magic, true, p.MagicTargets);
+                    p.EnergyLaneOrder = p.EnergyTargets.Concat(p.EnergySurplus).ToArray();
+                    p.MagicLaneOrder = p.MagicTargets.Concat(p.MagicSurplus).ToArray();
                 }
                 else
                 {
@@ -249,6 +257,8 @@ namespace NGUAdvisor.Managers
                     p.MagicTargets = Pick(c, p.Magic, true, mPool, prev?.MagicTargets);
                     p.EnergySurplus = Surplus(p.Energy, p.EnergyTargets);
                     p.MagicSurplus = Surplus(p.Magic, p.MagicTargets);
+                    p.EnergyLaneOrder = ByValuePerUnit(p.Energy.Where(x => p.EnergyTargets.Contains(x.Id) || p.EnergySurplus.Contains(x.Id)));
+                    p.MagicLaneOrder = ByValuePerUnit(p.Magic.Where(x => p.MagicTargets.Contains(x.Id) || p.MagicSurplus.Contains(x.Id)));
                 }
 
                 string Fmt(List<Entry> l) => l.Count == 0 ? "-"
@@ -295,6 +305,7 @@ namespace NGUAdvisor.Managers
                     // progressPerTick = power / divider x allocated x mult / (level+1); 50 ticks/s.
                     double lphPerUnit = power / divider * mult / (level + 1) * 50.0 * 3600.0;
                     double rating = ValueRatio(c, magic, id, level, NguGain.LevelsInHour(level, lphPerUnit * pool));
+                    double bb = NguLaneRank.BbCost(divider, level, power, mult);
                     into.Add(new Entry
                     {
                         Id = id,
@@ -302,7 +313,9 @@ namespace NGUAdvisor.Managers
                         Level = level,
                         Rating = rating,
                         Ratio = rating,   // refined to the actual share in Pick()
-                        LphPerUnit = lphPerUnit
+                        LphPerUnit = lphPerUnit,
+                        BbCost = bb,
+                        RatioAtBb = ValueRatio(c, magic, id, level, NguGain.LevelsInHour(level, lphPerUnit * bb))
                     });
                 }
                 catch { }
@@ -313,14 +326,17 @@ namespace NGUAdvisor.Managers
         // Rating exactly 1.0 = a capped curve (Respawn at its floor): genuinely worthless even
         // for otherwise-idle energy. Everything else with positive value beats idling.
         private static int[] Surplus(List<Entry> list, int[] targets) =>
-            list.Where(x => !targets.Contains(x.Id) && x.Rating > 1.0001)
-                .OrderByDescending(x => x.Rating).Select(x => x.Id).ToArray();
+            ByValuePerUnit(list.Where(x => !targets.Contains(x.Id) && x.Rating > 1.0001));
+
+        private static NguLaneRank.Lane AsLane(Entry e) => new NguLaneRank.Lane { Id = e.Id, RatioAtBb = e.RatioAtBb, BbCost = e.BbCost };
+
+        private static int[] ByValuePerUnit(IEnumerable<Entry> entries) => NguLaneRank.Order(entries.Select(AsLane));
 
         // Equal-share prune to a stable hot set: each pass splits the pool over the keepers and
         // drops anyone under its threshold AT THAT SHARE — survivors' shares grow, so the loop is
         // monotone and terminates. Prune-only by design (re-admitting on the larger share would
-        // oscillate). Nothing hot: deepen the top two by rating. `incumbents` = the previous plan's
-        // lanes, which get the lower exit threshold.
+        // oscillate). Nothing hot: deepen the two best by value per BB unit. `incumbents` = the
+        // previous plan's lanes, which get the lower exit threshold and the IncumbentEdge.
         private static int[] Pick(Character c, List<Entry> list, bool magic, double pool, int[] incumbents)
         {
             double Threshold(Entry e) => incumbents != null && incumbents.Contains(e.Id) ? HotExitRatio : HotEnterRatio;
@@ -338,7 +354,8 @@ namespace NGUAdvisor.Managers
                 if (hot.Count == keep.Count) break;
                 if (hot.Count == 0)
                 {
-                    keep = keep.OrderByDescending(x => x.Rating).Take(2).ToList();
+                    int[] deepen = NguLaneRank.Top(keep.Select(AsLane).ToList(), 2, incumbents);
+                    keep = keep.Where(x => deepen.Contains(x.Id)).ToList();
                     double s2 = pool / keep.Count;
                     foreach (var e in keep)
                     {
@@ -349,7 +366,7 @@ namespace NGUAdvisor.Managers
                 }
                 keep = hot;
             }
-            return keep.OrderByDescending(x => x.Rating).Select(x => x.Id).ToArray();
+            return ByValuePerUnit(keep);
         }
 
         private static int[] GuidePick(Character c, List<Entry> list, bool magic, double pool, int[] incumbents)

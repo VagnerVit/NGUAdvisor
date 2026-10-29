@@ -46,6 +46,11 @@ BeastMode → Parry. Offensive mode (3): paralyze-AI enemies paralyzed, Parry on
   charge multiplies parry/block mitigation (`chargeMulti`).
 - `IncomingDamage(block, parry, charge)` mirrors the game: titan growCount scaling, beast ×3,
   block bonus, parry ÷2, poison DoT window, charger special ×4, exploder ×1000, grower scaling.
+  Titan growth uses the count the game will have AFTER its bump (`growCount + 1`; Jake/Tippi and the
+  Godmother's explosions scale before bumping). It also prices the whole tick of the scripted titans
+  (decomp `EnemyAI.nerdAI/godmotherAI`): the Nerd's Power Glove on 4 is 5× **plus** the tick's random
+  hit (no `return`), his 3 and 7 are 1× + random; the Godmother's explosions are 25× each, and the
+  arming tick on 4 is priced as an explosion because the burst follows faster than a block can rise.
 - **OhShit replaces Paralyze** when ready and HP < 60 %.
 
 ## Beast mode contract

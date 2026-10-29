@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using NGUAdvisor.AllocationProfiles.BreakpointTypes;
+using SimpleJSON;
 
 namespace NGUAdvisor.Managers
 {
@@ -43,8 +45,12 @@ namespace NGUAdvisor.Managers
             // Quirks only: false = an unaffordable step is passed over instead of banking for it
             // (null = always bank). Steps are otherwise strictly sequential.
             public Func<bool> WaitWhenShort;
-            public Step(string m, long t, int ch) { Match = m; Target = t; MinChapter = ch; MinCap = 0; UntilChapter = 0; Nth = 0; WaitWhenShort = null; }
-            public Step(string m, long t, int ch, int cap) { Match = m; Target = t; MinChapter = ch; MinCap = cap; UntilChapter = 0; Nth = 0; WaitWhenShort = null; }
+            // The guide's "X until <milestone>" steps: skipped once this returns false (null = always on).
+            public Func<bool> While;
+            public Step(string m, long t, int ch) { Match = m; Target = t; MinChapter = ch; MinCap = 0; UntilChapter = 0; Nth = 0; WaitWhenShort = null; While = null; }
+            public Step(string m, long t, int ch, int cap) { Match = m; Target = t; MinChapter = ch; MinCap = cap; UntilChapter = 0; Nth = 0; WaitWhenShort = null; While = null; }
+
+            public bool Active() => While == null || While();
 
             public bool InWindow(int chapter) =>
                 chapter >= MinChapter && (UntilChapter == 0 || chapter <= UntilChapter);
@@ -55,7 +61,53 @@ namespace NGUAdvisor.Managers
         }
 
         // ---- ITOPOD perk order (guide ch2-8) ----
-        private static readonly Step[] PerkPlan =
+        // Built on first use: the stage tables below are static fields initialised after this line.
+        private static Step[] _perkPlan;
+        private static Step[] PerkPlan => _perkPlan ?? (_perkPlan = BuildPerkPlan());
+
+        private static readonly string[] EmPowCapNgu =
+        {
+            "Generic Energy Power Perk II", "Generic Energy Cap Perk II",
+            "Generic Magic Power Perk II", "Generic Magic Cap Perk II",
+            "Faster NGU Energy II", "Faster NGU Magic II",
+        };
+
+        private const long EmStageStartLevel = 10;   // where the guide's "EM Pow/Cap/NGU 2 - Lvl 10" leaves them
+        private const long EmMaxLevel = 100;
+
+        // Guide ch.5 "EM Pow/Cap/NGU ... (level in ratio 2:2:1)": Power and Cap climb two levels for every
+        // NGU-speed level, interleaved so the buys stay in that ratio while the stage lasts.
+        private static IEnumerable<Step> EmRatioStage(Func<bool> stageGate)
+        {
+            // One stage is ~270 steps sharing one gate; read it once a second, not once per step.
+            DateTime readAt = DateTime.MinValue;
+            bool open = false;
+            Func<bool> stageWhile = () =>
+            {
+                if (DateTime.UtcNow - readAt >= TimeSpan.FromSeconds(1)) { open = stageGate(); readAt = DateTime.UtcNow; }
+                return open;
+            };
+            for (long n = 1; EmStageStartLevel + 2 * n <= EmMaxLevel; n++)
+            {
+                foreach (string name in EmPowCapNgu)
+                {
+                    bool nguSpeed = name.StartsWith("Faster NGU", StringComparison.Ordinal);
+                    yield return new Step(name, EmStageStartLevel + (nguSpeed ? n : 2 * n), 5) { While = stageWhile };
+                }
+            }
+        }
+
+        private static Step[] BuildPerkPlan()
+        {
+            List<Step> plan = new List<Step>(PerkPlanHead);
+            plan.AddRange(EmRatioStage(() => !ChallengeDetector.CBlock3Complete()));   // "EM Pow/Cap/NGU until CBlock 3"
+            plan.AddRange(PerkPlanBanks5);
+            plan.AddRange(EmRatioStage(() => !NormalNguBbEasy()));   // "... until easy normal NGU BB (level in ratio 2:2:1)"
+            plan.AddRange(PerkPlanTail);
+            return plan.ToArray();
+        }
+
+        private static readonly Step[] PerkPlanHead =
         {
             new Step("The Newbie Energy Perk", 0, 2),
             new Step("The Newbie Magic Perk", 0, 2),
@@ -111,8 +163,16 @@ namespace NGUAdvisor.Managers
             new Step("Faster NGU Energy II", 10, 5),
             new Step("Faster NGU Magic II", 10, 5),
             new Step("The Fibonacci Perk", 3, 5),             // "Fib 3"
+        };
+
+        private static readonly Step[] PerkPlanBanks5 =
+        {
             new Step("Adv. Training Level Bank V", 0, 5),     // "Beard / AT Banks 5"
             new Step("Beard Temp Level Bank V", 0, 5),
+        };
+
+        private static readonly Step[] PerkPlanTail =
+        {
             new Step("The Fibonacci Perk", 34, 5),            // "Fib 34"
             new Step("Generic Energy Power Perk II", 0, 5),   // "Finish EM Pow/Cap/NGU"
             new Step("Generic Energy Cap Perk II", 0, 5),
@@ -309,6 +369,36 @@ namespace NGUAdvisor.Managers
         // 0 = stage unknown: every chapter-gated step then skips, so NextPerk/NextQuirk go un-Known
         // and NOTHING is bought — the planned-buy fallback still names what's next. (The old
         // "unknown = chapter 1" default made a transient detection failure read as "plan complete".)
+        private static readonly TimeSpan BbCheckInterval = TimeSpan.FromSeconds(10);
+        private static DateTime _bbCheckedAt = DateTime.MinValue;
+        private static bool _normalNguBbEasy;
+
+        // "Easy normal NGU BB": both caps hold every unlocked Normal NGU at one level per tick at once
+        // (NGUBP's BB, the game's NGUController.updateNGU stack). BB is read off the Normal track only —
+        // during the Evil-NGU tail the last Normal verdict stands.
+        private static bool NormalNguBbEasy()
+        {
+            Character c = Main.Character;
+            if (c == null || c.settings.nguLevelTrack != difficulty.normal) return _normalNguBbEasy;
+            if (DateTime.UtcNow - _bbCheckedAt < BbCheckInterval) return _normalNguBbEasy;
+            _bbCheckedAt = DateTime.UtcNow;
+            _normalNguBbEasy = AllLanesBb(ResourceType.Energy, c.totalCapEnergy())
+                && AllLanesBb(ResourceType.Magic, c.totalCapMagic());
+            return _normalNguBbEasy;
+        }
+
+        private static bool AllLanesBb(ResourceType type, double cap)
+        {
+            JSONArray all = new JSONArray();
+            all.Add("ALLNGU");
+            double need = 0;
+            foreach (ResourceBreakpoint bp in ResourceBreakpoint.ParseBreakpointArray(all, type))
+            {
+                if (bp is NGUBP lane && lane.IsValid()) need += lane.BbWithSpeed(1);
+            }
+            return need <= cap;
+        }
+
         private static int Chapter()
         {
             try { var p = ProgressionAnalyzer.Detect(); return p.Known ? p.Chapter : 0; }
@@ -415,7 +505,7 @@ namespace NGUAdvisor.Managers
 
                 foreach (var step in PerkPlan)
                 {
-                    if (!step.InWindow(chapter)) continue;
+                    if (!step.InWindow(chapter) || !step.Active()) continue;
                     int id = FindByName(ipc.perkName, step, "perk");
                     if (id < 0 || id >= levels.Count || id >= ipc.maxLevel.Count) continue;
                     if (ipc.perkDifficultyReq[id] > diff) continue;
@@ -453,7 +543,7 @@ namespace NGUAdvisor.Managers
 
                 foreach (var step in PerkPlan)
                 {
-                    if (step.WindowPassed(chapter)) continue;
+                    if (step.WindowPassed(chapter) || !step.Active()) continue;
                     int id = FindByName(ipc.perkName, step, "perk");
                     if (id < 0 || id >= levels.Count || id >= ipc.maxLevel.Count) continue;
                     long max = ipc.maxLevel[id] > 0 ? ipc.maxLevel[id] : long.MaxValue;

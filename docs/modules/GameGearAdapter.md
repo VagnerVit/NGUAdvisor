@@ -54,8 +54,10 @@ diagnostic's level-debt column only. Nothing that decides gear may call it.
   Drop/Gold/Hack/Wish from tier formulas ported verbatim from the reference's
   `cubeBaseItemData` (`util.js` ~line 256). If the game changes cube tiers, update BOTH the
   formula here and the comparison doc.
-- **`BuildBaseItem`** — nude adventure Power/Toughness from
-  `adventureAttackBonus()/adventureDefenseBonus()` (the site makes users type these in).
+- **`BuildBaseItem`** — nude adventure Power/Toughness from `adventure.attack/defense` (the site
+  makes users type these in). NOT `adventureAttackBonus()`: decomp `InventoryController` returns
+  `attackBonus()`, the WORN gear's sum, so that getter put the worn set into every candidate's score
+  and skewed the `ProjectedBestGear` ratios (titan push, AT planner, TitansPanel).
 
 The reference models these as items id 1000/1001 in an `other` slot; native passes them as extra
 list entries with `IsWeapon = false`.

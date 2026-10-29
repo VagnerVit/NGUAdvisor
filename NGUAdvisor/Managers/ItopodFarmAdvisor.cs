@@ -35,7 +35,7 @@ namespace NGUAdvisor.Managers
             public double ExpPerSecond;     // raw EXP award, before addExp's own bonuses
         }
 
-        private static ItopodRewards.Difficulty CurrentDifficulty()
+        internal static ItopodRewards.Difficulty CurrentDifficulty()
         {
             switch (Main.Character.settings.rebirthDifficulty)
             {

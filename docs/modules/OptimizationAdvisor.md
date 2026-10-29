@@ -25,6 +25,9 @@ can act on the row. Read-only itself; `Analyze()` cached 2 s; every rec individu
   at once and which over-projects both (2026-10-12). Cached 120 s **and keyed on the worn set**: callers
   multiply by live P/T, so a ratio measured in Ygg/gold/quest gear and applied after the restore is off
   by the whole swap (the GoldGearFactor bug). `ProjectedBestStats()` applies them to live P/T.
+- `ProjectedKillGear()` — the kill set's own gear attack/defense (`ScoreOf × 100` minus the live cube
+  and base items), from the same optimize run. Worn-set independent, so only the TTL refreshes it.
+  Consumer: `BoostSinks.CubeSoftcaps` (the cube softcap the kill set fights at).
 - `PushObjective()` — the version the kill machinery fights: highest version past
   `NextObjective()` whose staged requirement (staged on projected stats, regen gate included) the
   best P/T set clears. Only ApplyTitans and the Titans hero card read it; everything tracking AK

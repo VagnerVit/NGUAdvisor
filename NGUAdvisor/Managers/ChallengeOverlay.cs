@@ -647,7 +647,7 @@ namespace NGUAdvisor.Managers
         }
 
         // The NGUs to actually run: NGUAdvisors's value-ranked pick from the chapter candidates
-        // (>=1.05x/hr keeps a lane open; nothing hot = deepen the top two), chapter list fallback.
+        // (>=1.05x/hr keeps a lane open; nothing hot = deepen the best two per BB unit), chapter list fallback.
         private static string[] ChapterNgus(ResourceType type)
         {
             var ids = ChapterNguIds(type);
@@ -679,9 +679,27 @@ namespace NGUAdvisor.Managers
             return new string[0];
         }
 
+        // Hot (NGU-*) and surplus (CAPNGU-*) lanes interleaved in the plan's value-per-BB order. A CAP
+        // lane walked ahead of a hot one keeps its BB (NguBbSplit re-splits only the non-cap lanes), so a
+        // short pool funds the cheap lanes before a 10 000x dearer hot one; a full pool BBs every lane.
+        private static string[] ChapterNguLanes(ResourceType type, string[] ngus)
+        {
+            try
+            {
+                NGUAdvisors.Plan plan = NGUAdvisors.Compute(ChapterNguIds(ResourceType.Energy), ChapterNguIds(ResourceType.Magic));
+                bool magic = type == ResourceType.Magic;
+                int[] hot = magic ? plan.MagicTargets : plan.EnergyTargets;
+                int[] order = magic ? plan.MagicLaneOrder : plan.EnergyLaneOrder;
+                if (plan.Known && hot.Length > 0 && order != null && order.Length > 0)
+                    return order.Select(i => hot.Contains(i) ? $"NGU-{i}" : $"CAPNGU-{i}").ToArray();
+            }
+            catch { }
+            return ngus.Concat(ChapterNgusSurplus(type)).ToArray();
+        }
+
         public static string[] AutoTokens(ResourceType type)
         {
-            if (type == ResourceType.R3) return new[] { "ALLHACK" };
+            if (type == ResourceType.R3) return HackTokens();
             if (type != ResourceType.Energy && type != ResourceType.Magic) return new string[0];
 
             bool e = type == ResourceType.Energy;
@@ -711,8 +729,8 @@ namespace NGUAdvisor.Managers
                     // equal-share divisor and halve both, so every NGU here only drinks the leftover.
                     if (e) { list.Add("CAPALLBT"); list.Add("BESTAUG"); }
                     else list.Add("BR-30");
-                    foreach (var t in ngus.Select(n => "CAP" + n)) if (!list.Contains(t)) list.Add(t);
-                    foreach (var t in ChapterNgusSurplus(type)) if (!list.Contains(t)) list.Add(t);
+                    foreach (string t in ChapterNguLanes(type, ngus).Select(n => n.StartsWith("CAP") ? n : "CAP" + n))
+                        if (!list.Contains(t)) list.Add(t);
                     break;
                 case "TM HOUR":
                     // The guide's hour-0 shape (24hr profiles): cap the cheap BTs, fund TM, wandoos,
@@ -727,8 +745,7 @@ namespace NGUAdvisor.Managers
                         // Magic has no BESTAUG to drink the rest: TM, Wandoos and rituals all stop at
                         // their 1-per-tick caps (measured 2026-10-08: 26.5B of 28B magic idle all hour).
                         // Energy must NOT get these — a non-cap NGU token would split BESTAUG's share.
-                        foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
-                        foreach (var t in ChapterNgusSurplus(type)) if (!list.Contains(t)) list.Add(t);
+                        foreach (string t in ChapterNguLanes(type, ngus)) if (!list.Contains(t)) list.Add(t);
                     }
                     break;
                 case "RECOVERY":
@@ -757,15 +774,12 @@ namespace NGUAdvisor.Managers
                     // Guide ch.5: "When you reach Boss 115/120, BB AT P/T for the entire rebirth to prep
                     // for T7" — AT ahead of the NGUs until T7 falls.
                     if (e && evilDay && PrepsT7()) list.Add("CAPALLAT");
-                    foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
-                    // SURPLUS ABSORBERS (user 2026-07-11: 4.7B of a 5.4B pool sat idle once the
-                    // hot lanes took their caps — the game hard-caps each NGU at ONE level per
-                    // tick, decomp NGUController.updateNGU resets progress to 0 on level-up, so
-                    // hot lanes physically cannot drink more). Every absorber is CAP-type: out of
-                    // the equal-share divisor, fed strictly from what the hot lanes leave behind.
-                    // Value order: warm NGU lanes (any growth beats idle), AT (costs only energy),
-                    // then the aug pair last (aug levels also drain gold).
-                    foreach (var t in ChapterNgusSurplus(type)) if (!list.Contains(t)) list.Add(t);
+                    // SURPLUS ABSORBERS (user 2026-07-11: 4.7B of a 5.4B pool sat idle once the hot
+                    // lanes took their caps — one level per tick is the most a lane can use). Every
+                    // absorber is CAP-type: out of the equal-share divisor. Warm NGU lanes interleave
+                    // with the hot ones by value per BB unit, then AT (costs only energy), then the
+                    // aug pair (also drains gold).
+                    foreach (string t in ChapterNguLanes(type, ngus)) if (!list.Contains(t)) list.Add(t);
                     // Guide ch.5: "run AT with <40% of your Energy cap. Prioritize NGUs first" — AT gets
                     // what every NGU lane, warm ones included, leaves at BB, up to 40 %.
                     if (e && evilDay) list.Add("CAPALLAT:40");
@@ -795,6 +809,52 @@ namespace NGUAdvisor.Managers
                 if (bloodMatters && !list.Contains("BR-30")) list.Add("BR-30");
             }
             return list.ToArray();
+        }
+
+        private const int IncriminatingEvidenceId = 294;
+        private static string _lastHackPlan;
+
+        // HackPlan's guide order from live reads. A hack leaves the plan once it reaches its first
+        // milestone, so the stop needs no game target written into the save.
+        private static string[] HackTokens()
+        {
+            try
+            {
+                Character c = Main.Character;
+                int n = Math.Min(HackPlan.FirstMilestoneTo + 1, c.hacks.hacks.Count);
+                long[] levels = new long[n];
+                long[] thresholds = new long[n];
+                long[] hardCaps = new long[n];
+                // Only the milestone ids: milestoneThreshold for hacks 8/11/13 indexes the wish list.
+                for (int i = HackPlan.FirstMilestoneFrom; i < n; i++)
+                {
+                    levels[i] = c.hacks.hacks[i].level;
+                    thresholds[i] = c.hacksController.milestoneThreshold(i);
+                    hardCaps[i] = c.hacksController.hardCapLevel(i);
+                }
+                List<bool> maxxed = c.inventory.itemList.itemMaxxed;
+                bool evidence = IncriminatingEvidenceId < maxxed.Count && maxxed[IncriminatingEvidenceId];
+                bool cblock3 = ChallengeDetector.CBlock3Complete();
+                string[] tokens = HackPlan.Order(cblock3, evidence, levels, thresholds, hardCaps)
+                    .Select(id => $"HACK-{id}").ToArray();
+                string plan = string.Join(",", tokens);
+                if (plan != _lastHackPlan)
+                {
+                    _lastHackPlan = plan;
+                    string targets = string.Join(" ", Enumerable.Range(HackPlan.FirstMilestoneFrom,
+                        HackPlan.FirstMilestoneTo - HackPlan.FirstMilestoneFrom + 1)
+                        .Where(i => i < n).Select(i => $"{i}:{levels[i]}/{thresholds[i]}").ToArray());
+                    Main.LogDebug($"[HackDbg] plan={plan} cblock3={cblock3} evidenceMaxxed={evidence} milestones {targets}");
+                }
+                // ALLHACK tail: a planned hack whose in-game target is met drops out, and an empty R3 list
+                // would hand R3 back to the profile file.
+                return tokens.Concat(new[] { "ALLHACK" }).ToArray();
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"[HackDbg] failed: {e.Message}");
+                return new[] { "ALLHACK" };
+            }
         }
 
         // Pre-T7 at Boss 115+: the guide's T7 prep rebirth.

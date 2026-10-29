@@ -38,14 +38,37 @@ right now would be WORSE: a profile that starves them prices every lane at a sha
 prunes the plan away — the same deadlock shape `BloodPlanner.BloodMatters` was written to avoid.
 The gap between this plan and the profile is REPORTED instead (`Diagnose` → GrowthPanel,
 `[GrowthDbg]`) and `Summary` says "(at full-cap share)" so the number is never read as a forecast.
-Closing it for real needs a value-per-unit arbiter across sinks, which the advisor does not have.
+Closing it for real needs a value-per-unit arbiter ACROSS sinks, which the advisor does not have;
+between NGU lanes of one tree it has one (`NguLaneRank`, below).
 
 Split the pool equally over the kept set; drop lanes whose ratio at their ACTUAL share is under
 their threshold; re-split (survivors' shares grow); repeat (≤ 12 iters, monotone → terminates).
 Prune-only BY DESIGN — re-admitting on the larger share would oscillate. Nothing hot → deepen the
-top two by rating. `Surplus` = positive-value lanes (> 1.0001) outside the hot set — the game
-hard-caps every NGU at ONE level per tick, so a hot lane can't absorb extra pool; leftovers
+two best by value per BB unit. `Surplus` = positive-value lanes (> 1.0001) outside the hot set — the
+game hard-caps every NGU at ONE level per tick, so a hot lane can't absorb extra pool; leftovers
 belong in MORE lanes, not deeper ones.
+
+## Lane order — value per BB unit (`NguLaneRank`)
+
+A lane never earns more than one level per tick, so its whole hour is bought at BB — and the BBs of
+one tree span ~10 000× at the same level (live 2026-10-29, energy cap 1.08T: PP 688B, Magic NGU 56B,
+Drop Chance 4.34B, Augs/Wandoos/Gold/Power-α ~64M). Rating (growth at the full cap) ignores that, so a
+short pool (early marathon, after a rebirth or a gear swap) spent itself on the dear lanes first.
+
+- **Score** = `ln(RatioAtBb) / BbCost`. `BbCost` mirrors `NGUBP.EnergyBb/MagicBb(500)` term for term
+  (`ceil(divider × (L+1+500) / (power × speed stack))`, the BB a one-level-per-tick lane is sized with,
+  decomp `NGUController.updateNGU`); `RatioAtBb` is the hour at that allocation on the NguGain curve.
+- **Used for**: the order of the prune's hot set, the "deepen" pair, the surplus order and
+  `Plan.<E|M>LaneOrder` — targets and surplus interleaved, which ChallengeOverlay emits as
+  `NGU-*`/`CAPNGU-*` in that order (ChallengeOverlay.md). Membership of the hot set is unchanged:
+  still the 1.05/1.04 prune. `Rating`, `Ratio`, `Lph` and the summary are unchanged.
+- **A pool that covers every lane's BB allocates exactly as the rating order did** — each lane lands
+  at BB on either side of the cap divide. Pinned by `PoolCoveringEveryLaneAllocatesExactlyAsTheRatingOrderDid`.
+- **Deepen-pair hysteresis**: an incumbent's score counts `IncumbentEdge = 1.25×` — the same margin the
+  1.05/1.04 band asks of a ratio. Without it the four ~64M lanes, near-equal in score, would rotate the
+  pair the way the rating pair rotated Gold/PP and Power-β/Adv-β every 30 s cache (advisor.log
+  2026-10-29). Ties break by id.
+- **Chapter 4 is untouched**: its lane order is the guide ladder's targets then surplus.
 
 **Chapter 4 uses the guide's priority, not the prune** (`NguGuidePriority`, 2026-10-03, user-caught).
 The guide's ch.4 "NGU Priority" is a per-NGU ladder, not "any NGU over 1.05×": E/M NGU > 1.05 →

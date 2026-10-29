@@ -9,13 +9,14 @@ namespace NGUAdvisor.Managers
     //
     //  - The 13-value ladder and the id layout (id = tier for Power, +13 Toughness, +26 Special)
     //    are verified against ItemNameDesc.itemName[1..39] ("Power Boost 1" .. "Special boost 10K").
-    //  - Equipment.boostEquip: an atk/def boost adds its whole value to one channel and is then
+    //  - Equipment.boostEquip: an atk/def boost adds value × boostBonus to one channel and is then
     //    CLAMPED at floor(cap * (1 + level/100)) -- the overflow is destroyed, not banked. A spec
     //    boost instead CASCADES spec1 -> spec2 -> spec3, so its usable headroom is the sum of the
     //    three slots.
     //  - InventoryController.cubePower()/cubeToughness(): the cube is a SOFT sink. Past the softcap
     //    it returns softcap + sqrt(raw - softcap), so feeding it never becomes worthless, only
     //    sharply diminishing. Treating "cube at softcap" as zero demand understated late-run value.
+    //    The softcap is base attack + the WORN gear's attack, re-read on every stat evaluation.
     //  - InventoryController.boostRecycle: consuming a boost returns the NEXT TIER DOWN with
     //    probability Character.totalRecycleBonus(), recursively, and never below tier 1
     //    (ids 1/14/27 are excluded). The returned boost keeps its type.
@@ -52,15 +53,58 @@ namespace NGUAdvisor.Managers
             return CubeEffective(raw + add, softcap) - CubeEffective(raw, softcap);
         }
 
-        // Points a single boost of `value` delivers into one channel. Gear is a HARD sink (overflow
-        // wasted, so a boost is worth min(value, best single-item headroom)); the cube is a soft
-        // sink. A boost goes where it helps most, hence the max.
-        public static double Delivered(double value, double gearHeadroom, double cubeRaw, double cubeSoftcap, bool cubeUsable)
+        // Raw cube stat one boost point buys (InventoryController.infinityCubeBoost): value × boostBonus
+        // / num, num = 100, or 50 with ITOPOD perk 26, then divided by wishes' totalBoostRatioDivider.
+        // Gear takes value × boostBonus (Equipment.boostEquip), so the cube is a 50-100× weaker sink.
+        public static double CubeIntake(double boostBonus, bool improvedCubeBoosting, double boostRatioDivider)
         {
-            double gear = Math.Min(value, Math.Max(0.0, gearHeadroom));
-            double cube = cubeUsable ? CubeGain(cubeRaw, cubeSoftcap, value) : 0.0;
+            double num = (improvedCubeBoosting ? 50.0 : 100.0) / Math.Max(1.0, boostRatioDivider);
+            return boostBonus / num;
+        }
+
+        // Adventure-stat points a single boost of `value` delivers into one channel. Gear is a HARD sink
+        // (overflow wasted, so min(value × gearIntake, best single-item headroom)); the cube is a soft
+        // sink fed at cubeIntake per boost point. A boost goes where it helps most, hence the max.
+        public static double Delivered(double value, double gearIntake, double gearHeadroom,
+            double cubeIntake, double cubeRaw, double cubeSoftcap, bool cubeUsable)
+        {
+            double gear = Math.Min(value * gearIntake, Math.Max(0.0, gearHeadroom));
+            double cube = cubeUsable ? CubeGain(cubeRaw, cubeSoftcap, value * cubeIntake) : 0.0;
             return Math.Max(gear, cube);
         }
+
+        // A Special boost in the cube is split in half into Power AND Toughness (infinityCubeBoost:
+        // spec1Cap × boostBonus / (num × 2) into each).
+        public static double DeliveredSpecial(double value, double gearIntake, double gearHeadroom, double cubeIntake,
+            double powerRaw, double powerSoftcap, double toughnessRaw, double toughnessSoftcap, bool cubeUsable)
+        {
+            double gear = Math.Min(value * gearIntake, Math.Max(0.0, gearHeadroom));
+            if (!cubeUsable) return gear;
+            double half = value * cubeIntake / 2.0;
+            double cube = CubeGain(powerRaw, powerSoftcap, half) + CubeGain(toughnessRaw, toughnessSoftcap, half);
+            return Math.Max(gear, cube);
+        }
+
+        // InventoryController.infinityCubeTier(): (int)(log10(rawPower + rawToughness) − 1) on the RAW,
+        // un-softcapped sum, 0 below 100, at most 10.
+        public const int MaxCubeTier = 10;
+
+        public static int CubeTier(double rawSum)
+        {
+            if (rawSum < 100.0) return 0;
+            int tier = (int)(Math.Log10(rawSum) - 1.0);
+            return Math.Max(0, Math.Min(MaxCubeTier, tier));
+        }
+
+        // Raw P+T sum at which the next tier starts; +inf once the tier is maxed.
+        public static double NextCubeTierAt(int tier)
+            => tier >= MaxCubeTier ? double.PositiveInfinity : Math.Pow(10.0, Math.Max(0, tier) + 2);
+
+        // InventoryController.cubeLootBonus/cubeGoldBonus/cubeHackBonus/cubeWishBonus, as fractions.
+        public static double CubeLootBonus(int tier) => tier <= 0 ? 0.0 : 0.5 + (tier - 1) * 0.2;
+        public static double CubeGoldBonus(int tier) => tier <= 1 ? 0.0 : Math.Pow(tier - 1, 1.3) / 2.0;
+        public static double CubeHackBonus(int tier) => tier <= 7 ? 0.0 : tier == 8 ? 0.1 : tier == 9 ? 0.15 : 0.2;
+        public static double CubeWishBonus(int tier) => tier <= 8 ? 0.0 : tier == 9 ? 0.1 : 0.2;
 
         // Expected total delivery of a dropped boost of `tier`, following the recycling chain down
         // the ladder. `deliveredForTier` prices one boost of a given tier into the SAME channel

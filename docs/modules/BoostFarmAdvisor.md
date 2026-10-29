@@ -81,7 +81,8 @@ farm only while DC still pays) and the `[ZoneDbg] boostfarm` line's `dc=` field.
 ## Demand gate (`BoostDemandExists`)
 
 A coarse on/off switch behind the `AdvisorFarmBoost` setting: boosts only pay while something consumes
-them — an Infinity Cube under its softcap, or equipped/priority-listed gear with
+them — an Infinity Cube under its softcap **at the kill loadout** (`BoostSinks.CubeSoftcaps`, see
+ZoneCadence.md), or equipped/priority-listed gear with
 `GetNeededBoosts().Total() > 0` that is **not on `Settings.BoostBlacklist`** (checked inside the local
 `NeedsBoosts`, not in the two loops, because equipped gear is walked independently of the priority
 list — 2026-08-26). Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand

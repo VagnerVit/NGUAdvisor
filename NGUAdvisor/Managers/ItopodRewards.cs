@@ -104,5 +104,78 @@ namespace NGUAdvisor.Managers
         /// <summary>Perk points per kill (progress / pointThreshold).</summary>
         public static double PpPerKill(int floor, Difficulty difficulty, double ppBonus, double sadisticBasePpBonus = 0.0)
             => PpProgressPerKill(floor, difficulty, ppBonus, sadisticBasePpBonus) / PpThreshold;
+
+        // AdventureController kill handler: itopodLevel advances one floor per this many kills.
+        public const int KillsPerFloorAdvance = 10;
+
+        /// <summary>
+        /// ItopodPerkController.awardHighestLevelPP: one-time PP for first reaching a floor, paid only
+        /// on multiples of 10, ×10 on multiples of 100 (630 → 7, 700 → 70, 1000 → 100).
+        /// </summary>
+        public static int FirstReachBonusPp(int floor)
+        {
+            if (floor % 10 != 0) return 0;
+            int tens = floor / 10;
+            int pp = (int)Math.Ceiling(tens / 10.0);
+            if (tens % 10 == 0) pp *= 10;
+            if (pp < 0) pp = 10;
+            return pp;
+        }
+
+        /// <summary>Lowest floor above `highest` that pays a first-reach bonus.</summary>
+        public static int NextBonusFloor(int highest) => (Math.Max(0, highest) / 10 + 1) * 10;
+
+        public sealed class BonusClaim
+        {
+            public int Target;        // the climb ends when itopodLevel reaches this floor
+            public int Kills;
+            public double Seconds;
+            public double BonusPp;    // every first-reach bonus collected on the way
+            public double ClimbPp;    // per-kill PP earned while climbing
+            public double FarmPp;     // what the farm floor would have paid in the same time
+            public double NetPp => BonusPp + ClimbPp - FarmPp;
+        }
+
+        /// <summary>
+        /// The most profitable bonus floor to climb to, or null when none beats farming. The game
+        /// caps itopodStart at highest − 1 and advances one floor per 10 kills, so reaching floor B
+        /// costs 10 kills on every floor from highest − 1 to B − 1. Only targets up to `reachable`
+        /// (the highest floor whose fight is won) qualify: a death resets the climb to its start.
+        /// </summary>
+        public static BonusClaim BestBonusClaim(int highest, int reachable, double farmPpPerSecond,
+            Func<int, double> killSeconds, Func<int, double> ppPerKill, int maxFloor = 1600)
+        {
+            int start = Math.Max(0, highest - 1);
+            int last = Math.Min(reachable, maxFloor);
+            BonusClaim best = null;
+            double seconds = 0.0, climbPp = 0.0, bonus = 0.0;
+            int kills = 0;
+            for (int floor = start; floor < last; floor++)
+            {
+                double perKill = killSeconds(floor);
+                if (double.IsInfinity(perKill) || double.IsNaN(perKill) || perKill <= 0.0) break;
+                seconds += KillsPerFloorAdvance * perKill;
+                climbPp += KillsPerFloorAdvance * ppPerKill(floor);
+                kills += KillsPerFloorAdvance;
+
+                int arrived = floor + 1;
+                if (arrived <= highest) continue;
+                int pp = FirstReachBonusPp(arrived);
+                if (pp <= 0) continue;
+                bonus += pp;
+                BonusClaim candidate = new BonusClaim
+                {
+                    Target = arrived,
+                    Kills = kills,
+                    Seconds = seconds,
+                    BonusPp = bonus,
+                    ClimbPp = climbPp,
+                    FarmPp = seconds * Math.Max(0.0, farmPpPerSecond),
+                };
+                if (candidate.NetPp > 0.0 && (best == null || candidate.NetPp > best.NetPp))
+                    best = candidate;
+            }
+            return best;
+        }
     }
 }

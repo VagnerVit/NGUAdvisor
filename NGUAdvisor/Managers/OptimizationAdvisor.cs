@@ -645,13 +645,15 @@ namespace NGUAdvisor.Managers
         // Keyed on the worn set as well as the TTL: callers multiply by LIVE attack/defense, so a ratio
         // measured in another mode's gear is off by that whole swap (same fix as GoldGearFactor).
         private static double _projAtkMult = 1, _projDefMult = 1;
+        private static double _projGearAtk, _projGearDef;
         private static DateTime _projAt = DateTime.MinValue;
         private static string _projWorn;
+        private const double ProjectionTtlSeconds = 120;
 
         public static void ProjectedBestGear(out double atkMult, out double defMult)
         {
             string worn = string.Join(",", LoadoutManager.CurrentGearIds());
-            if (worn != _projWorn || (DateTime.UtcNow - _projAt).TotalSeconds > 120)
+            if (worn != _projWorn || (DateTime.UtcNow - _projAt).TotalSeconds > ProjectionTtlSeconds)
             {
                 _projAt = DateTime.UtcNow;
                 _projWorn = worn;
@@ -666,11 +668,25 @@ namespace NGUAdvisor.Managers
                     double killP = GearOptimizer.ScoreOf(kill, pow), killT = GearOptimizer.ScoreOf(kill, tou);
                     _projAtkMult = curP > 0 && killP > curP ? killP / curP : 1;
                     _projDefMult = curT > 0 && killT > curT ? killT / curT : 1;
+                    // ScoreOf = (items + cube item + base item) / 100, the last two read live; peel
+                    // them off to leave the kill set's own gear attack/defense.
+                    InventoryController ic = Main.InventoryController;
+                    _projGearAtk = Math.Max(0, killP * 100 - ic.cubePower() - Main.Character.adventure.attack);
+                    _projGearDef = Math.Max(0, killT * 100 - ic.cubeToughness() - Main.Character.adventure.defense);
                 }
-                catch { _projAtkMult = 1; _projDefMult = 1; }
+                catch { _projAtkMult = 1; _projDefMult = 1; _projGearAtk = 0; _projGearDef = 0; }
             }
             atkMult = _projAtkMult;
             defMult = _projDefMult;
+        }
+
+        // The kill set's gear attack/defense (what InventoryController.attackBonus() reads while it is
+        // worn), 0 when unknown. Independent of the worn set, so only the TTL refreshes it.
+        public static void ProjectedKillGear(out double attack, out double defense)
+        {
+            if ((DateTime.UtcNow - _projAt).TotalSeconds > ProjectionTtlSeconds) ProjectedBestGear(out _, out _);
+            attack = _projGearAtk;
+            defense = _projGearDef;
         }
 
         // Live P/T carried onto the best P/T set: the stats the titan kill loadout fights with.

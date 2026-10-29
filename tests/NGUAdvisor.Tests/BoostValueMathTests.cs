@@ -32,9 +32,81 @@ namespace NGUAdvisor.Tests
         {
             // Equipment.boostEquip clamps curAttack at floor(cap * (1 + level/100)) AFTER adding the
             // whole boost, so the excess is gone -- a 10K boost into 300 of headroom is worth 300.
-            Assert.Equal(300, BoostValueMath.Delivered(10000, 300, 0, 0, false));
-            Assert.Equal(500, BoostValueMath.Delivered(500, 4000, 0, 0, false));
-            Assert.Equal(0, BoostValueMath.Delivered(10000, 0, 0, 0, false));
+            Assert.Equal(300, BoostValueMath.Delivered(10000, 1.0, 300, 1.0, 0, 0, false));
+            Assert.Equal(500, BoostValueMath.Delivered(500, 1.0, 4000, 1.0, 0, 0, false));
+            Assert.Equal(0, BoostValueMath.Delivered(10000, 1.0, 0, 1.0, 0, 0, false));
+        }
+
+        [Fact]
+        public void GearTakesTheBoostTimesBoostBonus()
+        {
+            // Equipment.boostEquip(boost, boostBonus()): curAttack += capAttack * bonus, then the clamp.
+            Assert.Equal(1500, BoostValueMath.Delivered(500, 3.0, 4000, 1.0, 0, 0, false), 10);
+            Assert.Equal(4000, BoostValueMath.Delivered(2000, 3.0, 4000, 1.0, 0, 0, false), 10);
+        }
+
+        [Fact]
+        public void CubeIntakeIsBoostBonusOverTheDivider()
+        {
+            // infinityCubeBoost: num = 100 (50 with perk 26), num /= totalBoostRatioDivider().
+            Assert.Equal(0.01, BoostValueMath.CubeIntake(1.0, false, 1.0), 12);
+            Assert.Equal(0.02, BoostValueMath.CubeIntake(1.0, true, 1.0), 12);
+            Assert.Equal(0.12, BoostValueMath.CubeIntake(3.0, true, 2.0), 12);
+        }
+
+        [Fact]
+        public void CubeIsCreditedOnlyItsIntakeNotTheWholeBoost()
+        {
+            // A 10K boost with perk 26 and no boost bonus puts 200 raw into the cube, not 10000: with the
+            // gear channel holding 300 of room, the gear wins.
+            double intake = BoostValueMath.CubeIntake(1.0, true, 1.0);
+            Assert.Equal(300, BoostValueMath.Delivered(10000, 1.0, 300, intake, 0, 1e9, true), 10);
+            Assert.Equal(200, BoostValueMath.Delivered(10000, 1.0, 0, intake, 0, 1e9, true), 10);
+        }
+
+        [Fact]
+        public void SpecialSplitsHalfIntoCubePowerAndHalfIntoToughness()
+        {
+            // infinityCubeBoost: spec1Cap * boostBonus / (num * 2) into BOTH cube stats.
+            Assert.Equal(200, BoostValueMath.DeliveredSpecial(10000, 1.0, 0, 0.02, 0, 1e9, 0, 1e9, true), 10);
+            // Power deep past its softcap: only the Toughness half still lands at full value.
+            double d = BoostValueMath.DeliveredSpecial(10000, 1.0, 0, 0.02, 1e8, 1000, 0, 1e9, true);
+            Assert.Equal(100 + (Math.Sqrt(1e8 + 100 - 1000) - Math.Sqrt(1e8 - 1000)), d, 6);
+            Assert.Equal(0, BoostValueMath.DeliveredSpecial(10000, 1.0, 0, 0.02, 0, 1e9, 0, 1e9, false), 10);
+        }
+
+        [Fact]
+        public void CubeTierIsLogOfTheRawSumMinusOne()
+        {
+            // InventoryController.infinityCubeTier: (int)(log10(cubePower + cubeToughness) - 1), 0..10.
+            Assert.Equal(0, BoostValueMath.CubeTier(99));
+            Assert.Equal(1, BoostValueMath.CubeTier(100));
+            Assert.Equal(1, BoostValueMath.CubeTier(999));
+            Assert.Equal(6, BoostValueMath.CubeTier(23_800_000));
+            Assert.Equal(7, BoostValueMath.CubeTier(1e8));
+            Assert.Equal(10, BoostValueMath.CubeTier(1e15));
+            Assert.Equal(1e8, BoostValueMath.NextCubeTierAt(6), 0);
+            Assert.Equal(100, BoostValueMath.NextCubeTierAt(0), 0);
+            Assert.True(double.IsPositiveInfinity(BoostValueMath.NextCubeTierAt(10)));
+        }
+
+        [Fact]
+        public void CubeTierBonusesMatchTheGameTables()
+        {
+            // cubeLootBonus / cubeGoldBonus / cubeHackBonus / cubeWishBonus.
+            Assert.Equal(0.0, BoostValueMath.CubeLootBonus(0), 10);
+            Assert.Equal(0.5, BoostValueMath.CubeLootBonus(1), 10);
+            Assert.Equal(1.5, BoostValueMath.CubeLootBonus(6), 10);
+            Assert.Equal(0.0, BoostValueMath.CubeGoldBonus(1), 10);
+            Assert.Equal(0.5, BoostValueMath.CubeGoldBonus(2), 10);
+            Assert.Equal(Math.Pow(5, 1.3) / 2, BoostValueMath.CubeGoldBonus(6), 10);
+            Assert.Equal(0.0, BoostValueMath.CubeHackBonus(7), 10);
+            Assert.Equal(0.1, BoostValueMath.CubeHackBonus(8), 10);
+            Assert.Equal(0.15, BoostValueMath.CubeHackBonus(9), 10);
+            Assert.Equal(0.2, BoostValueMath.CubeHackBonus(10), 10);
+            Assert.Equal(0.0, BoostValueMath.CubeWishBonus(8), 10);
+            Assert.Equal(0.1, BoostValueMath.CubeWishBonus(9), 10);
+            Assert.Equal(0.2, BoostValueMath.CubeWishBonus(10), 10);
         }
 
         [Fact]
@@ -64,9 +136,9 @@ namespace NGUAdvisor.Tests
         public void BoostGoesWhereverItHelpsMost()
         {
             // Gear channel nearly full, cube wide open -> the cube wins.
-            Assert.Equal(5000, BoostValueMath.Delivered(5000, 10, 0, 100000, true), 10);
+            Assert.Equal(5000, BoostValueMath.Delivered(5000, 1.0, 10, 1.0, 0, 100000, true), 10);
             // Gear channel open, cube deep past its softcap -> gear wins.
-            Assert.Equal(5000, BoostValueMath.Delivered(5000, 9000, 1_000_000, 1000, true), 10);
+            Assert.Equal(5000, BoostValueMath.Delivered(5000, 1.0, 9000, 1.0, 1_000_000, 1000, true), 10);
         }
 
         [Fact]

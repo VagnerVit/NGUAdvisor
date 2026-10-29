@@ -91,7 +91,7 @@ An axis of its own, orthogonal to the optimize mode above: WHICH floor, not how 
 
 | Mode | Behavior |
 |---|---|
-| 0 Optimal | the solve above owns the floor; `ITOPODAutoPush` is false, so it never climbs past `highestItopodLevel − 1` |
+| 0 Optimal | the solve above owns the floor; `ITOPODAutoPush` is false, so it never climbs past `highestItopodLevel − 1` — except for a priced first-reach bonus climb (below) |
 | 1 Fixed | `ITOPODTargetFloor` IS the floor. `UpdateMaxFloor` skips the attack solve, `OptimizeFloor` writes the target and returns — no per-kill re-optimization, no buff-aware shifting |
 | 2 Push | climbs to `PushTargetFloor()` — the highest floor whose FIGHT is won (below) — in the `GearChain.ItopodPush` set, then returns to Optimal by itself |
 
@@ -133,6 +133,24 @@ to a 10 (user rule 2026-09-23: 418 is not worth the climb over 410; 420 or stay 
 **Push finishes by itself.** Once the push set is worn (`ItopodPushGearPending()` false) and the
 target is no longer above `highestItopodLevel − 1`, `UpdateMaxFloor` sets the floor mode back to
 Optimal and clears `ITOPODAutoPush`; the gear override ends with it (user request 2026-09-23).
+
+## First-reach bonus climb (Optimal mode)
+
+Game truth (`AdventureController` zone-1000 kill handler → `ItopodPerkController.awardHighestLevelPP`):
+the bonus is paid on the 10th kill on floor `B − 1`, when `itopodLevel` advances to `B` and
+`B > highestItopodLevel`; `B` must be a multiple of 10 (`ItopodRewards.FirstReachBonusPp`). The
+field is lifetime (written only by the `Adventure()` ctor and the kill handler — rebirth keeps it).
+`itopodStart` is capped at `highest − 1`, so reaching `B` costs 10 kills on every floor from
+`highest − 1` to `B − 1`; the farm solve alone can never collect it.
+
+`TryStartBonusClaim` (end of `UpdateMaxFloor`, at most every 60 s) runs only in floor mode Optimal
+with `ITOPODAutoPush` off and a manual `ITOPODCombatMode`. Candidates are bonus floors up to
+`max(BestWinnableFloor, SolvedMaxFloor)` — the push reach. `ItopodRewards.BestBonusClaim` prices each
+climb at `ItopodConstants.ExpectedKillSeconds` per kill: bonuses + per-kill PP on the climb floors
+against `ItopodFarmAdvisor.ForMode(...).PpPerSecond` for the same time, and takes the best positive
+net. The climb itself is an ordinary Push range `(highest − 1, B)` on the gear worn now; at `B` the
+pod returns to Optimal. A death on a claim blocks further claims until the push reach exceeds the
+reach at the time of death. Decisions log once per change as `[ItopodBonusDbg]`.
 
 ## Push mode
 
