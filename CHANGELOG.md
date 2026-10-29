@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-29
+
 ### Added
 
 - **ITOPOD climbs for the one-time "first time reached" Perk point bonus** (every 10th floor; 70 PP
