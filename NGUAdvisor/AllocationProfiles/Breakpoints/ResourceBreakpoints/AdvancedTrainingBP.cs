@@ -23,6 +23,10 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         private bool TargetMetAt(int index)
         {
+            // AllAdvancedTraining.reachedTarget: the Wandoos slots count as reached while Wandoos 98 is off.
+            if ((index == 3 || index == 4) && !_character.settings.wandoos98On)
+                return true;
+
             long target = _character.advancedTraining.levelTarget[index];
             if (target < 0L)
                 return true;

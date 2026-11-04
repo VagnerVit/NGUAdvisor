@@ -202,7 +202,7 @@ report:
 - **Template takeover is generated-list-only** (below).
 
 - **Stripping**: tokens for systems a challenge kills are dropped (BestAug refuses NOAUG,
-  TimeMachineBP refuses NOTM, NGUBP dies with the disabled NGU button).
+  TimeMachineBP refuses NOTM, NGUBP is locked while `NGU.disabled`, which the No-NGU challenge and the Troll disable-NGU roll set while the NGU button stays interactable).
 - **Re-weighting templates** (`Templates`): stripping alone leaves SURVIVORS holding the dead
   systems' shares (a 70 %-NGU profile in NONGU floods basic training), so per-challenge templates
   re-weight the remaining priorities. `_fallbackOn`/`_templateOn` narrate each injection ONCE per

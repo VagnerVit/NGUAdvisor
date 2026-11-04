@@ -344,15 +344,15 @@ namespace NGUAdvisor.Managers
                     }
                     double cycle = BoostValueMath.CycleSeconds(idle, respawn, swing, hits);
 
-                    // AI.paralyze needs TWO landed attacks to freeze us for 2s (EnemyAI.paralyzeAI:
-                    // paralyzeEffect 1 warns, 2 paralyzes). Non-titan zones delay the enemy's first
+                    // AI.paralyze freezes us for 2s on its THIRD action (EnemyAI.paralyzeAI: effect 0 does
+                    // nothing, 1 plain attack, 2 attack + paralyze). Non-titan zones delay the enemy's first
                     // strike by +50% of its attack rate (CombatAI's firstStrike), so a kill that
-                    // ends before two enemy swings pays nothing.
+                    // ends before the third enemy swing pays nothing.
                     double killTime = idle ? hits * swing : (hits - 1.0) * swing;
                     double enemySwings = e.AttackRate > 0.0 && killTime >= 1.5 * e.AttackRate
                         ? Math.Floor((killTime - 1.5 * e.AttackRate) / e.AttackRate) + 1.0
                         : 0.0;
-                    if (e.Paralyzes && enemySwings >= 2.0) cycle += 2.0;
+                    if (e.Paralyzes && enemySwings >= 3.0) cycle += 2.0;
 
                     totalCycle += cycle;
                     foughtCount++;

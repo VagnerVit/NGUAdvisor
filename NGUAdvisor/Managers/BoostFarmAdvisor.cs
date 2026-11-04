@@ -124,7 +124,7 @@ namespace NGUAdvisor.Managers
                 // because equipped gear is walked independently of the priority list.
                 bool NeedsBoosts(int id)
                 {
-                    if (InventoryManager.BoostBlacklisted(id)) return false;
+                    if (BoostSinks.TakesNoBoost(id)) return false;
                     var slot = LoadoutManager.FindItemSlot(id);
                     return slot != null && slot.equipment.GetNeededBoosts().Total() > 0;
                 }
@@ -199,7 +199,7 @@ namespace NGUAdvisor.Managers
                     try
                     {
                         // Unlocked = boss requirement met (ZoneHelpers.ZoneUnlocks, indexed by zone).
-                        if (z.Zone >= ZoneHelpers.ZoneUnlocks.Length || c.bossID <= ZoneHelpers.ZoneUnlocks[z.Zone]) continue;
+                        if (z.Zone >= ZoneHelpers.ZoneUnlocks.Length || c.effectiveBossID() < ZoneHelpers.ZoneUnlocks[z.Zone]) continue;
 
                         double perKill = ValuePerNormalKill(z, dc, dcRoot, sinks);
                         if (perKill <= 0) continue;   // nothing this zone drops can be absorbed
@@ -285,6 +285,9 @@ namespace NGUAdvisor.Managers
         //
         // The id is decided by the auto-transform type, because every boost drop is rerolled into it
         // (ItemNameDesc, all four loot paths) — ids 1-13 Power, 14-26 Toughness, 27-39 Special.
+        // LootDrop.itopodDrop awards makeLevelledLoot(id, 1): a level-1 copy, so it merges for 1 + 1 levels.
+        private const int ItopodBoostMergeLevels = 2;
+
         public class DropInfo
         {
             public bool Known;
@@ -292,7 +295,7 @@ namespace NGUAdvisor.Managers
             public int Id;
             public int Tier;
             public int Type;              // BoostSinks.TypePower/Toughness/Special
-            public double DropsPerSecond;
+            public double DropsPerSecond;   // in NeedDrops units: drops x merge levels each (2 in ITOPOD, 1 in zones)
             public int HaveDrops;         // sum of (level + 1) over owned copies
             public const int NeedDrops = 101;
             public bool Maxxed;
@@ -322,7 +325,7 @@ namespace NGUAdvisor.Managers
                     ItopodFarmAdvisor.Rates r = ItopodFarmAdvisor.ForMode(Main.Settings?.ITOPODCombatMode == 0 ? 0 : 3);
                     if (!r.Known) return d;
                     tier = ItopodRewards.BoostLadderIndex(ItopodRewards.Tier(r.DefaultFloor));
-                    dropsPerSecond = ItopodRewards.BoostDropChance * r.KillsPerSecond;
+                    dropsPerSecond = ItopodRewards.BoostDropChance * r.KillsPerSecond * ItopodBoostMergeLevels;
                 }
                 else
                 {

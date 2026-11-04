@@ -85,8 +85,8 @@ outright**, because boost rolls only fire on `enemyType.normal`. The verdict say
 reporting a mysteriously small rate. ITOPOD is unaffected (`CheckEnemy` skips the bossOnly branch for
 zone ≥ 1000), so routing there is the correct answer while that toggle is on.
 
-`AI.paralyze` costs 2 s but only after **two** landed enemy attacks (`EnemyAI.paralyzeAI`:
-`paralyzeEffect` 1 warns, 2 freezes), and non-titan zones delay the enemy's first strike by +50% of its
+`AI.paralyze` costs 2 s but only on the enemy's **third** action (`EnemyAI.paralyzeAI`:
+`paralyzeEffect` 0 does nothing, 1 attacks, 2 attacks and freezes), and non-titan zones delay the enemy's first strike by +50% of its
 attack rate. A kill that ends inside that window pays nothing — which is why one-shot farming never
 sees a paralyzer.
 
@@ -203,7 +203,12 @@ A flat "tier value" over-priced high tiers badly. `Equipment.boostEquip` decides
   the whole chain, which is why `WithRecycling` takes a per-tier pricing callback instead of a scalar.
 
 Drop type is uniform 1/3 over Power / Toughness / Special (`Random.Range(1, 4)` over the three item ids
-of the tier), so `ValueOfDrop` averages the three channel prices.
+of the tier), so `ValueOfDrop` averages the three channel prices — unless the game's
+`settings.autoTransform` is 1..3: `ItemNameDesc.makeLoot` then rerolls every boost drop into that type
+(level kept) and `ValueOfDrop` prices the single channel (`Sinks.DropType`).
+
+Sinks exclude boost-blacklisted items and items `TransformManager.Frozen` (a maxed chain copy held back):
+`GetBoostSlots` never boosts them, so their headroom is not a channel (`BoostSinks.TakesNoBoost`).
 
 ## Boost ladder (verified, no longer reconstructed)
 

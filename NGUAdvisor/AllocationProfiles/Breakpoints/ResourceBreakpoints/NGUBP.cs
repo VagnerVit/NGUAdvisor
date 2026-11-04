@@ -13,7 +13,8 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             {
                 case ResourceType.Magic when Index <= 6:
                 case ResourceType.Energy when Index <= 8:
-                    return _character.buttons.ngu.interactable;
+                    // The No-NGU challenge and the Troll "disable NGU" roll set NGU.disabled but leave the button interactable.
+                    return _character.buttons.ngu.interactable && !_character.NGU.disabled;
             }
 
             return false;

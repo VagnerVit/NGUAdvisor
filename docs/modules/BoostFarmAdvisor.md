@@ -83,7 +83,7 @@ farm only while DC still pays) and the `[ZoneDbg] boostfarm` line's `dc=` field.
 A coarse on/off switch behind the `AdvisorFarmBoost` setting: boosts only pay while something consumes
 them — an Infinity Cube under its softcap **at the kill loadout** (`BoostSinks.CubeSoftcaps`, see
 ZoneCadence.md), or equipped/priority-listed gear with
-`GetNeededBoosts().Total() > 0` that is **not on `Settings.BoostBlacklist`** (checked inside the local
+`GetNeededBoosts().Total() > 0` that is **not on `Settings.BoostBlacklist` and not `TransformManager.Frozen`** (both via `BoostSinks.TakesNoBoost`; zones are gated on `effectiveBossID() >= ZoneUnlocks[zone]`) (checked inside the local
 `NeedsBoosts`, not in the two loops, because equipped gear is walked independently of the priority
 list — 2026-08-26). Otherwise ITOPOD PP/EXP beats boost farming. **Fails OPEN** (demand
 unknown → keep farming) — the classic always-boost behavior on any read error.
@@ -105,6 +105,7 @@ landing in my inventory, and how long until it maxes". Game truth, all from the 
 | a dropped boost arrives at **level 0** | `Equipment` ctor; `ItemNameDesc` adds `bonusLootLevels()` only to items already above level 0, so boosts never get it |
 | merging is `level = level + other.level + 1`, capped at 100 | `Equipment.mergeItem` |
 | ⇒ one copy holds `level + 1` drops, and **level 100 costs 101 drops** of that exact id | the two rules above |
+| **ITOPOD boost drops arrive at level 1** (`makeLevelledLoot(id, 1)`), so each is worth 2 merge levels; zone boosts (`makeLoot`) are level 0 | `LootDrop.itopodDrop`. `DropInfo.DropsPerSecond` is in 101-scale units (drops × merge levels), so the ITOPOD ETA halves; the random `bonusLootLevels` bonus is ignored |
 | reaching 100 marks the id maxed and **merges of it are refused forever** | `checkItemTransform` → `markItemAsMaxxed`; `mergeable()` tests `itemMaxxed[id]` |
 | the id is `tier + (type − 1) × 13` | ids 1-13 Power, 14-26 Toughness, 27-39 Special |
 

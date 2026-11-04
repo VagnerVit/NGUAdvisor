@@ -611,6 +611,7 @@ namespace NGUAdvisor.Managers
                     int id = FindByName(qc.quirkName, step, "quirk");
                     if (id < 0 || id >= levels.Count || id >= qc.maxLevel.Count) continue;
                     if (qc.quirkDifficultyReq[id] > diff) continue;
+                    if (QuirkSystemLocked(c, qc, id)) continue;
                     long max = qc.maxLevel[id] > 0 ? qc.maxLevel[id] : long.MaxValue;
                     long target = step.Target > 0 ? Math.Min(step.Target, max) : max;
                     if (levels[id] >= target) continue;
@@ -627,6 +628,15 @@ namespace NGUAdvisor.Managers
             }
             catch (Exception e) { Main.LogDebug($"SpendPlanner quirks: {e.Message}"); }
             return b;
+        }
+
+        // BeastQuestPerkController.tryLevelUp refuses a quirk whose system (Res3, Cards, Wishes) is not unlocked yet.
+        private static bool QuirkSystemLocked(Character c, BeastQuestPerkController qc, int id)
+        {
+            itopodPerk type = qc.quirkType[id];
+            return (type == itopodPerk.Res3 && !c.res3.res3On)
+                || (type == itopodPerk.Cards && !c.cards.cardsOn)
+                || (type == itopodPerk.Wishes && !c.wishes.wishesOn);
         }
 
         public struct PlannedBuy
@@ -679,9 +689,9 @@ namespace NGUAdvisor.Managers
             return f;
         }
 
-        // Same contract as BuyPerks: mirrors BeastQuestPerkController.doLevelUp(id) -- deduct quirkPoints,
-        // increment quirkLevel[id], doEffect(id) -- and skips only its UI calls (showTooltip, updateText),
-        // which carry no game state.
+        // Mirrors BeastQuestPerkController.doLevelUp(id) -- deduct quirkPoints, increment quirkLevel[id],
+        // doEffect(id) -- skipping only its UI calls. NextQuirk already applies tryLevelUp's gates
+        // (max level, QP, difficulty, Res3/Cards/Wishes unlocked), which doLevelUp itself does not check.
         public static int BuyQuirks(int maxBuys)
         {
             int bought = 0;

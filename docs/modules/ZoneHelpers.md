@@ -66,9 +66,11 @@ titans didn't count as reachable until one boss kill past their unlock.
 
 ## Autokill checks
 
-`AutokillAvailable(titanIndex, version)`: T1–T5 are hardcoded stat thresholds from the game
-(incl. item 135 maxed for T4, 3× boss5Kills for T5); T6–T12 call the game's own
-`autokillTitan{N}V{v}Achieved`; T13/T14 never AK (returns false).
+`AutokillAvailable(titanIndex, version)` mirrors the game's gate in `AdventureController`: the
+`settings.autoKillTitans` toggle and `effectiveBossID() >=` 58/66/82/100/116/132/426/467/491/777/826/850
+for every titan, then the stats. T1–T5 are hardcoded thresholds (T1–T3 strict `>`, T4/T5 `>=`; item 135
+maxed for T4, 3× boss5Kills for T5); T6–T12 also need the riddle unlock (`titan6..9Unlocked`) and call
+the game's own `autokillTitan{N}V{v}Achieved`; T13/T14 never AK (returns false).
 
 `TitanHasWantedDrops(titanIndex)`: does this titan still owe us gear? An auto-killed titan dies in
 whatever is worn, so its drop table is the ONLY reason to spend a swap on it. Reads

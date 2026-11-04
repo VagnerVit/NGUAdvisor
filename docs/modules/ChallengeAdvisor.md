@@ -39,8 +39,11 @@ table it was written not to be.
   for a rebirth — and a severity-2 row sorts to the top of a slot-limited dashboard, where it would
   sit for weeks pushing out rows the user can act on this minute.
 - **Silent inside a challenge** (`ChallengeDetector.Current() != null`) — finish this one first.
-- **An unreadable challenge is skipped, never guessed**: the completion read is per-challenge in its
-  own try, and a key missing from the map drops those rungs out of the ranking entirely.
+- **An unreadable or locked challenge is skipped, never guessed**: the read is per-challenge in its
+  own try and gated on the controller's `unlocked()`; a key missing from the map drops those rungs
+  out of the ranking entirely.
+- **Normal difficulty only**: `completions()` is the Normal counter, so on Evil/Sadistic the row is
+  silent instead of recommending runs that would not advance it.
 - Counts come from `allChallenges.<x>.completions()` — the SAME accessor the reward gates read, not
   `currentCompletions()` (per-difficulty, clamped), which would disagree with the gate it advises.
 - `ChallengeGates` is Unity-free and unit-tested (`ChallengeGatesTests`), the same split that moved

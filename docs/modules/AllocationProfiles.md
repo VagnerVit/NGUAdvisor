@@ -54,7 +54,7 @@ Contract (`ResourceBreakpoint`):
 - `IsValid()` = `CorrectResourceType() && Unlocked() && !TargetMet()` — an invalid priority DROPS
   OUT and its share redistributes (this is how LevelPlanner's target caps steer allocation, and how
   ChallengeOverlay's stripping works: e.g. `BestAug` refuses NOAUG, `TimeMachineBP` refuses NOTM,
-  `NGUBP` dies with the disabled NGU button).
+  `NGUBP` is locked while `NGU.disabled`).
 - `UpdateMaxAllocation(prioCount)` — non-cap tokens take `idle / prioCount`; **CAP tokens take
   `min(need, idle-at-their-turn)`**, so they stay OUT of the equal-share divisor. Allocation walks
   the list IN ORDER recomputing idle/prioCount per non-cap token, which is why ChallengeOverlay

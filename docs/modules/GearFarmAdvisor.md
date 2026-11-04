@@ -37,7 +37,7 @@ This replaced `KillsPerHour = 800` with `~77 % normal / 10 % boss` shares. All t
 real normal share ranges 0.7143–0.8125, the boss share is `1 / spawnTableSize`, and zones whose enemies
 need a second swing farm materially slower.
 
-Zones compete when they are boss-unlocked (`bossID > ZoneUnlocks[zone]`), **killable** (damage per swing
+Zones compete when they are boss-unlocked (`effectiveBossID() >= ZoneUnlocks[zone]` — the table is in the effectiveBossID domain, Evil +301 / Sadistic +602, and the game unlocks on that comparison; raw `bossID` hid every zone above the Evil boss number), **killable** (damage per swing
 outpaces enemy regen) and **survivable**. Titan zones excluded. The OPower one-shot gate is gone: it is
 calibrated on the boss, and boss-only rolls now price themselves correctly through
 `est.BossKillsPerSecond` — a boss that takes 40 swings collapses its own rolls' rate instead of being
@@ -54,13 +54,26 @@ the binary search and the verdict text all judge on the same budget.
 
 ## Analysis details
 
-- `DropsNeeded(id)` = `max(1, 100 − highestOwnedLevel)`; unowned = 100 (a fresh drop is level 1,
-  each merge +1). Maxed (`itemMaxxed`) and **loot-filtered** (`itemFiltered`) items are skipped —
+- `LevelsNeeded(id)` = `max(1, 100 − highestOwnedLevel)`; unowned counts as level −1 (a `makeLoot` drop
+  arrives at level 0, so 101). A drop adds `itemLevel + 1` (`Equipment.mergeItem`), so each roll
+  contributes `rate × (Level + 1)` levels/hour. `Level` is the roll's `makeLevelledLoot` level
+  (`makeLoot` = 0; e.g. zone 24 pendant 142 at 5, Looty 128 at 25, zones 25/27/28/29 Looty at 68,
+  zone 0 item 75 at 10, zones 1/3 boss gear at 4/1); `Levels` carries per-item values where one
+  roll mixes them (item 53 in zones 2/3/5). The random `bonusLootLevels` chance is not modelled.
+  Maxed (`itemMaxxed`) and **loot-filtered** (`itemFiltered`) items are skipped —
   a filtered item never drops.
 - Zone time-to-cap = the SLOWEST missing item (max over items of `needed / perHour`).
 - `ReqLootFactor`: rates are monotonic in DC → binary search, **geometric midpoint**
   (`sqrt(lo*hi)`, the range spans decades), 60 iterations, up to `lootFactor × 1e9`; −1 when even
   that can't make budget (per-roll `Cap` binds).
+
+## Gated rolls
+
+A roll with `Gate` fires only while the game's `itemList` flag is set: zone 18 item 178
+(`stealthComplete`), zone 20 items 226/227 (`chocoComplete`), zone 21 item 220
+(`edgyBootsComplete`), zone 33 item 366 (`westernComplete`). A closed roll is dropped from the
+zone's missing items and from `WantedGearNeedFactor`, so it neither shows as uncapped nor yields an
+infinite time-to-cap.
 
 ## Consumers
 

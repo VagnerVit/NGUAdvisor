@@ -33,6 +33,7 @@ namespace NGUAdvisor.Managers
             public double GearIntake = 1.0;
             public double CubeIntake = BoostValueMath.CubeIntake(1.0, false, 1.0);
             public double RecycleChance;
+            public int DropType;   // game autoTransform 1..3: every boost drop is rerolled into this type; 0 = uniform
         }
 
         // CUBE SOFTCAP AT THE KILL LOADOUT. cubePower() re-reads the softcap (base attack + WORN gear
@@ -73,8 +74,16 @@ namespace NGUAdvisor.Managers
             int[] prio = Main.Settings?.PriorityBoosts;
             if (prio != null)
                 foreach (int id in prio) ids.Add(id);
-            ids.RemoveWhere(id => InventoryManager.BoostBlacklisted(id));
+            ids.RemoveWhere(id => TakesNoBoost(id));
             return ids;
+        }
+
+        // Blacklisted, or the copy GetBoostSlots would pick is frozen by transform-chain protection:
+        // either way the item never receives a boost, so it is neither a sink nor demand.
+        public static bool TakesNoBoost(int id)
+        {
+            if (InventoryManager.BoostBlacklisted(id)) return true;
+            return TransformManager.Frozen(LoadoutManager.FindItemSlot(id));
         }
 
         public static Sinks Current()
@@ -111,17 +120,21 @@ namespace NGUAdvisor.Managers
                     c.adventure.itopod.perkLevel[ImprovedCubeBoostingPerk] >= 1,
                     c.wishesController.totalBoostRatioDivider());
                 s.RecycleChance = c.totalRecycleBonus();
+                int autoTransform = c.settings.autoTransform;
+                s.DropType = autoTransform >= TypePower && autoTransform <= TypeSpecial ? autoTransform : TypeNone;
             }
             catch (Exception e) { Main.LogDebug($"BoostSinks.Current: {e.Message}"); }
             return s;
         }
 
-        // Expected adventure-stat points delivered by ONE dropped boost of `tier`, averaged over the
-        // three equally likely types and following the recycling chain (which preserves the type).
+        // Expected adventure-stat points delivered by ONE dropped boost of `tier`, following the
+        // recycling chain (which preserves the type). With the game's autoTransform on 1..3 every drop
+        // is rerolled into that type (ItemNameDesc.makeLoot); otherwise the three types are equally likely.
         public static double ValueOfDrop(int tier, Sinks s)
         {
             if (s == null || tier < 1) return 0.0;
             double[] scores = ScoresAt(tier, s, s.CubeUsable);
+            if (s.DropType >= TypePower && s.DropType <= TypeSpecial) return scores[s.DropType - 1];
             return (scores[0] + scores[1] + scores[2]) / 3.0;
         }
 

@@ -204,8 +204,9 @@ namespace NGUAdvisor.Managers
                         break;
                     case PodAi.Poison:
                         hp -= hit;
-                        if (counter >= 1 && counter <= 5) hp -= poisonTick;
-                        if (counter > 5) counter = -3;
+                        // EnemyAI.poisonAttack bumps the counter inside the tick branch as well as at the end.
+                        if (counter >= 1 && counter <= 5) { hp -= poisonTick; counter++; }
+                        else if (counter > 5) counter = -3;
                         counter++;
                         break;
                     case PodAi.Rapid:

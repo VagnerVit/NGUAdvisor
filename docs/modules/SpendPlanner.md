@@ -56,6 +56,8 @@ while the guide still had buys queued (user-reported).
   plan — there is no perk boss-req field to guard on, so a still-locked one must never stall
   earlier steps.
 - Quirk name id 6 carries a trailing space in game data — hence the `?.Trim()`.
+- `NextQuirk` skips quirks whose system is locked, like `tryLevelUp` does: `quirkType` Res3/Cards/Wishes
+  needs `res3On`/`cardsOn`/`wishesOn` (`QuirkSystemLocked`); `doLevelUp` itself checks none of it.
 - **Every step must be quotable from the guide (user-reported 2026-10-02).** The ch4 block once
   carried More Inventory Space I/II, Bonus Boss EXP and TM Level Banks I/II — none of them in any
   guide perk order — ahead of BB2, while ICB and the whole Evil-prep set were missing; auto-buy spent

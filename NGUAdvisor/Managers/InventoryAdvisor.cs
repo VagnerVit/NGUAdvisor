@@ -187,6 +187,7 @@ namespace NGUAdvisor.Managers
             try
             {
                 var f = LoadoutManager.FindItemSlot(id);
+                if (TransformManager.Frozen(f)) return false;
                 return f != null && f.equipment.GetNeededBoosts().Total() > 0;
             }
             catch { return true; }
@@ -224,7 +225,7 @@ namespace NGUAdvisor.Managers
             // because this is the value AdvisorApply writes into Settings.PriorityBoosts every 10 minutes:
             // an item that GetBoostSlots is going to skip must not be put back into the list the panel
             // shows, or the panel disagrees with the behavior once every advisor pass.
-            return list.Where(id => !InventoryManager.BoostBlacklisted(id)).ToArray();
+            return list.Where(id => !BoostSinks.TakesNoBoost(id)).ToArray();
         }
     }
 }

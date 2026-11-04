@@ -68,7 +68,7 @@ namespace NGUAdvisor.Managers
                 double k;
                 try
                 {
-                    k = c.settings.rebirthDifficulty == difficulty.sadistic ? 1.25
+                    k = c.settings.rebirthDifficulty == difficulty.sadistic ? c.bossController.sadisticBossMultiplier()
                         : c.settings.rebirthDifficulty == difficulty.evil ? 1.5 : 2.0;
                 }
                 catch { k = 2.0; }
@@ -248,7 +248,7 @@ namespace NGUAdvisor.Managers
         }
 
         // ---- Slice 2: allocation strips. The per-system challenge guards already exist (AugmentBP/
-        // BestAug refuse NOAUG, TimeMachineBP refuses NOTM, NGUBP dies with the disabled NGU button),
+        // BestAug refuse NOAUG, TimeMachineBP refuses NOTM, NGUBP is locked while NGU.disabled),
         // and PerformSwap filters IsValid() BEFORE computing shares — so redistribution is free. The
         // hole this closes: a profile breakpoint whose priorities are ALL dead in the active challenge
         // used to bail out and leave the resource idle for the whole challenge. Now the overlay

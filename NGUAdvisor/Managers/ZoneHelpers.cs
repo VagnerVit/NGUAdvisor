@@ -228,13 +228,30 @@ namespace NGUAdvisor.Managers
             _character.adventure.SetFieldValue($"titan{titanIndex + 1}Version", version - 1);
         }
 
+        // effectiveBossID the game's titan branches in AdventureController.checkTitanSpawns demand.
+        private static readonly int[] AutokillBossRequirement = { 58, 66, 82, 100, 116, 132, 426, 467, 491, 777, 826, 850 };
+
+        // Mirrors the game's own auto-kill gate: the player toggle, the boss threshold, the riddle
+        // unlock for T6-T9, then the stat thresholds (T1-T3 compare with strict >, T4+ with >=).
         public static bool AutokillAvailable(int titanIndex, int version)
         {
             if (titanIndex >= 12)
                 return false;
 
+            if (!_character.settings.autoKillTitans || _character.effectiveBossID() < AutokillBossRequirement[titanIndex])
+                return false;
+
             if (titanIndex >= 5)
+            {
+                switch (titanIndex)
+                {
+                    case 5: if (!_character.adventure.titan6Unlocked) return false; break;
+                    case 6: if (!_character.adventure.titan7Unlocked) return false; break;
+                    case 7: if (!_character.adventure.titan8Unlocked) return false; break;
+                    case 8: if (!_character.adventure.titan9Unlocked) return false; break;
+                }
                 return _character.adventureController.CallMethod<AdventureController, bool>($"autokillTitan{titanIndex + 1}V{version}Achieved");
+            }
 
             if (version != 1)
                 return false;
@@ -242,11 +259,11 @@ namespace NGUAdvisor.Managers
             switch (titanIndex)
             {
                 case 0:
-                    return _character.totalAdvAttack() >= 3000.0 && _character.totalAdvDefense() >= 2500.0;
+                    return _character.totalAdvAttack() > 3000.0 && _character.totalAdvDefense() > 2500.0;
                 case 1:
-                    return _character.totalAdvAttack() >= 9000.0 && _character.totalAdvDefense() >= 7000.0;
+                    return _character.totalAdvAttack() > 9000.0 && _character.totalAdvDefense() > 7000.0;
                 case 2:
-                    return _character.totalAdvAttack() >= 25000.0 && _character.totalAdvDefense() >= 15000.0;
+                    return _character.totalAdvAttack() > 25000.0 && _character.totalAdvDefense() > 15000.0;
                 case 3:
                     var itemCheck = _character.inventory.itemList.itemMaxxed[135];
                     return _character.totalAdvAttack() >= 8e5 && _character.totalAdvDefense() >= 4e5 && _character.totalAdvHPRegen() >= 14000.0 && itemCheck;

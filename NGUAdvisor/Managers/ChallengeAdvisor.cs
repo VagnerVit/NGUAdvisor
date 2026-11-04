@@ -31,11 +31,15 @@ namespace NGUAdvisor.Managers
                 // Inside a challenge there is nothing to recommend — finish this one first.
                 if (ChallengeDetector.Current() != null) return a;
 
+                // The gates count Normal completions (completions()); on Evil/Sadistic the game counts
+                // that challenge's other counter, so a Normal-counter recommendation would not advance.
+                if (c.settings.rebirthDifficulty != difficulty.normal) return a;
+
                 Dictionary<string, int> have = new Dictionary<string, int>();
-                // A challenge the game has not introduced yet throws on read; a missing key just means
+                // A challenge the player cannot enter yet is left out; a missing key just means
                 // "no gate to advise here", which ChallengeGates.Next already treats as skip.
-                try { have["TC"] = c.allChallenges.trollChallenge.completions(); } catch (Exception) { }
-                try { have["NOAUG"] = c.allChallenges.noAugsChallenge.completions(); } catch (Exception) { }
+                try { if (c.allChallenges.trollChallenge.unlocked()) have["TC"] = c.allChallenges.trollChallenge.completions(); } catch (Exception) { }
+                try { if (c.allChallenges.noAugsChallenge.unlocked()) have["NOAUG"] = c.allChallenges.noAugsChallenge.completions(); } catch (Exception) { }
                 if (have.Count == 0) return a;
 
                 ChallengeGates.Gate? next = ChallengeGates.Next(have);

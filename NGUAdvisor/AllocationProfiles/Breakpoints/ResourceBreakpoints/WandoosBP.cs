@@ -7,7 +7,14 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
     {
         protected override bool CorrectResourceType() => Type == ResourceType.Energy || Type == ResourceType.Magic;
 
-        protected override bool Unlocked() => _character.buttons.wandoos.interactable && !_character.wandoos98.disabled;
+        // Wandoos98Controller advances dump progress only while it is on and installed (or 24 h installed-time reached).
+        private const double InstallSeconds = 86400.0;
+
+        protected override bool Unlocked() =>
+            _character.buttons.wandoos.interactable
+            && !_character.wandoos98.disabled
+            && _character.settings.wandoos98On
+            && (_character.wandoos98.installed || _character.wandoos98.installTime.totalseconds >= InstallSeconds);
 
         // This used to be a hardcoded `false`, which is what made the lane a leftovers BLACK HOLE
         // (AllocationProfiles.md, "WAN/CAPWAN"): it never dropped out, never released its share, and

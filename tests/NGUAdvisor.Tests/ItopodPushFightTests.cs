@@ -52,7 +52,7 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void PoisonIsTheHardestAiWhenDefenseFloorsTheRegularHit()
         {
-            // Floor 100: a ~290 s fight; regular hits total ~39k, poison adds ~43k on top.
+            // Floor 100: a ~290 s fight; regular hits total ~39k, poison adds ~33k on top.
             var f = Fighter(1000.0, 1e15, 60000.0, 0.0);
             int floor = 100;
             Assert.True(ItopodConstants.WinsFight(f, floor, ItopodConstants.PodAi.Normal));

@@ -121,8 +121,8 @@ A fixed target above `highestItopodLevel − 1` pushes to the TARGET, not to the
 the floor (every enemy stat grows with it, ours do not). Game truth (decomp `EnemyAI`): enemy hit
 `max(0.1·atk, atk − totalAdvDefense/2)·roll`, ×3 in beast mode (`PlayerController.takeDamage`),
 AR 1.2 s; every AI counter resets at spawn, and the pod spawns one of each of normal, charger (4×
-hit every 5th action, actions 3–4 idle), poison (+`floor(0.2·atk·roll)` straight off curHP on 5 of
-every 9 actions — defense does not touch it), rapid (actions 9–14 at 0.3·AR), grower (×(1 +
+hit every 5th action, actions 3–4 idle), poison (+`floor(0.2·atk·roll)` straight off curHP on 3 of
+every 7 actions (the game bumps its counter twice per tick action) — defense does not touch it), rapid (actions 9–14 at 0.3·AR), grower (×(1 +
 ⌊n/2⌋/5)) and paralyze (2 s of no attacking every 12 actions, action 1 of each cycle idle). Regen
 ticks on both sides. The enemy side takes its WORST jitter and roll (1.02, 1.2) because a death
 ends the push; our side is the mean sustained rotation (`BoostValueMath.SustainedDamagePerSlot`),

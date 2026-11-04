@@ -302,6 +302,15 @@ namespace NGUAdvisor.Managers
 
         public void DoCombat() => CombatAttacks();
 
+        // PlayerController.charge(): the factor a Charge would grant, whether or not one is active yet.
+        private float ChargeFactor()
+        {
+            float factor = _ac.chargeMulti;
+            if (_character.inventory.itemList.megaComplete)
+                factor *= 1.1f;
+            return factor;
+        }
+
         private float IncomingDamage(bool block, bool parry, bool charge)
         {
             float damage = Mathf.Max(_eai.minDamage(), _eai.baseDamage());
@@ -310,12 +319,17 @@ namespace NGUAdvisor.Managers
             damage *= TitanSpecialFactor();
             if (BeastModeActive())
                 damage *= 3f;
+            // PlayerController.takeDamage: block consumes Charge, so a parry in the same hit gets none.
+            float chargeFactor = charge ? ChargeFactor() : 1f;
             if (block)
+            {
                 damage *= _character.advancedTrainingController.block.blockBonus(0);
+                damage /= chargeFactor;
+                chargeFactor = 1f;
+            }
             if (parry)
-                damage /= 2f;
-            if (charge && (block || parry))
-                damage /= _ac.chargeMulti;
+                damage /= _ac.parryMulti * chargeFactor;
+            damage /= _pc.defenseBuffFactor * _pc.defenseDebuffFactor;
 
             switch (_enemy.AI)
             {
@@ -1231,7 +1245,9 @@ namespace NGUAdvisor.Managers
             }
 
             float attackMultiplier = _pc.baseDamage() * _pc.offenseBuffFactor * _pc.offenseDebuffFactor * _pc.chargeFactor * 0.8f;
-            float oneShotDamage = _enemy.curHP + _enemy.defense / 2;
+            // baseDamage() already subtracts the enemy's defense / 2, so a kill needs only curHP.
+            float oneShotDamage = _enemy.curHP;
+            float pierceMultiplier = _pc.baseDamage(3f) * _pc.offenseBuffFactor * _pc.offenseDebuffFactor * _pc.chargeFactor * 0.8f;
 
             var gain = 0f;
             var loss = 0f;
@@ -1310,7 +1326,7 @@ namespace NGUAdvisor.Managers
             if (canPierce)
             {
                 // If Piercing Attack one-shots the enemy, use it
-                if (_enemy.curHP + _enemy.defense / 3 <= attackMultiplier * _character.strongAttackPower())
+                if (_enemy.curHP <= pierceMultiplier * _character.strongAttackPower())
                 {
                     _ac.pierceMove.doMove();
                     return;

@@ -45,7 +45,8 @@ BeastMode → Parry. Offensive mode (3): paralyze-AI enemies paralyzed, Parry on
   mode (3× damage taken!), parry (halves), then block even if it was held for a special;
   charge multiplies parry/block mitigation (`chargeMulti`).
 - `IncomingDamage(block, parry, charge)` mirrors the game: titan growCount scaling, beast ×3,
-  block bonus, parry ÷2, poison DoT window, charger special ×4, exploder ×1000, grower scaling.
+  block bonus, parry ÷`parryMulti`, Charge ÷`chargeMulti`(×1.1 with `megaComplete`; block consumes it, so
+  a parry in the same hit gets none), player `defenseBuffFactor`/`defenseDebuffFactor`, poison DoT window, charger special ×4, exploder ×1000, grower scaling.
   Titan growth uses the count the game will have AFTER its bump (`growCount + 1`; Jake/Tippi and the
   Godmother's explosions scale before bumping). It also prices the whole tick of the scripted titans
   (decomp `EnemyAI.nerdAI/godmotherAI`): the Nerd's Power Glove on 4 is 5× **plus** the tick's random
@@ -70,8 +71,9 @@ when affordable. Strong/Pierce are held back near his special so they're availab
 
 ## Attack selection (`CombatAttacks`) — DPS economics
 
-- One-shot checks first: `oneShotDamage = curHP + defense/2` (pierce: `defense/3`) vs
-  `attackMultiplier × movePower` where attackMultiplier includes 0.8 safety factor.
+- One-shot checks first: `curHP` vs `attackMultiplier × movePower` (pierce: its own
+  multiplier from `baseDamage(3f)`), 0.8 safety factor included. `baseDamage()` already subtracts the
+  enemy's defense/2, so defense is NOT added to curHP again.
 - Otherwise a **gain/loss wait model**: `gain = power × (globalCooldown − remainingCooldown)`
   per available-but-not-ready stronger move vs `loss` = best ready move; waits for the stronger
   attack only when there's enough quiet time (`TimeTillNextDamagingAttack − OptimalTimeToBlock >

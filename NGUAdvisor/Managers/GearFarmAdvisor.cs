@@ -5,7 +5,7 @@ using System.Linq;
 namespace NGUAdvisor.Managers
 {
     // Gear-farm advisor (Farm Gear Zones): find zones whose droppable EQUIPMENT is not yet
-    // level-100 (each drop merges +1 toward the permanent item-max bonus) and rank them by
+    // level-100 (each drop merges its loot level + 1 toward the permanent item-max bonus) and rank them by
     // time-to-cap at the CURRENT drop chance; when no zone caps inside the time budget, report
     // the drop chance that would.
     //
@@ -34,7 +34,32 @@ namespace NGUAdvisor.Managers
             public int Span = 1;           // switch outcomes the roll splits into
             public bool Boss;              // fires on boss kills only
             public bool Normal;            // fires on normal-enemy kills only
+            public int Level;              // loot level of every item in the roll (makeLevelledLoot; makeLoot = 0)
+            public int[] Levels;           // per-item levels parallel to Items, where the roll mixes them
+            public ZoneGate Gate;          // game flag that must be set before the roll fires
             public int[] Items;
+        }
+
+        // Set-completion flags the game checks around a zone roll (LootDrop.zoneNDrop).
+        private enum ZoneGate { None, Choco, EdgyBoots, Western, Stealth }
+
+        private static bool GateOpen(ZoneGate gate, ItemList il)
+        {
+            switch (gate)
+            {
+                case ZoneGate.Choco: return il.chocoComplete;
+                case ZoneGate.EdgyBoots: return il.edgyBootsComplete;
+                case ZoneGate.Western: return il.westernComplete;
+                case ZoneGate.Stealth: return il.stealthComplete;
+                default: return true;
+            }
+        }
+
+        private static int LevelOf(Roll r, int id)
+        {
+            if (r.Levels == null) return r.Level;
+            int i = Array.IndexOf(r.Items, id);
+            return i >= 0 ? r.Levels[i] : r.Level;
         }
 
         // A zone is "worth farming now" if its slowest uncapped item finishes inside this budget
@@ -63,229 +88,229 @@ namespace NGUAdvisor.Managers
         private static readonly Dictionary<int, Roll[]> Table = new Dictionary<int, Roll[]>
         {
             { 0, new[] {
-                new Roll { Chance = 0.25, Span = 1, Normal = true, Items = new[] { 75 } },
+                new Roll { Chance = 0.25, Span = 1, Normal = true, Level = 10, Items = new[] { 75 } },
                 new Roll { Chance = 0.15, Span = 3, Normal = true, Items = new[] { 1, 14, 27 } } } },
             { 1, new[] {
                 new Roll { Chance = 0.15, Span = 3, Normal = true, Items = new[] { 1, 14, 27 } },
-                new Roll { Chance = 0.65, Span = 7, Boss = true, Items = new[] { 40, 41, 42, 43, 44, 45, 46 } },
-                new Roll { Chance = 0.1, Span = 1, Boss = true, Items = new[] { 77 } } } },
+                new Roll { Chance = 0.65, Span = 7, Boss = true, Level = 4, Items = new[] { 40, 41, 42, 43, 44, 45, 46 } },
+                new Roll { Chance = 0.1, Span = 1, Boss = true, Level = 4, Items = new[] { 77 } } } },
             { 2, new[] {
-                new Roll { Chance = 0.008, Span = 1, Items = new[] { 135 } },
+                new Roll { Chance = 0.008, Span = 1, Level = 1, Items = new[] { 135 } },
                 new Roll { Chance = 0.12, Span = 3, Normal = true, Items = new[] { 1, 14, 27 } },
                 new Roll { Chance = 0.08, Span = 3, Normal = true, Items = new[] { 2, 15, 28 } },
-                new Roll { Chance = 0.5, Span = 7, Boss = true, Items = new[] { 47, 48, 49, 50, 51, 52, 53 } },
-                new Roll { Chance = 0.013, Span = 1, Items = new[] { 432 } } } },
+                new Roll { Chance = 0.5, Span = 7, Boss = true, Levels = new[] { 1, 1, 1, 1, 1, 1, 0 }, Items = new[] { 47, 48, 49, 50, 51, 52, 53 } },
+                new Roll { Chance = 0.013, Span = 1, Level = 1, Items = new[] { 432 } } } },
             { 3, new[] {
                 new Roll { Chance = 0.13, Span = 3, Normal = true, Items = new[] { 1, 14, 27 } },
                 new Roll { Chance = 0.12, Span = 3, Normal = true, Items = new[] { 2, 15, 28 } },
-                new Roll { Chance = 0.75, Span = 9, Boss = true, Items = new[] { 54, 55, 56, 57, 58, 59, 60, 61, 53 } },
-                new Roll { Chance = 0.0125, Span = 1, Items = new[] { 433 } } } },
+                new Roll { Chance = 0.75, Span = 9, Boss = true, Levels = new[] { 0, 0, 0, 0, 0, 0, 0, 0, 1 }, Items = new[] { 54, 55, 56, 57, 58, 59, 60, 61, 53 } },
+                new Roll { Chance = 0.0125, Span = 1, Level = 1, Items = new[] { 433 } } } },
             { 4, new[] {
                 new Roll { Chance = 0.08, Span = 3, Normal = true, Items = new[] { 3, 16, 29 } },
                 new Roll { Chance = 0.08, Span = 3, Normal = true, Items = new[] { 2, 15, 28 } },
                 new Roll { Chance = 0.003, Span = 1, Boss = true, Items = new[] { 66 } },
                 new Roll { Chance = 0.01, Span = 1, Boss = true, Items = new[] { 67 } },
                 new Roll { Chance = 0.01, Span = 1, Boss = true, Items = new[] { 172 } },
-                new Roll { Chance = 0.4, Span = 1, Boss = true, Items = new[] { 53 } },
-                new Roll { Chance = 0.01, Span = 1, Items = new[] { 434 } } } },
+                new Roll { Chance = 0.4, Span = 1, Boss = true, Level = 2, Items = new[] { 53 } },
+                new Roll { Chance = 0.01, Span = 1, Level = 1, Items = new[] { 434 } } } },
             { 5, new[] {
                 new Roll { Chance = 0.015, Span = 3, Normal = true, Items = new[] { 3, 16, 29 } },
                 new Roll { Chance = 0.06, Span = 3, Normal = true, Items = new[] { 2, 15, 28 } },
-                new Roll { Chance = 0.4, Span = 8, Boss = true, Items = new[] { 68, 69, 70, 71, 72, 73, 74, 53 } },
-                new Roll { Chance = 0.007, Span = 1, Items = new[] { 435 } } } },
+                new Roll { Chance = 0.4, Span = 8, Boss = true, Levels = new[] { 0, 0, 0, 0, 0, 0, 0, 3 }, Items = new[] { 68, 69, 70, 71, 72, 73, 74, 53 } },
+                new Roll { Chance = 0.007, Span = 1, Level = 1, Items = new[] { 435 } } } },
             { 7, new[] {
                 new Roll { Chance = 0.03, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 3, 16, 29 } },
                 new Roll { Chance = 0.03, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 4, 17, 30 } },
                 new Roll { Chance = 0.3, Span = 7, Boss = true, Items = new[] { 85, 86, 87, 88, 89, 90, 91 } },
-                new Roll { Chance = 0.005, Span = 1, Items = new[] { 436 } } } },
+                new Roll { Chance = 0.005, Span = 1, Level = 1, Items = new[] { 436 } } } },
             { 9, new[] {
                 new Roll { Chance = 0.07, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 4, 17, 30 } },
                 new Roll { Chance = 0.07, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 5, 18, 31 } },
                 new Roll { Chance = 0.32, Span = 7, Boss = true, Items = new[] { 95, 96, 97, 98, 99, 100, 101 } },
-                new Roll { Chance = 0.005, Span = 1, Items = new[] { 437 } } } },
+                new Roll { Chance = 0.005, Span = 1, Level = 1, Items = new[] { 437 } } } },
             { 10, new[] {
                 new Roll { Chance = 0.06, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 4, 17, 30 } },
                 new Roll { Chance = 0.06, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 5, 18, 31 } },
                 new Roll { Chance = 0.3, Span = 7, Boss = true, Items = new[] { 103, 104, 105, 106, 107, 108, 109 } },
-                new Roll { Chance = 0.0015, Span = 1, Boss = true, Items = new[] { 110 } },
+                new Roll { Chance = 0.0015, Span = 1, Boss = true, Level = 4, Items = new[] { 110 } },
                 new Roll { Chance = 0.002, Span = 1, Boss = true, Items = new[] { 66 } },
-                new Roll { Chance = 0.0045, Span = 1, Items = new[] { 438 } } } },
+                new Roll { Chance = 0.0045, Span = 1, Level = 1, Items = new[] { 438 } } } },
             { 12, new[] {
                 new Roll { Chance = 0.03, Cap = 0.25, Span = 3, Normal = true, Items = new[] { 5, 18, 31 } },
                 new Roll { Chance = 0.03, Cap = 0.25, Span = 3, Normal = true, Items = new[] { 6, 19, 32 } },
                 new Roll { Chance = 0.2, Span = 5, Boss = true, Items = new[] { 122, 123, 124, 125, 126 } },
-                new Roll { Chance = 0.0015, Span = 1, Boss = true, Items = new[] { 127 } },
-                new Roll { Chance = 0.0025, Span = 1, Boss = true, Items = new[] { 66 } },
-                new Roll { Chance = 0.004, Span = 1, Items = new[] { 439 } } } },
+                new Roll { Chance = 0.0015, Span = 1, Boss = true, Level = 4, Items = new[] { 127 } },
+                new Roll { Chance = 0.0025, Span = 1, Boss = true, Level = 1, Items = new[] { 66 } },
+                new Roll { Chance = 0.004, Span = 1, Level = 1, Items = new[] { 439 } } } },
             { 13, new[] {
                 new Roll { Chance = 0.011, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 6, 19, 32 } },
                 new Roll { Chance = 0.011, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 7, 20, 33 } },
                 new Roll { Chance = 0.08, Span = 5, Boss = true, Items = new[] { 130, 131, 132, 133, 134 } },
                 new Roll { Chance = 0.01, Span = 1, Boss = true, Items = new[] { 76 } },
-                new Roll { Chance = 0.002, Span = 1, Items = new[] { 440 } } } },
+                new Roll { Chance = 0.002, Span = 1, Level = 1, Items = new[] { 440 } } } },
             { 15, new[] {
                 new Roll { Chance = 0.0035, Cap = 0.25, Span = 3, Normal = true, Items = new[] { 6, 19, 32 } },
                 new Roll { Chance = 0.0035, Cap = 0.25, Span = 3, Normal = true, Items = new[] { 7, 20, 33 } },
-                new Roll { Chance = 0.01, Span = 5, Boss = true, Items = new[] { 143, 144, 145, 146, 147 } },
-                new Roll { Chance = 0.0002, Span = 1, Boss = true, Items = new[] { 148 } },
-                new Roll { Chance = 0.006, Span = 1, Boss = true, Items = new[] { 76 } },
-                new Roll { Chance = 0.0002, Span = 1, Items = new[] { 441 } } } },
+                new Roll { Chance = 0.01, Span = 5, Boss = true, Level = 1, Items = new[] { 143, 144, 145, 146, 147 } },
+                new Roll { Chance = 0.0002, Span = 1, Boss = true, Level = 5, Items = new[] { 148 } },
+                new Roll { Chance = 0.006, Span = 1, Boss = true, Level = 1, Items = new[] { 76 } },
+                new Roll { Chance = 0.0002, Span = 1, Level = 1, Items = new[] { 441 } } } },
             { 17, new[] {
                 new Roll { Chance = 0.001, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 7, 20, 33 } },
                 new Roll { Chance = 0.001, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 8, 21, 34 } },
-                new Roll { Chance = 0.00006, Cap = 0.05, Span = 5, Normal = true, Items = new[] { 164, 165, 166, 167, 168 } },
-                new Roll { Chance = 0.00018, Cap = 0.15, Span = 5, Boss = true, Items = new[] { 164, 165, 166, 167, 168 } },
-                new Roll { Chance = 0.0005, Cap = 0.1, Span = 1, Boss = true, Items = new[] { 67 } },
-                new Roll { Chance = 0.00001, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.0001, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 94 } },
-                new Roll { Chance = 0.00005, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 163 } },
-                new Roll { Chance = 0.000012, Cap = 0.03, Span = 1, Items = new[] { 442 } } } },
+                new Roll { Chance = 0.00006, Cap = 0.05, Span = 5, Normal = true, Level = 1, Items = new[] { 164, 165, 166, 167, 168 } },
+                new Roll { Chance = 0.00018, Cap = 0.15, Span = 5, Boss = true, Level = 1, Items = new[] { 164, 165, 166, 167, 168 } },
+                new Roll { Chance = 0.0005, Cap = 0.1, Span = 1, Boss = true, Level = 10, Items = new[] { 67 } },
+                new Roll { Chance = 0.00001, Cap = 0.01, Span = 1, Boss = true, Level = 5, Items = new[] { 128 } },
+                new Roll { Chance = 0.0001, Cap = 0.01, Span = 1, Boss = true, Level = 1, Items = new[] { 94 } },
+                new Roll { Chance = 0.00005, Cap = 0.01, Span = 1, Boss = true, Level = 3, Items = new[] { 163 } },
+                new Roll { Chance = 0.000012, Cap = 0.03, Span = 1, Level = 1, Items = new[] { 442 } } } },
             { 18, new[] {
                 new Roll { Chance = 0.00012, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 8, 21, 34 } },
                 new Roll { Chance = 0.00012, Cap = 0.2, Span = 3, Normal = true, Items = new[] { 9, 22, 35 } },
-                new Roll { Chance = 0.00003, Cap = 0.04, Span = 5, Normal = true, Items = new[] { 173, 174, 175, 176, 177 } },
-                new Roll { Chance = 0.00009, Cap = 0.1, Span = 5, Boss = true, Items = new[] { 173, 174, 175, 176, 177 } },
-                new Roll { Chance = 0.00007, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 94 } },
-                new Roll { Chance = 0.00003, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 163 } },
-                new Roll { Chance = 0.000007, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.000001, Cap = 0.005, Span = 1, Boss = true, Items = new[] { 178 } },
-                new Roll { Chance = 0.000006, Cap = 0.02, Span = 1, Items = new[] { 443 } } } },
+                new Roll { Chance = 0.00003, Cap = 0.04, Span = 5, Normal = true, Level = 1, Items = new[] { 173, 174, 175, 176, 177 } },
+                new Roll { Chance = 0.00009, Cap = 0.1, Span = 5, Boss = true, Level = 1, Items = new[] { 173, 174, 175, 176, 177 } },
+                new Roll { Chance = 0.00007, Cap = 0.01, Span = 1, Boss = true, Level = 5, Items = new[] { 94 } },
+                new Roll { Chance = 0.00003, Cap = 0.01, Span = 1, Boss = true, Level = 8, Items = new[] { 163 } },
+                new Roll { Chance = 0.000007, Cap = 0.01, Span = 1, Boss = true, Level = 8, Items = new[] { 128 } },
+                new Roll { Chance = 0.000001, Cap = 0.005, Span = 1, Boss = true, Level = 5, Gate = ZoneGate.Stealth, Items = new[] { 178 } },
+                new Roll { Chance = 0.000006, Cap = 0.02, Span = 1, Level = 1, Items = new[] { 443 } } } },
             { 20, new[] {
                 new Roll { Chance = 0.00055, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 8, 21, 34 } },
                 new Roll { Chance = 0.00055, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 9, 22, 35 } },
-                new Roll { Chance = 0.00018, Cap = 0.08, Span = 5, Normal = true, Items = new[] { 221, 222, 223, 224, 225 } },
-                new Roll { Chance = 0.00055, Cap = 0.12, Span = 5, Boss = true, Items = new[] { 221, 222, 223, 224, 225 } },
-                new Roll { Chance = 0.00018, Cap = 0.12, Span = 2, Boss = true, Items = new[] { 226, 227 } },
+                new Roll { Chance = 0.00018, Cap = 0.08, Span = 5, Normal = true, Level = 1, Items = new[] { 221, 222, 223, 224, 225 } },
+                new Roll { Chance = 0.00055, Cap = 0.12, Span = 5, Boss = true, Level = 1, Items = new[] { 221, 222, 223, 224, 225 } },
+                new Roll { Chance = 0.00018, Cap = 0.12, Span = 2, Boss = true, Level = 1, Gate = ZoneGate.Choco, Items = new[] { 226, 227 } },
                 new Roll { Chance = 1E-9, Base = 0.001, Cap = 0.01, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.00008, Cap = 0.016, Span = 1, Items = new[] { 444 } } } },
+                new Roll { Chance = 0.00008, Cap = 0.016, Span = 1, Level = 1, Items = new[] { 444 } } } },
             { 21, new[] {
                 new Roll { Chance = 0.00012, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 8, 21, 34 } },
                 new Roll { Chance = 0.00012, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 9, 22, 35 } },
-                new Roll { Chance = 0.00007, Cap = 0.08, Span = 7, Normal = true, Items = new[] { 213, 214, 215, 216, 217, 218, 219 } },
-                new Roll { Chance = 0.00021, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 213, 214, 215, 216, 217, 218, 219 } },
-                new Roll { Chance = 0.000018, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 220 } },
-                new Roll { Chance = 1E-10, Base = 0.0015, Cap = 0.015, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.00002, Cap = 0.011, Span = 1, Items = new[] { 445 } } } },
+                new Roll { Chance = 0.00007, Cap = 0.08, Span = 7, Normal = true, Level = 1, Items = new[] { 213, 214, 215, 216, 217, 218, 219 } },
+                new Roll { Chance = 0.00021, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 213, 214, 215, 216, 217, 218, 219 } },
+                new Roll { Chance = 0.000018, Cap = 0.12, Span = 1, Boss = true, Level = 1, Gate = ZoneGate.EdgyBoots, Items = new[] { 220 } },
+                new Roll { Chance = 1E-10, Base = 0.0015, Cap = 0.015, Span = 1, Boss = true, Level = 1, Items = new[] { 142 } },
+                new Roll { Chance = 0.00002, Cap = 0.011, Span = 1, Level = 1, Items = new[] { 445 } } } },
             { 22, new[] {
                 new Roll { Chance = 0.0001, Cap = 0.08, Span = 3, Normal = true, Items = new[] { 9, 22, 35 } },
                 new Roll { Chance = 0.0001, Cap = 0.06, Span = 3, Normal = true, Items = new[] { 10, 23, 36 } },
-                new Roll { Chance = 0.00003, Cap = 0.08, Span = 6, Normal = true, Items = new[] { 231, 232, 233, 234, 235, 236 } },
-                new Roll { Chance = 0.0001, Cap = 0.12, Span = 6, Boss = true, Items = new[] { 231, 232, 233, 234, 235, 236 } },
-                new Roll { Chance = 2E-11, Base = 0.0015, Cap = 0.02, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.000012, Cap = 0.013, Span = 1, Items = new[] { 446 } } } },
+                new Roll { Chance = 0.00003, Cap = 0.08, Span = 6, Normal = true, Level = 1, Items = new[] { 231, 232, 233, 234, 235, 236 } },
+                new Roll { Chance = 0.0001, Cap = 0.12, Span = 6, Boss = true, Level = 1, Items = new[] { 231, 232, 233, 234, 235, 236 } },
+                new Roll { Chance = 2E-11, Base = 0.0015, Cap = 0.02, Span = 1, Boss = true, Level = 2, Items = new[] { 142 } },
+                new Roll { Chance = 0.000012, Cap = 0.013, Span = 1, Level = 1, Items = new[] { 446 } } } },
             { 24, new[] {
                 new Roll { Chance = 0.00005, Cap = 0.07, Span = 3, Normal = true, Items = new[] { 10, 23, 36 } },
                 new Roll { Chance = 0.00005, Cap = 0.07, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
-                new Roll { Chance = 0.000015, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 251, 252, 253, 254, 255, 256, 257 } },
-                new Roll { Chance = 0.00005, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 251, 252, 253, 254, 255, 256, 257 } },
-                new Roll { Chance = 0.00005, Cap = 0.03, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.000012, Cap = 0.03, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.000006, Cap = 0.017, Span = 1, Items = new[] { 447 } } } },
+                new Roll { Chance = 0.000015, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 251, 252, 253, 254, 255, 256, 257 } },
+                new Roll { Chance = 0.00005, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 251, 252, 253, 254, 255, 256, 257 } },
+                new Roll { Chance = 0.00005, Cap = 0.03, Span = 1, Boss = true, Level = 5, Items = new[] { 142 } },
+                new Roll { Chance = 0.000012, Cap = 0.03, Span = 1, Boss = true, Level = 25, Items = new[] { 128 } },
+                new Roll { Chance = 0.000006, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 447 } } } },
             { 25, new[] {
                 new Roll { Chance = 0.00003, Cap = 0.08, Span = 3, Normal = true, Items = new[] { 10, 23, 36 } },
                 new Roll { Chance = 0.00003, Cap = 0.08, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
-                new Roll { Chance = 0.000011, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 258, 259, 260, 261, 262, 263, 264 } },
-                new Roll { Chance = 0.000035, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 258, 259, 260, 261, 262, 263, 264 } },
-                new Roll { Chance = 0.000035, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.00001, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.000014, Cap = 0.017, Span = 1, Items = new[] { 448 } } } },
+                new Roll { Chance = 0.000011, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 258, 259, 260, 261, 262, 263, 264 } },
+                new Roll { Chance = 0.000035, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 258, 259, 260, 261, 262, 263, 264 } },
+                new Roll { Chance = 0.000035, Cap = 0.12, Span = 1, Boss = true, Level = 10, Items = new[] { 142 } },
+                new Roll { Chance = 0.00001, Cap = 0.12, Span = 1, Boss = true, Level = 68, Items = new[] { 128 } },
+                new Roll { Chance = 0.000014, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 448 } } } },
             { 27, new[] {
                 new Roll { Chance = 0.000022, Cap = 0.09, Span = 3, Normal = true, Items = new[] { 10, 23, 36 } },
                 new Roll { Chance = 0.000022, Cap = 0.09, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
-                new Roll { Chance = 0.000009, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 301, 302, 303, 304, 305, 306, 307 } },
-                new Roll { Chance = 0.000025, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 301, 302, 303, 304, 305, 306, 307 } },
-                new Roll { Chance = 0.000025, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.000006, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.000004, Cap = 0.017, Span = 1, Items = new[] { 449 } } } },
+                new Roll { Chance = 0.000009, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 301, 302, 303, 304, 305, 306, 307 } },
+                new Roll { Chance = 0.000025, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 301, 302, 303, 304, 305, 306, 307 } },
+                new Roll { Chance = 0.000025, Cap = 0.12, Span = 1, Boss = true, Level = 10, Items = new[] { 142 } },
+                new Roll { Chance = 0.000006, Cap = 0.12, Span = 1, Boss = true, Level = 68, Items = new[] { 128 } },
+                new Roll { Chance = 0.000004, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 449 } } } },
             { 28, new[] {
                 new Roll { Chance = 0.000018, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
                 new Roll { Chance = 0.000018, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
-                new Roll { Chance = 0.000007, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 308, 309, 310, 311, 312, 313, 314 } },
-                new Roll { Chance = 0.000021, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 308, 309, 310, 311, 312, 313, 314 } },
-                new Roll { Chance = 0.000021, Cap = 0.08, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.000007, Cap = 0.08, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.0000025, Cap = 0.017, Span = 1, Items = new[] { 450 } } } },
+                new Roll { Chance = 0.000007, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 308, 309, 310, 311, 312, 313, 314 } },
+                new Roll { Chance = 0.000021, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 308, 309, 310, 311, 312, 313, 314 } },
+                new Roll { Chance = 0.000021, Cap = 0.08, Span = 1, Boss = true, Level = 10, Items = new[] { 142 } },
+                new Roll { Chance = 0.000007, Cap = 0.08, Span = 1, Boss = true, Level = 68, Items = new[] { 128 } },
+                new Roll { Chance = 0.0000025, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 450 } } } },
             { 29, new[] {
                 new Roll { Chance = 0.000015, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
                 new Roll { Chance = 0.000015, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
-                new Roll { Chance = 0.0000055, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 315, 316, 317, 318, 319, 320, 321 } },
-                new Roll { Chance = 0.000018, Cap = 0.12, Span = 7, Boss = true, Items = new[] { 315, 316, 317, 318, 319, 320, 321 } },
-                new Roll { Chance = 0.000018, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 142 } },
-                new Roll { Chance = 0.0000055, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 128 } },
-                new Roll { Chance = 0.000002, Cap = 0.017, Span = 1, Items = new[] { 451 } } } },
+                new Roll { Chance = 0.0000055, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 315, 316, 317, 318, 319, 320, 321 } },
+                new Roll { Chance = 0.000018, Cap = 0.12, Span = 7, Boss = true, Level = 1, Items = new[] { 315, 316, 317, 318, 319, 320, 321 } },
+                new Roll { Chance = 0.000018, Cap = 0.12, Span = 1, Boss = true, Level = 10, Items = new[] { 142 } },
+                new Roll { Chance = 0.0000055, Cap = 0.12, Span = 1, Boss = true, Level = 68, Items = new[] { 128 } },
+                new Roll { Chance = 0.000002, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 451 } } } },
             { 31, new[] {
                 new Roll { Chance = 6E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 11, 24, 37 } },
                 new Roll { Chance = 6E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
-                new Roll { Chance = 2E-7, Cap = 0.05, Span = 7, Normal = true, Items = new[] { 345, 346, 347, 348, 349, 350, 351 } },
-                new Roll { Chance = 6E-7, Cap = 0.15, Span = 7, Boss = true, Items = new[] { 345, 346, 347, 348, 349, 350, 351 } },
-                new Roll { Chance = 0.0000012, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 170 } },
-                new Roll { Chance = 4E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 169 } },
-                new Roll { Chance = 8E-8, Cap = 0.017, Span = 1, Items = new[] { 452 } } } },
+                new Roll { Chance = 2E-7, Cap = 0.05, Span = 7, Normal = true, Level = 1, Items = new[] { 345, 346, 347, 348, 349, 350, 351 } },
+                new Roll { Chance = 6E-7, Cap = 0.15, Span = 7, Boss = true, Level = 1, Items = new[] { 345, 346, 347, 348, 349, 350, 351 } },
+                new Roll { Chance = 0.0000012, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 170 } },
+                new Roll { Chance = 4E-7, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 169 } },
+                new Roll { Chance = 8E-8, Cap = 0.017, Span = 1, Level = 1, Items = new[] { 452 } } } },
             { 32, new[] {
                 new Roll { Chance = 4E-7, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
                 new Roll { Chance = 4E-7, Cap = 0.1, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 1.5E-7, Cap = 0.05, Span = 7, Normal = true, Items = new[] { 352, 353, 354, 355, 356, 357, 358 } },
-                new Roll { Chance = 4.5E-7, Cap = 0.15, Span = 7, Boss = true, Items = new[] { 352, 353, 354, 355, 356, 357, 358 } },
-                new Roll { Chance = 4.5E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 229 } },
-                new Roll { Chance = 1.5E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 230 } } } },
+                new Roll { Chance = 1.5E-7, Cap = 0.05, Span = 7, Normal = true, Level = 1, Items = new[] { 352, 353, 354, 355, 356, 357, 358 } },
+                new Roll { Chance = 4.5E-7, Cap = 0.15, Span = 7, Boss = true, Level = 1, Items = new[] { 352, 353, 354, 355, 356, 357, 358 } },
+                new Roll { Chance = 4.5E-7, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 229 } },
+                new Roll { Chance = 1.5E-7, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 230 } } } },
             { 33, new[] {
                 new Roll { Chance = 2.5E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
                 new Roll { Chance = 2.5E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 1E-7, Cap = 0.04, Span = 7, Normal = true, Items = new[] { 359, 360, 361, 362, 363, 364, 365 } },
-                new Roll { Chance = 2E-8, Cap = 0.12, Span = 1, Normal = true, Items = new[] { 366 } },
-                new Roll { Chance = 3E-7, Cap = 0.15, Span = 7, Boss = true, Items = new[] { 359, 360, 361, 362, 363, 364, 365 } },
-                new Roll { Chance = 0.000001, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 229 } },
-                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 366 } },
-                new Roll { Chance = 3E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 230 } } } },
+                new Roll { Chance = 1E-7, Cap = 0.04, Span = 7, Normal = true, Level = 1, Items = new[] { 359, 360, 361, 362, 363, 364, 365 } },
+                new Roll { Chance = 2E-8, Cap = 0.12, Span = 1, Normal = true, Level = 1, Gate = ZoneGate.Western, Items = new[] { 366 } },
+                new Roll { Chance = 3E-7, Cap = 0.15, Span = 7, Boss = true, Level = 1, Items = new[] { 359, 360, 361, 362, 363, 364, 365 } },
+                new Roll { Chance = 0.000001, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 229 } },
+                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Level = 1, Gate = ZoneGate.Western, Items = new[] { 366 } },
+                new Roll { Chance = 3E-7, Cap = 0.12, Span = 1, Boss = true, Level = 1, Items = new[] { 230 } } } },
             { 35, new[] {
                 new Roll { Chance = 1E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 12, 25, 38 } },
                 new Roll { Chance = 1E-7, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 4E-8, Cap = 0.04, Span = 8, Normal = true, Items = new[] { 392, 393, 394, 395, 396, 397, 398, 399 } },
-                new Roll { Chance = 1.2E-7, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 392, 393, 394, 395, 396, 397, 398, 399 } },
-                new Roll { Chance = 4E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 229 } },
-                new Roll { Chance = 1.2E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 230 } } } },
+                new Roll { Chance = 4E-8, Cap = 0.04, Span = 8, Normal = true, Level = 1, Items = new[] { 392, 393, 394, 395, 396, 397, 398, 399 } },
+                new Roll { Chance = 1.2E-7, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 392, 393, 394, 395, 396, 397, 398, 399 } },
+                new Roll { Chance = 4E-7, Cap = 0.12, Span = 1, Boss = true, Level = 5, Items = new[] { 229 } },
+                new Roll { Chance = 1.2E-7, Cap = 0.12, Span = 1, Boss = true, Level = 5, Items = new[] { 230 } } } },
             { 36, new[] {
                 new Roll { Chance = 6E-8, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 6E-8, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 2.5E-8, Cap = 0.04, Span = 8, Normal = true, Items = new[] { 400, 401, 402, 403, 404, 405, 406, 407 } },
-                new Roll { Chance = 8E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 400, 401, 402, 403, 404, 405, 406, 407 } },
-                new Roll { Chance = 2.5E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 229 } },
-                new Roll { Chance = 8E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 230 } } } },
+                new Roll { Chance = 2.5E-8, Cap = 0.04, Span = 8, Normal = true, Level = 1, Items = new[] { 400, 401, 402, 403, 404, 405, 406, 407 } },
+                new Roll { Chance = 8E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 400, 401, 402, 403, 404, 405, 406, 407 } },
+                new Roll { Chance = 2.5E-7, Cap = 0.12, Span = 1, Boss = true, Level = 15, Items = new[] { 229 } },
+                new Roll { Chance = 8E-8, Cap = 0.12, Span = 1, Boss = true, Level = 15, Items = new[] { 230 } } } },
             { 37, new[] {
                 new Roll { Chance = 4E-8, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 4E-8, Cap = 0.15, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 1.6E-8, Cap = 0.04, Span = 8, Normal = true, Items = new[] { 408, 409, 410, 411, 412, 413, 414, 415 } },
-                new Roll { Chance = 5E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 408, 409, 410, 411, 412, 413, 414, 415 } },
-                new Roll { Chance = 1.6E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 229 } },
-                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 230 } } } },
+                new Roll { Chance = 1.6E-8, Cap = 0.04, Span = 8, Normal = true, Level = 1, Items = new[] { 408, 409, 410, 411, 412, 413, 414, 415 } },
+                new Roll { Chance = 5E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 408, 409, 410, 411, 412, 413, 414, 415 } },
+                new Roll { Chance = 1.6E-7, Cap = 0.12, Span = 1, Boss = true, Level = 40, Items = new[] { 229 } },
+                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Level = 40, Items = new[] { 230 } } } },
             { 39, new[] {
                 new Roll { Chance = 2.5E-8, Cap = 0.16, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 2.5E-8, Cap = 0.16, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 1E-8, Cap = 0.04, Span = 8, Normal = true, Items = new[] { 453, 454, 455, 456, 457, 458, 459, 460 } },
-                new Roll { Chance = 3E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 453, 454, 455, 456, 457, 458, 459, 460 } },
-                new Roll { Chance = 1E-7, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 295 } },
-                new Roll { Chance = 4E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 296 } } } },
+                new Roll { Chance = 1E-8, Cap = 0.04, Span = 8, Normal = true, Level = 1, Items = new[] { 453, 454, 455, 456, 457, 458, 459, 460 } },
+                new Roll { Chance = 3E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 453, 454, 455, 456, 457, 458, 459, 460 } },
+                new Roll { Chance = 1E-7, Cap = 0.12, Span = 1, Boss = true, Level = 2, Items = new[] { 295 } },
+                new Roll { Chance = 4E-8, Cap = 0.12, Span = 1, Boss = true, Level = 2, Items = new[] { 296 } } } },
             { 40, new[] {
                 new Roll { Chance = 2E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 2E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 8E-9, Cap = 0.05, Span = 8, Normal = true, Items = new[] { 496, 497, 498, 499, 500, 501, 502, 503 } },
-                new Roll { Chance = 2.4E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 496, 497, 498, 499, 500, 501, 502, 503 } },
-                new Roll { Chance = 8E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 295 } },
-                new Roll { Chance = 3E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 296 } } } },
+                new Roll { Chance = 8E-9, Cap = 0.05, Span = 8, Normal = true, Level = 1, Items = new[] { 496, 497, 498, 499, 500, 501, 502, 503 } },
+                new Roll { Chance = 2.4E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 496, 497, 498, 499, 500, 501, 502, 503 } },
+                new Roll { Chance = 8E-8, Cap = 0.12, Span = 1, Boss = true, Level = 4, Items = new[] { 295 } },
+                new Roll { Chance = 3E-8, Cap = 0.12, Span = 1, Boss = true, Level = 4, Items = new[] { 296 } } } },
             { 41, new[] {
                 new Roll { Chance = 1.6E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 1.6E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 6E-9, Cap = 0.05, Span = 8, Normal = true, Items = new[] { 461, 462, 463, 464, 465, 466, 467, 468 } },
-                new Roll { Chance = 1.8E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 461, 462, 463, 464, 465, 466, 467, 468 } },
-                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 295 } },
-                new Roll { Chance = 2.4E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 296 } } } },
+                new Roll { Chance = 6E-9, Cap = 0.05, Span = 8, Normal = true, Level = 1, Items = new[] { 461, 462, 463, 464, 465, 466, 467, 468 } },
+                new Roll { Chance = 1.8E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 461, 462, 463, 464, 465, 466, 467, 468 } },
+                new Roll { Chance = 6E-8, Cap = 0.12, Span = 1, Boss = true, Level = 8, Items = new[] { 295 } },
+                new Roll { Chance = 2.4E-8, Cap = 0.12, Span = 1, Boss = true, Level = 8, Items = new[] { 296 } } } },
             { 43, new[] {
                 new Roll { Chance = 1E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
                 new Roll { Chance = 1E-8, Cap = 0.17, Span = 3, Normal = true, Items = new[] { 13, 26, 39 } },
-                new Roll { Chance = 4E-9, Cap = 0.05, Span = 8, Normal = true, Items = new[] { 507, 508, 509, 510, 511, 512, 513, 514 } },
-                new Roll { Chance = 1.2E-8, Cap = 0.15, Span = 8, Boss = true, Items = new[] { 507, 508, 509, 510, 511, 512, 513, 514 } },
-                new Roll { Chance = 4E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 295 } },
-                new Roll { Chance = 1.8E-8, Cap = 0.12, Span = 1, Boss = true, Items = new[] { 296 } } } },
+                new Roll { Chance = 4E-9, Cap = 0.05, Span = 8, Normal = true, Level = 1, Items = new[] { 507, 508, 509, 510, 511, 512, 513, 514 } },
+                new Roll { Chance = 1.2E-8, Cap = 0.15, Span = 8, Boss = true, Level = 1, Items = new[] { 507, 508, 509, 510, 511, 512, 513, 514 } },
+                new Roll { Chance = 4E-8, Cap = 0.12, Span = 1, Boss = true, Level = 16, Items = new[] { 295 } },
+                new Roll { Chance = 1.8E-8, Cap = 0.12, Span = 1, Boss = true, Level = 16, Items = new[] { 296 } } } },
 
         };
 
@@ -337,7 +362,7 @@ namespace NGUAdvisor.Managers
                 var il = Main.Character.inventory.itemList;
                 foreach (Roll r in rolls)
                 {
-                    if (r.Chance <= 0 || r.Items == null || !r.Items.Any(id => StillWanted(id, il))) continue;
+                    if (r.Chance <= 0 || r.Items == null || !GateOpen(r.Gate, il) || !r.Items.Any(id => StillWanted(id, il))) continue;
                     need = Math.Max(need, (r.Cap - r.Base) / r.Chance);
                 }
             }
@@ -373,17 +398,19 @@ namespace NGUAdvisor.Managers
             }
         }
 
-        // Drops still needed to cap: 100 - highest owned level (a fresh drop is level 1; each
-        // merge is +1). Unowned items need the full 100.
-        private static int DropsNeeded(int id)
+        // Merge levels still needed to cap: 100 - highest owned level. A drop adds its own level + 1
+        // (Equipment.mergeItem), and the first copy of an unowned item arrives at its level without the
+        // +1, so unowned counts as level -1. The random bonusLootLevels chance is not modelled.
+        private static int LevelsNeeded(int id)
         {
+            const int UnownedLevel = -1;
             try
             {
                 var slot = LoadoutManager.FindItemSlot(id);
-                if (slot == null) return 100;
-                return Math.Max(1, 100 - slot.level);
+                int owned = slot == null ? UnownedLevel : (int)slot.level;
+                return Math.Max(1, 100 - owned);
             }
-            catch { return 100; }
+            catch { return 100 - UnownedLevel; }
         }
 
         // Per-hour drop rate of one roll at the given (already zone-adjusted) DC factor.
@@ -416,12 +443,12 @@ namespace NGUAdvisor.Managers
             double worst = 0;
             foreach (var id in missing)
             {
-                double perHour = 0;
+                double levelsPerHour = 0;
                 foreach (var r in rolls)
                     if (Array.IndexOf(r.Items, id) >= 0)
-                        perHour += RollRate(r, dc, est);
-                if (perHour <= 0) return double.PositiveInfinity;
-                worst = Math.Max(worst, DropsNeeded(id) / perHour);
+                        levelsPerHour += RollRate(r, dc, est) * (LevelOf(r, id) + 1);
+                if (levelsPerHour <= 0) return double.PositiveInfinity;
+                worst = Math.Max(worst, LevelsNeeded(id) / levelsPerHour);
             }
             return worst;
         }
@@ -446,7 +473,7 @@ namespace NGUAdvisor.Managers
                     try
                     {
                         if (ZoneHelpers.ZoneIsTitan(zone)) continue;
-                        if (zone >= ZoneHelpers.ZoneUnlocks.Length || c.bossID <= ZoneHelpers.ZoneUnlocks[zone]) continue;
+                        if (zone >= ZoneHelpers.ZoneUnlocks.Length || c.effectiveBossID() < ZoneHelpers.ZoneUnlocks[zone]) continue;
 
                         // Cadence decides viability now, not OPower: a zone we cannot dent (damage
                         // below enemy regen) or cannot survive is out, and everything else is costed
@@ -468,8 +495,9 @@ namespace NGUAdvisor.Managers
                         }
                         if (bestEst == null) continue;
 
+                        Roll[] openRolls = kv.Value.Where(r => GateOpen(r.Gate, il)).ToArray();
                         var missing = new List<int>();
-                        foreach (var id in kv.Value.SelectMany(r => r.Items).Distinct())
+                        foreach (var id in openRolls.SelectMany(r => r.Items).Distinct())
                             if (StillWanted(id, il)) missing.Add(id);
                         if (missing.Count == 0) continue;
 
@@ -479,15 +507,15 @@ namespace NGUAdvisor.Managers
                             ZoneName = ZoneHelpers.ZoneList.TryGetValue(zone, out var n) ? n : $"Zone {zone}",
                             MissingItems = missing,
                             Mode = bestMode,
-                            HoursToCap = HoursToCap(zone, kv.Value, missing, lootFactor, bestEst)
+                            HoursToCap = HoursToCap(zone, openRolls, missing, lootFactor, bestEst)
                         };
                         plan.Viable = plan.HoursToCap <= budgetH;
 
                         // Required lootFactor for the budget: rates are monotonic in DC, so binary
                         // search; if even a huge DC can't cap in budget (roll caps), report -1.
                         if (plan.Viable) plan.ReqLootFactor = 0;
-                        else if (double.IsInfinity(HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst))
-                            || HoursToCap(zone, kv.Value, missing, lootFactor * 1e9, bestEst) > budgetH)
+                        else if (double.IsInfinity(HoursToCap(zone, openRolls, missing, lootFactor * 1e9, bestEst))
+                            || HoursToCap(zone, openRolls, missing, lootFactor * 1e9, bestEst) > budgetH)
                             plan.ReqLootFactor = -1;
                         else
                         {
@@ -495,7 +523,7 @@ namespace NGUAdvisor.Managers
                             for (int i = 0; i < 60; i++)
                             {
                                 double mid = Math.Sqrt(lo * hi);   // geometric: the range spans decades
-                                if (HoursToCap(zone, kv.Value, missing, mid, bestEst) <= budgetH) hi = mid;
+                                if (HoursToCap(zone, openRolls, missing, mid, bestEst) <= budgetH) hi = mid;
                                 else lo = mid;
                             }
                             plan.ReqLootFactor = hi;

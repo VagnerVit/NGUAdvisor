@@ -18,9 +18,11 @@ namespace NGUAdvisor.AllocationProfiles.RebirthStuff
             private readonly string engage;
             private readonly int maxCompletions;
             private readonly Func<int> curCompletions;
+            private readonly Func<bool> unlocked;
 
-            private RCTarget(string name, int index, string engage, int maxCompletions, Func<int> curCompletions)
+            private RCTarget(string name, int index, string engage, int maxCompletions, Func<int> curCompletions, Func<bool> unlocked)
             {
+                this.unlocked = unlocked;
                 this.name = name;
                 this.index = index;
                 this.maxCompletions = maxCompletions;
@@ -35,43 +37,45 @@ namespace NGUAdvisor.AllocationProfiles.RebirthStuff
                 {
                     case "BASIC":
                         return new RCTarget("Basic Challenge", index, "engageBasicChallenge",
-                            cc.basicChallenge.maxCompletions, () => cc.basicChallenge.currentCompletions());
+                            cc.basicChallenge.maxCompletions, () => cc.basicChallenge.currentCompletions(), () => cc.basicChallenge.unlocked());
                     case "NOAUG":
                         return new RCTarget("No Augs Challenge", index, "engageNoAugsChallenge",
-                            cc.noAugsChallenge.maxCompletions, () => cc.noAugsChallenge.currentCompletions());
+                            cc.noAugsChallenge.maxCompletions, () => cc.noAugsChallenge.currentCompletions(), () => cc.noAugsChallenge.unlocked());
                     case "24HR":
                         return new RCTarget("24 Hour Challenge", index, "engage24HourChallenge",
-                            cc.hour24Challenge.maxCompletions, () => cc.hour24Challenge.currentCompletions());
+                            cc.hour24Challenge.maxCompletions, () => cc.hour24Challenge.currentCompletions(), () => cc.hour24Challenge.unlocked());
                     case "100LC":
                         return new RCTarget("100 Level Challenge", index, "engagelevel100Challenge",
-                            cc.level100Challenge.maxCompletions, () => cc.level100Challenge.currentCompletions());
+                            cc.level100Challenge.maxCompletions, () => cc.level100Challenge.currentCompletions(), () => cc.level100Challenge.unlocked());
                     case "NOEC":
                         return new RCTarget("No Equipment Challenge", index, "engageNoEquipChallenge",
-                            cc.noEquipmentChallenge.maxCompletions, () => cc.noEquipmentChallenge.currentCompletions());
+                            cc.noEquipmentChallenge.maxCompletions, () => cc.noEquipmentChallenge.currentCompletions(), () => cc.noEquipmentChallenge.unlocked());
                     case "TC":
                         return new RCTarget("Troll Challenge", index, "engageTrollChallenge",
-                            cc.trollChallenge.maxCompletions, () => cc.trollChallenge.currentCompletions());
+                            cc.trollChallenge.maxCompletions, () => cc.trollChallenge.currentCompletions(), () => cc.trollChallenge.unlocked());
                     case "NORB":
                         return new RCTarget("No Rebirth Challenge", index, "engageNoRebirthChallenge",
-                            cc.noRebirthChallenge.maxCompletions, () => cc.noRebirthChallenge.currentCompletions());
+                            cc.noRebirthChallenge.maxCompletions, () => cc.noRebirthChallenge.currentCompletions(), () => cc.noRebirthChallenge.unlocked());
                     case "LSC":
                         return new RCTarget("Laser Sword Challenge", index, "engageLaserSwordChallenge",
-                            cc.laserSwordChallenge.maxCompletions, () => cc.laserSwordChallenge.currentCompletions());
+                            cc.laserSwordChallenge.maxCompletions, () => cc.laserSwordChallenge.currentCompletions(), () => cc.laserSwordChallenge.unlocked());
                     case "BLIND":
                         return new RCTarget("Blind Challenge", index, "engageBlindChallenge",
-                            cc.blindChallenge.maxCompletions, () => cc.blindChallenge.currentCompletions());
+                            cc.blindChallenge.maxCompletions, () => cc.blindChallenge.currentCompletions(), () => cc.blindChallenge.unlocked());
                     case "NONGU":
                         return new RCTarget("No NGU Challenge", index, "engageNGUChallenge",
-                            cc.NGUChallenge.maxCompletions, () => cc.NGUChallenge.currentCompletions());
+                            cc.NGUChallenge.maxCompletions, () => cc.NGUChallenge.currentCompletions(), () => cc.NGUChallenge.unlocked());
                     case "NOTM":
                         return new RCTarget("No TM Challenge", index, "engageTimeMachineChallenge",
-                            cc.timeMachineChallenge.maxCompletions, () => cc.timeMachineChallenge.currentCompletions());
+                            cc.timeMachineChallenge.maxCompletions, () => cc.timeMachineChallenge.currentCompletions(), () => cc.timeMachineChallenge.unlocked());
                 }
                 Log($"Incorrect challenge name: {name}");
                 return null;
             }
 
-            public bool ChallengeValid() => index <= maxCompletions && index == curCompletions() + 1;
+            // Engage() calls engageXxx directly, so the game's own start gates (verifyChallengeStatus, unlocked()) are ours to check.
+            public bool ChallengeValid() => index <= maxCompletions && index == curCompletions() + 1
+                && _character.bossID > 0 && unlocked();
 
             public bool Engage()
             {
@@ -158,6 +162,10 @@ namespace NGUAdvisor.AllocationProfiles.RebirthStuff
                 return false;
 
             if (_character.rebirthTime.totalseconds < _character.rebirth.minRebirthTime() || _character.challenges.noRebirthChallenge.inChallenge)
+                return false;
+
+            // Rebirth.rebirth() refuses without the first boss while the next rebirth difficulty is the selected one.
+            if (_character.bossID <= 0 && _character.nextRebirthDifficulty == _character.settings.rebirthDifficulty)
                 return false;
 
             return true;

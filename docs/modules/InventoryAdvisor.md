@@ -36,6 +36,10 @@ boosted by the manager pass regardless" assumption is gone. Fully-boosted items 
 display. Written into `Settings.PriorityBoosts` by `AdvisorApply.ApplyBoostPriority` (10-min throttle —
 this is the expensive sweep).
 
+**Frozen transform-chain copies are not boost demand** (`BoostSinks.TakesNoBoost`, same test as the
+blacklist plus `TransformManager.Frozen` on the copy `FindItemSlot` returns): `GetBoostSlots` skips them, so
+`NeedsBoosts` and the final filter drop them too.
+
 **`Settings.BoostBlacklist` is filtered out of the returned order** (restored 2026-08-26 —
 `InventoryManager.BoostBlacklisted`). Filtered at the end, not in the three passes, because this value
 is what gets written into `PriorityBoosts`: without the filter, an item the user blacklisted is put

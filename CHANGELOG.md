@@ -24,6 +24,20 @@ All notable changes to NGU Advisor are documented in this file.
   short of one level per tick are no longer forecast up to twice too fast.
 - **The Number NGU is valued with the run's time multiplier**, as the game applies it.
 - **Iron Pill gains are capped at 1e8**, as in the game.
+- **Boost and gear farming see every unlocked zone on Evil and Sadistic** — zones were compared
+  with the boss number of the current difficulty, so every zone above it was treated as locked.
+- **Gear farm counts the level a drop arrives at**, so items that drop pre-levelled (up to L68) no
+  longer read as tens of times slower to cap, and set-locked items wait for their set.
+- **ITOPOD boosts count as the level-1 drops they are**, and with auto-transform on a drop is valued
+  as the type it turns into; transform-chain copies kept at 100 no longer count as boost demand.
+- **Titans count as auto-killed only with the game's auto-kill toggle on** and its exact thresholds.
+- **ITOPOD and zone fight models use the game's poison and paralyse timing**; the one-shot check no
+  longer counts enemy defense twice, and incoming damage includes defensive buffs, parry and charge.
+- **No NGU and the Troll NGU troll stop NGU allocation**, since the game zeroes every NGU bonus there.
+- **Profile challenges start only once the game has unlocked them**, and challenge advice is
+  limited to unlocked challenges on Normal, where those completions count.
+- **Quirks for Resource 3, cards and wishes wait until the system is unlocked**, as the game does.
+- **Wandoos and its AT slots get nothing while Wandoos is off or still installing.**
 
 ## [1.13.0] - 2026-11-04
 
