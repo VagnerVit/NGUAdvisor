@@ -28,7 +28,7 @@ BloodPlanner mirrors both so its "CAST NOW" advice can never contradict what the
 
 ## Effect formulas (game-exact)
 
-- Iron Pill: `floor(blood^0.25)`, ×`ironPillBonus()` on Evil+.
+- Iron Pill: `floor(blood^0.25)`, ×`ironPillBonus()` on Evil+. Clamped at 1e8 like the game.
 - MacGuffin α: `floor((log10(blood/minMacguffin1Blood) + 1) × totalBloodGuffbonus())`; unlock =
   perk 72 ≥ 1.
 - MacGuffin β: `floor(log20(blood/minMacguffin2Blood) + 1)`; unlock = perk 73 ≥ 1 AND Evil+.

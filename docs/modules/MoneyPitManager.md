@@ -46,6 +46,7 @@ the user's threshold.
 IronPill → digger {10} (Blood) + cap all rituals (if ManageMagic); Worn → Shockwave loadout with
 daycare save (gear-leveling run); Exp → digger {11} (EXP); Pomegranate → Yggdrasil loadout;
 Daycare → fill daycare. Non-prediction path: ≥1e50 with wish 4 → Shockwave + diggers {11,10}.
+The advisor tier-ETA ignores the ≥1e50 thresholds without wish 4: `oneTossReward` gives everything ≥1e30 one tier then.
 
 ## Advisor throw policy (`AdvisorPlan`) — shared by ApplyPit and the PIT panel chip
 

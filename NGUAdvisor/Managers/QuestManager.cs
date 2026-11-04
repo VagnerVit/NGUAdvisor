@@ -143,7 +143,11 @@ namespace NGUAdvisor.Managers
             var time = slots * _qc.timerThreshold() - Quest.dailyQuestTimer.totalseconds;
             var averageDrops = Settings.FiftyItemMinors || _character.adventure.itopod.perkLevel[94] >= 610 ? 50f : 54.5f;
             var remainingDrops = Quest.inQuest ? Quest.targetDrops - Quest.curDrops : averageDrops;
-            var eta = _qc.expectedTimePerDrop() * _qc.idleDropFactor() * remainingDrops;
+            // idleDropFactor scales idle questing only; a manual quest drops at 1 / expectedTimePerDrop.
+            bool nextQuestIsMajor = Settings.AllowMajorQuests && Quest.curBankedQuests > 0;
+            bool runsIdle = Quest.inQuest ? Quest.idleMode : !Settings.ManualMinors && !nextQuestIsMajor;
+            float dropFactor = runsIdle ? _qc.idleDropFactor() : 1f;
+            var eta = _qc.expectedTimePerDrop() * dropFactor * remainingDrops;
             // Give a bit of extra time for safety
             questBankOverfill = time * 1.1f < eta;
         }

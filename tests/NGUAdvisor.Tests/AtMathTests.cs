@@ -133,22 +133,52 @@ namespace NGUAdvisor.Tests
             Assert.Equal(1338.2, seconds.Value, 1);
         }
 
-        // The third branch: the target sits ABOVE the ceiling, so the answer is the tick-capped stretch
-        // up to the ceiling PLUS the closed form beyond it. ppt = 2 at level 1000 puts the ceiling at
-        // 2*1001 - 1 = 2001 and r at 2*1001/0.02 = 100100.
+        // Above the ceiling a level costs ceil((L+1)/c) ticks (the bar discards its overflow). ppt = 2 at
+        // level 1000 gives c = 2002; worked by hand for k = L+1 = 1001..5000:
+        //   k <= 2002 -> 1 tick (1002 levels), k <= 4004 -> 2 ticks (2002 levels), rest -> 3 ticks (996).
+        //   1002 + 4004 + 2988 = 7994 ticks = 159.88 s.
         [Fact]
-        public void ATargetPastTheCeilingPaysTicksToItAndTheClosedFormBeyond()
+        public void ATargetPastTheCeilingPaysWholeTicksPerLevel()
         {
             double? seconds = AtMath.SecondsToTarget(1000, 5000, 2, 0.02);
             Assert.NotNull(seconds);
-            // 0.02*(2001-1000) + ((5001^2 - 2002^2) / (2*100100)) = 20.02 + 104.90508
-            Assert.Equal(124.925, seconds.Value, 3);
+            Assert.Equal(159.88, seconds.Value, 6);
 
-            // And it is SLOWER than either single-regime shortcut, which is the defect this branch fixes:
-            // the uncapped closed form starts at r/(L+1) = 100 levels/s, twice what one level per tick
-            // allows, so dropping the cap promises a time the game cannot deliver.
+            // Slower than the continuous closed form (124.925 s with the cap, 119.925 s without).
             Assert.True(seconds.Value > AtMath.SecondsToLevel(1000, 5000, 100100).Value);
             Assert.True(seconds.Value > 0.02 * (5000 - 1000));
+        }
+
+        // Span above the exact cap but few tick-count groups: c = 100, k = 1024..10000. Hand-worked:
+        // k 1024..1100 cost 11 (77 levels), then 100 levels each at 12..100 ticks.
+        [Fact]
+        public void ALongSpanWithFewTickGroupsIsStillExact()
+        {
+            double? seconds = AtMath.SecondsToTarget(1023, 10000, 100.0 / 1024.0, 0.02);
+            Assert.NotNull(seconds);
+            Assert.Equal((77 * 11 + 100 * (5050 - 66)) * 0.02, seconds.Value, 6);
+        }
+
+        // Both caps exceeded: c = 0.5 makes every level cost exactly 2k ticks, so the exact sum is
+        // N(N+1) - 1023*1024 and the approximation must land within 1e-4 of it.
+        [Fact]
+        public void AHugeSpanFallsBackToTheMeanTickCount()
+        {
+            const double n = 1_000_000;
+            double? seconds = AtMath.SecondsToTarget(1023, n, 0.5 / 1024.0, 0.02);
+            Assert.NotNull(seconds);
+            double exact = (n * (n + 1) - 1023.0 * 1024.0) * 0.02;
+            Assert.InRange(seconds.Value / exact, 1.0 - 1e-4, 1.0 + 1e-4);
+        }
+
+        [Fact]
+        public void LevelsPerTickIsOneOverTheWholeTicksPerLevel()
+        {
+            Assert.Equal(1.0, AtMath.LevelsPerTick(1.0), 12);
+            Assert.Equal(1.0, AtMath.LevelsPerTick(40.0), 12);
+            Assert.Equal(0.5, AtMath.LevelsPerTick(0.6), 12);          // 1/0.6 = 1.67 -> 2 ticks
+            Assert.Equal(1.0 / 200.0, AtMath.LevelsPerTick(0.005014), 12);
+            Assert.Equal(0.0, AtMath.LevelsPerTick(0.0), 12);
         }
 
         [Fact]
@@ -165,11 +195,11 @@ namespace NGUAdvisor.Tests
 
         // ---- LevelAtCapped: the forward projection AtHourPlanner extends the AT segment on ----
 
-        // THE safety property of the AtHourPlanner fix: at ppt <= 1 the ceiling sits at or below the
-        // current level, so the capped projection is the SAME arithmetic the planner used before. This
-        // is the whole argument that switching the planner over cannot move a non-blitz slot's forecast.
+        // Whole ticks per level move the projection by less than a level against the continuous closed
+        // form for a slot that is not blitz-boosting. At a vanishing ppt (hundreds of thousands of ticks
+        // per level) the two agree: the hour lands inside the first level, as a fraction of it.
         [Fact]
-        public void LevelAtCappedEqualsTheUncappedClosedFormWhenNotBlitzBoosting()
+        public void LevelAtCappedStaysWithinALevelOfTheClosedFormWhenNotBlitzBoosting()
         {
             double[] ppts = { 1.0, 0.75, 0.5, 0.1, 1e-6 };
             double[] levels = { 0, 1, 1000, 4_758_488 };
@@ -180,8 +210,11 @@ namespace NGUAdvisor.Tests
                     {
                         double r = ppt * (l0 + 1) / 0.02;
                         double uncapped = System.Math.Sqrt((l0 + 1) * (l0 + 1) + 2 * r * t) - 1;
-                        Assert.Equal(uncapped, AtMath.LevelAtCapped(l0, ppt, t, 0.02), 9);
+                        double capped = AtMath.LevelAtCapped(l0, ppt, t, 0.02);
+                        Assert.True(capped <= uncapped + 1.0, $"ppt={ppt} l0={l0} t={t}: {capped} > {uncapped}");
                     }
+            Assert.Equal(AtMath.LevelAt(4_758_488, 1e-6 * 4_758_489 / 0.02, 7200),
+                         AtMath.LevelAtCapped(4_758_488, 1e-6, 7200, 0.02), 1);
         }
 
         // And the other half: above one progress per tick the cap binds, so the projection must come out
@@ -217,36 +250,32 @@ namespace NGUAdvisor.Tests
         public void LevelAtCappedInsideTheCappedRegionIsOneLevelPerTick()
         {
             Assert.Equal(1500, AtMath.LevelAtCapped(1000, 2, 0.02 * 500, 0.02), 9);
-            Assert.Equal(2001, AtMath.LevelAtCapped(1000, 2, 20.02, 0.02), 9);     // exactly at the ceiling
+            Assert.Equal(2001, AtMath.LevelAtCapped(1000, 2, 20.02, 0.02), 9);     // 1001 ticks, 1001 levels
         }
 
-        // The straddle: the capped phase ends inside the window, so the answer is the ceiling carried
-        // forward by the closed form for the remainder. Mirrors SecondsToTarget's third branch, and the
-        // two must agree — the time this projection needs to reach a level is what SecondsToTarget quotes.
+        // Past the one-per-tick region the projection and SecondsToTarget are exact inverses at whole
+        // levels: 7994 ticks (159.88 s) land on level 5000 for ppt = 2 from level 1000 (see above).
         [Fact]
-        public void LevelAtCappedStraddlesIntoTheClosedFormAndAgreesWithSecondsToTarget()
+        public void LevelAtCappedAgreesWithSecondsToTarget()
         {
-            // The sheet-anchored 124.925 s is itself rounded, so it lands a fraction of a level short.
-            Assert.Equal(5000, AtMath.LevelAtCapped(1000, 2, 124.925, 0.02), 2);
-
-            // Exact both ways: the projection and the ETA are inverses across the straddle.
             double? t = AtMath.SecondsToTarget(1000, 5000, 2, 0.02);
             Assert.NotNull(t);
-            Assert.Equal(124.925, t.Value, 3);
             Assert.Equal(5000, AtMath.LevelAtCapped(1000, 2, t.Value, 0.02), 6);
 
-            // And the capped phase really is a prefix here: 1001 levels of it, then the closed form.
-            Assert.True(AtMath.LevelAtCapped(1000, 2, 20.02, 0.02) < AtMath.LevelAtCapped(1000, 2, 124.925, 0.02));
+            // One tick short of level 2003 (2 ticks per level there): half a level of progress.
+            Assert.Equal(2002.5, AtMath.LevelAtCapped(1000, 2, 0.02 * (1002 + 1), 0.02), 6);
+            Assert.True(AtMath.LevelAtCapped(1000, 2, 20.02, 0.02) < AtMath.LevelAtCapped(1000, 2, 159.88, 0.02));
         }
 
-        // The second branch, in isolation: below one progress per tick there is no ceiling above the
-        // current level, so the whole answer is the closed form and nothing is charged per tick.
+        // Below one progress per tick, ticks per level are ceil(k/c), not k/c: ppt = 0.4 at level 1000
+        // gives c = 400.4, so 3 ticks for k = 1001..1201 and 4 ticks for k = 1202..1500:
+        // 201*3 + 299*4 = 1799 ticks = 35.98 s, where the continuous form says ~31.2 s.
         [Fact]
-        public void ASlotBelowOneProgressPerTickIsPureClosedForm()
+        public void ASlotBelowOneProgressPerTickPaysWholeTicks()
         {
-            double? seconds = AtMath.SecondsToTarget(1000, 5000, 0.5, 0.02);
+            double? seconds = AtMath.SecondsToTarget(1000, 1500, 0.4, 0.02);
             Assert.NotNull(seconds);
-            Assert.Equal(AtMath.SecondsToLevel(1000, 5000, 0.5 * 1001 / 0.02).Value, seconds.Value, 6);
+            Assert.Equal(35.98, seconds.Value, 6);
         }
 
         // Worked by hand: 1 % of a 1e10 cap is 1e8; BB = 1e15 / speed <= 1e8 needs speed 1e7, i.e.

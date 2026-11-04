@@ -4,8 +4,8 @@ namespace NGUAdvisor.Managers
 {
     // What an hour of an NGU lane is worth, as the game computes it. Bonus curves are decomp
     // AllNGUController.<x>BonusNormal/Evil/Sadistic: linear up to a softcap, then a power of the level.
-    // Respawn has its own capped curve (NGUAdvisors.RespawnRatio); Number's timeMulti factor is left
-    // out, which leaves a ratio between two levels at the same run time unchanged only approximately.
+    // Respawn has its own capped curve (NGUAdvisors.RespawnRatio); Number's timeMulti scales its level
+    // term, so the caller folds it into `factor`.
     public static class NguGain
     {
         public const double TicksPerHour = 50.0 * 3600.0;
@@ -61,22 +61,14 @@ namespace NGUAdvisor.Managers
         public static double Ratio(bool magic, int id, int track, double level, double gained, double factor)
             => Bonus(magic, id, track, level + gained, factor) / Bonus(magic, id, track, level, factor);
 
-        // Levels one hour adds at a rate quoted at the current level. The game caps an NGU at one level
-        // per tick and divides progress by (level+1), so the quoted rate holds only for the first level:
-        // with K = progress per tick at level 0, levels come one per tick until level+1 reaches K, then
-        // (level+1)/K ticks each, i.e. (L+1)^2 grows by 2K per tick.
+        // Levels one hour adds at a rate quoted at the current level. The game divides progress by
+        // (level+1) and discards the bar's overflow, so a level costs max(1, ceil((level+1)/K)) ticks
+        // with K = progress per tick at level 0 (AtMath.LevelsInTicks).
         public static double LevelsInHour(double level, double levelsPerHourNow)
         {
             if (levelsPerHourNow <= 0) return 0;
             double k = levelsPerHourNow / TicksPerHour * (level + 1.0);
-            double ticks = TicksPerHour;
-            double at = level;
-            double cappedLevels = Math.Min(ticks, Math.Max(0.0, k - (at + 1.0)));
-            at += cappedLevels;
-            ticks -= cappedLevels;
-            if (ticks > 0)
-                at = Math.Sqrt((at + 1.0) * (at + 1.0) + 2.0 * k * ticks) - 1.0;
-            return at - level;
+            return AtMath.LevelsInTicks(level, k, TicksPerHour);
         }
     }
 }

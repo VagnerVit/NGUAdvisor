@@ -35,7 +35,7 @@ M = (energy/50) * sqrt(epow) * atSpeedBonus        so  progressPerTick = M / (ba
 r = 50 * progressPerTick * (L+1) = 50 * M / baseTime          <-- CONSTANT in L
 ```
 
-`r` being free of `L` is the whole trick: `dL/dt = r/(L+1)` then integrates exactly, and the panel
+`r` being free of `L` is the whole trick: `dL/dt = r/(L+1)` then integrates to the continuous model (the quantised ETA is below), and the panel
 needs no simulation. That gives the four functions in `AtMath.cs`:
 
 | function | closed form | the sheet's name for it |
@@ -49,10 +49,9 @@ needs no simulation. That gives the four functions in `AtMath.cs`:
 | `SecondsToTarget(level, target, ppt, tickSeconds)` | the **piecewise** answer built on the two above | the sheet's three-branch ETA |
 | `LevelAtCapped(l0, ppt, t, tickSeconds)` | the piecewise **forward** projection — `SecondsToTarget`'s twin | — (`AtHourPlanner` uses it) |
 
-**Do not replace these with a tick loop or a "safer" numeric solve.** They are not approximations;
-they are the exact integral of the game's own per-tick rule, and that is only true because `r` is
-constant. But the closed form alone is **only half the answer** — see the next section, which is the
-one fact the whole calculation turns on.
+`LevelAt` / `SecondsToLevel` are the **continuous** limit of the game's rule (`r` constant). They are
+not what the ETA quotes: the bar is quantised, so `SecondsToTarget` / `LevelAtCapped` count whole
+ticks per level — see the next section, which is the one fact the whole calculation turns on.
 
 ## The overflow is DISCARDED — which is why the ETA is piecewise
 
@@ -63,34 +62,37 @@ barProgress[id] += progressPerTick();
 if (barProgress[id] >= 1f) { barProgress[id] = 0f; if (canLevel()) level++; }
 ```
 
-**The bar is set to zero, not decremented by 1.** The overflow is thrown away. So a slot with
-`progressPerTick >= 1` gains **exactly one level per tick** — 0.02 s per level, hard — however much
-energy is assigned to it. Ten times the energy buys nothing there.
+**The bar is set to zero, not decremented by 1.** The overflow is thrown away. Within one level
+`progressPerTick` is constant, so climbing from level `L` to `L+1` takes exactly
+`max(1, ceil(1/p(L)))` ticks, with `p(L) = c/(L+1)` and `c = ppt·(level+1) = M/baseTime` (constant in
+`L`). With `k = L+1` a level costs `max(1, ceil(k/c))` ticks:
 
-That is the fact everything on this panel turns on. The closed form `dL/dt = r/(L+1)` is the *uncapped*
-rate; it is valid **only above the blitz-boost ceiling**. Below the ceiling the game is not slower than
-`r/(L+1)` — it is *capped*, and the cap is the binding constraint. `AtMath.SecondsToTarget`
-(`AtMath.cs:57-75`) therefore has three branches off `ceiling = BbCeiling(ppt·(level+1), 1.0)`:
+- `k <= c` (the blitz-boost region) is one level per tick — ten times the energy buys nothing there;
+- above it a level costs a **whole** number of ticks, so the real rate is below the continuous
+  `c/(L+1)` on average by half a tick per level (`ceil` adds 0.5 on average).
 
-| case | answer |
-|---|---|
-| `target <= ceiling` — never leaves the capped region | `tickSeconds · (target − level)` |
-| `level >= ceiling` — already past it | the pure closed form, `SecondsToLevel(level, target, r)` |
-| straddling | `tickSeconds · (ceiling − level)` **+** `SecondsToLevel(ceiling, target, r)` |
+`AtMath.SecondsToTarget` / `LevelAtCapped` sum that per level (`AtMath.SumTicks`): O(1) for the
+one-tick region, an exact per-level loop for spans up to 4096 levels, an exact loop over tick-count
+groups (`ceil(k/c) = n` for `k` in `((n-1)c, nc]`) up to 4096 groups, and beyond both — where every
+level already costs thousands of ticks — the continuous sum plus the mean `0.5` per level (error
+< 1e-3 relative). `LevelAtCapped` inverts it by binary search and adds the fractional progress into the
+next level, so it round-trips with `SecondsToTarget` exactly at whole levels. The same machinery
+prices `NguGain.LevelsInHour` (NGUs discard overflow the same way, `NGUController.cs:54-58`);
+Wandoos has a constant `p`, hence `AtMath.LevelsPerTick` = `1/ceil(1/p)`.
 
-with `r = ppt·(level+1)/tickSeconds` (which is the constant `50·M/baseTime`). The two regimes are one
-prefix and one suffix and can never interleave: `r` is constant while `progressPerTick` falls as the
-level rises, so a slot below the ceiling stays below it until it crosses, once.
+Worked case: `ppt = 2` at level 1000 (`c = 2002`) reaching 5000 takes 7994 ticks = 159.88 s — the
+old three-branch closed form said 124.925 s and an uncapped one 119.925 s.
 
 ### The source spreadsheet had this right; the first native port flattened it
 
 This is recorded so the three branches do not later read as over-engineering somebody could simplify
 away. The sheet is a **three-branch** calculation — that is exactly what `bb`/`bbtrue` are for. The
-first implementation here used `SecondsToLevel` unconditionally, and it shipped.
+first implementation here used `SecondsToLevel` unconditionally, and it shipped. (The three
+branches were later folded into the per-level tick sum above, which contains them.)
 
 **The direction of the error is the memorable part: capping at one level per tick makes an ETA
 *slower*, not faster, so the flattened version *under-quoted*.** The worked case pinned in the tests —
-level 1000 → 5000 at `ppt = 2`, ceiling 2001, `r = 100100` — is **124.925 s** piecewise against
+level 1000 → 5000 at `ppt = 2`, ceiling 2001, `r = 100100` — is **124.925 s** piecewise (159.88 s with whole ticks per level) against
 **119.925 s** uncapped. The uncapped form starts at `r/(L+1) = 100` levels/s, twice what one level per
 tick allows, so dropping the cap promises a time the game physically cannot deliver.
 
@@ -379,7 +381,7 @@ purpose snapshot. The button only requests (`Main.RequestAtTarget`); `Update()` 
 
 ## Tests, and the invalid audit baseline
 
-`tests/NGUAdvisor.Tests/AtMathTests.cs`, 16 facts: `LevelAt(l0,r,0) == l0`; monotone in `t`; `r == 0`
+`tests/NGUAdvisor.Tests/AtMathTests.cs`, facts: `LevelAt(l0,r,0) == l0`; monotone in `t`; `r == 0`
 stays at `l0`; `SecondsToLevel` round-trips `LevelAt`; `SecondsToLevel` returns null for zero,
 negative, `NaN` and `+∞` rates and for a target at or behind the current level; `StatMultiplier` is 1
 at 0 and at negatives and matches `1 + 0.1·L^0.4` at a known level; the two sheet-validation cases
@@ -391,7 +393,7 @@ and the no-rate/no-tick guards, the pure one-level-per-tick region, and the stra
 against `SecondsToTarget`. Then three for `LevelForMultiplier`: the round trip against
 `StatMultiplier` across five levels, the forward check (the level it names really yields the asked-for
 multiplier, plus the hand-worked `5^2.5` for `m = 1.5`), and the null contract (`m <= 1`, negatives,
-`NaN`, ±∞). `AtPanel` is Unity-dependent — build only. Suite: 218 passing.
+`NaN`, ±∞). `AtPanel` is Unity-dependent — build only. The straddle, group and mean-fallback branches of `SumTicks` each have a hand-worked case.
 
 > **MEASURED 2026-08-10 against build `260810-1616`: `UI AUDIT` reports ZERO issues across all 26
 > audited panels**, this module's included. The docs' standing "the audit must be zero" rule holds —

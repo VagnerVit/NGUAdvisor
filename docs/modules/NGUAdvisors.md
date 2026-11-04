@@ -10,7 +10,7 @@ game's exact math.
 - `levels/hr = power / speedDivider(id) × allocation × multiplierStack / (level+1) × 50 × 3600` is
   the rate AT THE CURRENT LEVEL only. The hour actually lands `NguGain.LevelsInHour`: one level per
   tick at most (180 000/hr — the game drops the overfill), and the `/(level+1)` slows every later
-  level, so `(L+1)²` grows by `2K` per tick. GO's `vreachable` simulates the same; the uncapped
+  level: a level costs `max(1, ceil((L+1)/K))` whole ticks (`AtMath.LevelsInTicks`; the bar is reset, not decremented). GO's `vreachable` simulates the same; the uncapped
   quote overstated every fast lane (Gold at L1.29M "reached" 1.2×/hr, which needs 258k levels).
 - **The multiplier stack matches the game term for term**: totalNGUSpeedBonus, itopod E/M NGU,
   macguffin[4]/[5], NGU-speed NGUs, diggers, hacks, beast quirks, wishes, cards, troll-challenge

@@ -1311,22 +1311,45 @@ namespace NGUAdvisor.Managers
             try { return BaseRebirth.AnyChallengesValid(); } catch { return false; }
         }
 
-        // True if the player can't afford `factor` x the cheapest augment upgrade (augs are the gold
-        // sink that drives Power/Toughness). factor > 1 gives callers hysteresis (e.g. the adventure
-        // router farms gold until TWO upgrades are affordable, so it doesn't flap at the boundary).
+        // True if the player can't afford `factor` x the cheapest NEXT gold payment of the augment halves
+        // being funded (the game charges gold only when a level starts, progress == 0). With no energy
+        // on any half, the advisor's gold gate may have left it idle for exactly this reason, so the
+        // cheapest half that could take energy stands in. factor > 1 gives callers hysteresis (e.g. the
+        // adventure router farms gold until TWO levels are affordable, so it doesn't flap).
         public static bool GoldStarvedForAugs(Character c, double factor = 1.0)
         {
             try
             {
-                var ac = c.augmentsController;
+                AllAugsController ac = c.augmentsController;
                 if (ac == null) return false;
                 double gold = c.realGold;
-                double minCost = double.MaxValue;
+                double minFunded = double.MaxValue;
+                double minCandidate = double.MaxValue;
                 for (int i = 0; i < 7; i++)
                 {
-                    double cost = ac.augments[i].getUpgradeCost();
-                    if (cost > 0 && cost < minCost) minCost = cost;
+                    AugmentController aug = ac.augments[i];
+                    if (!aug.augLocked() && !aug.hitAugmentTarget())
+                    {
+                        double cost = aug.getAugCost();
+                        if (cost > 0)
+                        {
+                            minCandidate = Math.Min(minCandidate, cost);
+                            if (c.augments.augs[i].augEnergy > 0 && c.augments.augs[i].augProgress <= 0f)
+                                minFunded = Math.Min(minFunded, cost);
+                        }
+                    }
+                    if (!aug.upgradeLocked() && !aug.hitUpgradeTarget())
+                    {
+                        double cost = aug.getUpgradeCost();
+                        if (cost > 0)
+                        {
+                            minCandidate = Math.Min(minCandidate, cost);
+                            if (c.augments.augs[i].upgradeEnergy > 0 && c.augments.augs[i].upgradeProgress <= 0f)
+                                minFunded = Math.Min(minFunded, cost);
+                        }
+                    }
                 }
+                double minCost = minFunded != double.MaxValue ? minFunded : minCandidate;
                 return minCost != double.MaxValue && gold < minCost * factor;
             }
             catch { return false; }

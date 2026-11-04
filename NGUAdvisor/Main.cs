@@ -1160,7 +1160,8 @@ namespace NGUAdvisor
                 if (needsAllocation)
                     _profile.DoAllocations();
 
-                QuestManager.ManageQuests();
+                if (Character.buttons.beast.interactable)
+                    QuestManager.ManageQuests();
 
                 // ADVISOR PIT OWNS AUTOMATIC THROW TIMING (slice 7.6C2A-1). Both callers reach the same
                 // CheckMoneyPit(), and without this guard they RACE — one that the standard path wins

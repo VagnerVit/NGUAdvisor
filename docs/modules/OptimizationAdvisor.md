@@ -35,7 +35,9 @@ can act on the row. Read-only itself; `Analyze()` cached 2 s; every rec individu
 - `BossUnlockCeiling()` — highest boss that still unlocks anything at this difficulty; past it,
   boss pushing is pure EXP (drives the "NUMBER ritual" row and the diggers' `ceiling0`).
 - `GoldStarvedForAugs/Diggers(c, factor)` — gold-sink starvation checks; `factor` gives callers
-  hysteresis (adventure router farms gold until TWO upgrades are affordable). Digger upgrade cost
+  hysteresis (adventure router farms gold until TWO levels are affordable). Augs: "starved" = gold
+  below the cheapest next payment (aug level, or upgrade when unlocked) of a half holding energy at
+  progress 0; with no energy placed, the cheapest unlocked half. Digger upgrade cost
   = `baseGoldCost × growthRate^maxLevel` (decomp AllGoldDiggerController).
 
 ## Digger/beard set computation (consumed by AdvisorApply)

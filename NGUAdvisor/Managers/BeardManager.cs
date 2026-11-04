@@ -57,8 +57,16 @@ namespace NGUAdvisor.Managers
             // Trying to keep the golden beard on
             if (_character.allChallenges.trollChallenge.completions() >= 7)
             {
+                // Deactivating beard 6 clears all active diggers, so it must survive truncation.
                 if (beards.Length > _bc.capBeards())
                 {
+                    if (Array.IndexOf(beards, 6) > 0)
+                    {
+                        List<int> reordered = new List<int> { 6 };
+                        reordered.AddRange(Array.FindAll(beards, x => x != 6));
+                        beards = reordered.ToArray();
+                    }
+
                     Array.Resize(ref beards, _bc.capBeards());
                     allEquipped = false;
                 }

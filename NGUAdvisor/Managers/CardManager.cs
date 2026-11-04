@@ -229,6 +229,12 @@ namespace NGUAdvisor.Managers
                     index++;
                     continue;
                 }
+                // The game refuses an END card without free inventory space (tryConsumeCard).
+                if (card.type == cardType.end && !_character.inventoryController.freeSpace())
+                {
+                    index++;
+                    continue;
+                }
                 LogCard($"Cast Card: Cost: {card.manaCosts.Sum()}, Rarity: {card.cardRarity}, Bonus Type: {card.bonusType}");
                 card.isProtected = false;
                 _cc.tryConsumeCard(index);

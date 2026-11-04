@@ -225,10 +225,17 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             double horizon = Horizon(out bool hardStop);
 
             double gold = _character.realGold;
-            // Net GPS (after digger drain), as DiggerManager and MoneyPitManager read it: what the run
-            // will actually have banked by the end of the horizon is what the levels get paid from.
+            // goldPerSecond() nets out only digger drain; blood rituals charge realGold separately
+            // (GoldPanel's ledger sums the same goldConsumedPerSecond), so they come off here too.
             double gps = 0;
             try { gps = _character.goldPerSecond(); } catch { }
+            try
+            {
+                foreach (BloodMagicController ritual in _character.bloodMagicController.bloodMagics)
+                    if (ritual != null)
+                        gps -= ritual.goldConsumedPerSecond();
+            }
+            catch { }
             double budget = gold + Math.Max(0.0, gps) * horizon;
 
             var bestAugment = -1;

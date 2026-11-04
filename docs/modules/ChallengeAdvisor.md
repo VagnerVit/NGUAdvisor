@@ -4,11 +4,12 @@ Recommends **starting** a challenge — the gap nothing else filled. `LscAdvisor
 enter LSC, and `ChallengeOverlay` reshapes the allocation once you are already inside one, but no
 module ever said a challenge was worth running.
 
-That silence was expensive. The advisor's own NGU math multiplies by **3** the moment Troll
-Challenge has one completion (`NGUBP.cs:152`, which mirrors the game's NGU speed formula, and
-`NGUAdvisors.cs:88`). A player at TC 0 therefore reads every projection already discounted to a
-third, with nothing on screen saying why — and the same ladder gates the 8th blood ritual, the
-Numbers fruit and the golden beard/digger.
+That silence was expensive. The advisor's own NGU math multiplies **magic** NGU speed by **3** the
+moment Normal Troll Challenge has one completion (`NGUBP.cs:230`, which mirrors the game's NGU speed
+formula, and `NGUAdvisors.cs:113`); the energy ×3 needs a *Sadistic* Troll completion instead
+(`NGUBP.cs:189`, `NGUAdvisors.cs:126`). A player at TC 0 therefore reads every magic-NGU projection
+already discounted to a third, with nothing on screen saying why — and the same ladder gates the 8th
+blood ritual, the Numbers fruit and the golden beard/digger.
 
 ## The table is not an opinion
 
@@ -17,7 +18,7 @@ somewhere else**, and `Source` names that reader:
 
 | gate | reward | source |
 |---|---|---|
-| Troll ×1 | ×3 NGU speed (energy + magic) | `NGUBP.cs:152`, `NGUAdvisors.cs:88` |
+| Troll ×1 | ×3 magic NGU speed (energy needs a Sadistic completion) | `NGUBP.cs:230`, `NGUAdvisors.cs:113` |
 | No Augs ×1 | ×1.1 augment speed | `AugmentBP.cs:123`, `Extensions.cs:248` |
 | Troll ×5 | unlocks the Numbers fruit | `SpendPlanner.cs:515` |
 | Troll ×6 | unlocks the 8th ritual (Turn Yourself Inside Out) | `AllBloodMagicController.ritualsUnlocked` (decomp) |

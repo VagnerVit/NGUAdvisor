@@ -188,7 +188,8 @@ namespace NGUAdvisor.AllocationProfiles
                     _wrapper.wandoos.Swap();
                 if (Settings.ManageGear && !Settings.AutoProfile && Main.Character.buttons.inventory.interactable)
                     _wrapper.gear.Swap();
-                if (Settings.ManageWishes && !preventMagicAllocation)
+                bool manageWishes = Settings.ManageWishes && !preventMagicAllocation && Main.Character.buttons.wishes.interactable;
+                if (manageWishes)
                 {
                     if (Settings.ManageEnergy)
                         _character.removeMostEnergy();
@@ -204,7 +205,7 @@ namespace NGUAdvisor.AllocationProfiles
                     _wrapper.magic.Swap();
                 if (Settings.ManageR3)
                     _wrapper.r3.Swap();
-                if (Settings.ManageWishes && !preventMagicAllocation)
+                if (manageWishes)
                 {
                     // Allocating to wishes again because there can be spare resources
                     WishManager.Allocate(true);

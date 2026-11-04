@@ -109,7 +109,8 @@ namespace NGUAdvisor.Managers
         {
             bool diffCheck(int id) => _wc.properties[id].difficultyRequirement <= _character.settings.rebirthDifficulty;
             bool levelCheck(int id) => Wishes[id].level < _wc.properties[id].maxLevel;
-            var validWishes = Enumerable.Range(0, _character.wishes.wishSize()).Where(id => diffCheck(id) && levelCheck(id));
+            bool unlockedCheck(int id) => !_wc.wishLocked(id);
+            var validWishes = Enumerable.Range(0, _character.wishes.wishSize()).Where(id => diffCheck(id) && levelCheck(id) && unlockedCheck(id));
             validWishes = validWishes.Except(Settings.WishBlacklist);
             return validWishes.ToList();
         }

@@ -5,8 +5,10 @@ each OS's A/D bonus over a run-matched window and recommends the best.
 
 ## Game-truth formulas (verified against the decomp)
 
-- Level rate per OS: `min(alloc × totalWandoosSpeed / baseTime, 1)` per tick, **50 ticks/s**
-  (1 level/tick hard max — the game adds progress once per 0.02 s tick).
+- Level rate per OS: `p = alloc × totalWandoosSpeed / baseTime` per tick, **50 ticks/s**. The bar is
+  reset (overflow discarded, `Wandoos98Controller` ~272-278), so a level costs `ceil(1/p)` ticks and
+  the rate is `AtMath.LevelsPerTick(p) = 1/ceil(1/p)` (1 level/tick max once `p >= 1`). The table below
+  predates this and quotes the continuous rate (~0.3 % high for 98 `CAPWAN:30`).
 - `baseTime`: Normal `1e9 / 1e12 / 1e15` (98/MEH/XL); **Evil+ `1e21 / 1e27 / 1e33`**.
 - Bonus (`wandoosBonus`): 98 `((1+E/100)(1+M/25))^0.8`; MEH `(1+E/5)(1+2M)`;
   XL `((1+6E)(1+40M))^1.05`.

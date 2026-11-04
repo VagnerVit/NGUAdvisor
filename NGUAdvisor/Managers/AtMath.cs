@@ -9,8 +9,9 @@ namespace NGUAdvisor.Managers
     //   progressPerTick() = (energy/50) * sqrt(totalEnergyPower()) * totalAdvancedTrainingSpeedBonus()
     //                       / getDivisor()
     // A level lands when barProgress >= 1 and the game ticks 50/s. With
-    // M = (energy/50) * sqrt(epow) * atSpeedBonus the level speed is dL/dt = r/(L+1) for a CONSTANT
-    // r = 50*M/baseTime, which is what makes the closed forms below exact rather than a simulation.
+    // M = (energy/50) * sqrt(epow) * atSpeedBonus the CONTINUOUS level speed is dL/dt = r/(L+1) for a
+    // constant r = 50*M/baseTime (LevelAt / SecondsToLevel). The game's bar is quantised, so the
+    // projections (SecondsToTarget, LevelAtCapped) count whole ticks per level instead.
     //
     // This replaces three Apps Script functions in the community AT Calculator (atcalc, bb, bbtrue)
     // whose bodies are in no export of that sheet. They were derived here, then checked against the
@@ -41,20 +42,16 @@ namespace NGUAdvisor.Managers
             return ((l1 + 1.0) * (l1 + 1.0) - (l0 + 1.0) * (l0 + 1.0)) / (2.0 * r);
         }
 
-        // THE answer to "how long until this slot reaches that level" — three branches, because the
-        // closed form above is only half the story.
+        // THE answer to "how long until this slot reaches that level".
         //
         // Game truth, from updateAdvancedTraining:
         //   barProgress[id] += progressPerTick();
         //   if (barProgress[id] >= 1f) { barProgress[id] = 0f; if (canLevel()) level++; }
-        // The bar is RESET, not decremented, so the overflow is DISCARDED: a slot with
-        // progressPerTick >= 1 gains exactly one level per tick however much energy it holds. Feeding
-        // the closed form across that region promises a time the game physically cannot deliver — which
-        // is what this function exists to stop (the source spreadsheet branched here too).
-        //
-        // r = progressPerTick * (level+1) / tickSeconds is CONSTANT (it is 50*M/baseTime), and
-        // progressPerTick falls as the level rises, so a slot below the ceiling stays below it until it
-        // crosses — the two regimes are one prefix and one suffix, never interleaved.
+        // The bar is RESET, not decremented, so the overflow is DISCARDED. Within one level the
+        // progress per tick is constant, so reaching level L+1 takes max(1, ceil(1/p(L))) ticks with
+        // p(L) = c/(L+1), c = ppt*(level+1) (= M/baseTime, constant in L). That one formula covers
+        // the one-level-per-tick region (p >= 1) and the slower one above the ceiling alike; the
+        // continuous closed form (LevelAt / SecondsToLevel) is only its limit and under-quotes.
         public static double? SecondsToTarget(double level, double target, double ppt, double tickSeconds)
         {
             if (double.IsNaN(ppt) || double.IsInfinity(ppt) || ppt <= 0) return null;
@@ -62,42 +59,97 @@ namespace NGUAdvisor.Managers
             if (tickSeconds <= 0) return null;
             if (target <= level) return null;
 
-            double ceiling = BbCeiling(ppt * (level + 1.0), 1.0);
-            double r = ppt * (level + 1.0) / tickSeconds;
-
-            if (target <= ceiling)                      // never leaves the one-level-per-tick region
-                return tickSeconds * (target - level);
-            if (level >= ceiling)                       // already past it: pure closed form
-                return SecondsToLevel(level, target, r);
-
-            double? closed = SecondsToLevel(ceiling, target, r);
-            if (!closed.HasValue) return null;
-            return tickSeconds * (ceiling - level) + closed.Value;
+            double ticks = TicksToReach(level, target, ppt * (level + 1.0));
+            if (double.IsNaN(ticks) || double.IsInfinity(ticks)) return null;
+            return ticks * tickSeconds;
         }
 
-        // The FORWARD twin of SecondsToTarget: where does the level land after t seconds, honouring the
-        // same one-level-per-tick cap? Same three regimes, same reasoning (barProgress is RESET, so the
-        // overflow is discarded and no amount of energy buys more than one level per tick).
-        //
-        // Equivalence property this is relied upon for: when ppt <= 1 the ceiling sits at or below the
-        // current level, so the first branch returns the plain uncapped closed form — bit-for-bit the
-        // arithmetic callers had before. Only blitz-boosting slots (ppt > 1) see a different number, and
-        // for those the capped answer is strictly LOWER.
+        // The FORWARD twin of SecondsToTarget: where does the level land after t seconds, with the same
+        // per-level tick count. The result carries the fractional progress into the next level, so
+        // it round-trips with SecondsToTarget exactly at whole levels.
         public static double LevelAtCapped(double l0, double ppt, double t, double tickSeconds)
         {
             if (t <= 0) return l0;
             if (ppt <= 0 || tickSeconds <= 0) return l0;
+            if (double.IsNaN(ppt) || double.IsInfinity(ppt)) return l0;
 
-            double ceiling = BbCeiling(ppt * (l0 + 1.0), 1.0);
-            double r = ppt * (l0 + 1.0) / tickSeconds;
+            return l0 + LevelsInTicks(l0, ppt * (l0 + 1.0), t / tickSeconds);
+        }
 
-            if (ceiling <= l0)                    // not blitz-boosting: the cap never binds
-                return LevelAt(l0, r, t);
+        // Levels the game's discard-the-overflow bar gains from `level` in `ticks` ticks, whole levels
+        // plus the fraction of the next one. c = progressPerTick * (level+1).
+        public static double LevelsInTicks(double level, double c, double ticks)
+        {
+            if (c <= 0 || ticks <= 0) return 0;
+            long first = (long)Math.Floor(level) + 1;       // k = L+1 of the first level gained
 
-            double tCap = (ceiling - l0) * tickSeconds;
-            if (t <= tCap)                        // still inside the one-level-per-tick region
-                return l0 + t / tickSeconds;
-            return LevelAt(ceiling, r, t - tCap); // capped prefix, then the closed form beyond it
+            double lo = 0, hi = Math.Floor(ticks);          // every level costs at least one tick
+            while (lo < hi)
+            {
+                double mid = Math.Floor((lo + hi + 1.0) / 2.0);
+                if (SumTicks(first, first + (long)mid - 1, c) <= ticks) lo = mid; else hi = mid - 1.0;
+            }
+            double left = ticks - SumTicks(first, first + (long)lo - 1, c);
+            double nextCost = Math.Max(1.0, Math.Ceiling((first + lo) / c));
+            return lo + Math.Min(left / nextCost, 1.0);
+        }
+
+        // Ticks to climb from `level` to `target`.
+        public static double TicksToReach(double level, double target, double c)
+        {
+            if (c <= 0 || target <= level) return 0;
+            long first = (long)Math.Floor(level) + 1;
+            return SumTicks(first, (long)Math.Ceiling(target), c);
+        }
+
+        // Levels per tick of a bar whose per-tick progress is constant (Wandoos): 1 / ceil(1/p), 1 once
+        // p >= 1.
+        public static double LevelsPerTick(double progressPerTick)
+        {
+            if (double.IsNaN(progressPerTick) || progressPerTick <= 0) return 0;
+            if (progressPerTick >= 1.0) return 1.0;
+            return 1.0 / Math.Ceiling(1.0 / progressPerTick);
+        }
+
+        private const long ExactSumCap = 4096;
+
+        // Sum over k = first..last of max(1, ceil(k/c)). Exact while the span of levels or of tick-count
+        // groups stays under the cap; beyond both the tick counts exceed the cap, where ceil(x) = x + 0.5
+        // on average is within 1e-3 relative.
+        private static double SumTicks(long first, long last, double c)
+        {
+            if (last < first) return 0;
+            double sum = 0;
+            double onesEnd = Math.Floor(c);                       // k <= c: one tick each
+            if (onesEnd >= first)
+            {
+                long end = onesEnd >= last ? last : (long)onesEnd;
+                sum += end - first + 1;
+                first = end + 1;
+                if (first > last) return sum;
+            }
+
+            long span = last - first + 1;
+            if (span <= ExactSumCap)
+            {
+                for (long k = first; k <= last; k++) sum += Math.Ceiling(k / c);
+                return sum;
+            }
+
+            double nFirst = Math.Ceiling(first / c);
+            double nLast = Math.Ceiling(last / c);
+            if (nLast - nFirst < ExactSumCap)
+            {
+                for (double n = nFirst; n <= nLast; n++)
+                {
+                    double lo = Math.Max(first, Math.Floor((n - 1.0) * c) + 1.0);
+                    double hi = Math.Min(last, Math.Floor(n * c));
+                    if (hi >= lo) sum += n * (hi - lo + 1.0);
+                }
+                return sum;
+            }
+
+            return sum + ((double)last * (last + 1.0) - (first - 1.0) * (double)first) / (2.0 * c) + 0.5 * span;
         }
 
         // The AT slot's contribution to attack/defense: 1 + 0.1 * L^0.4 (slot 1 = attack, 0 = defense).

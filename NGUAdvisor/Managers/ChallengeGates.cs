@@ -24,7 +24,7 @@ namespace NGUAdvisor.Managers
         public static readonly Gate[] All =
         {
             new Gate { Key = "TC",    Name = "Troll Challenge", Needed = 1, Multiplier = 3.0,
-                       Reward = "x3 NGU speed (energy and magic)", Source = "NGUBP.cs:152 / NGUAdvisors.cs:88" },
+                       Reward = "x3 magic NGU speed", Source = "NGUBP.cs:230 / NGUAdvisors.cs:113" },
             new Gate { Key = "NOAUG", Name = "No Augs Challenge", Needed = 1, Multiplier = 1.1,
                        Reward = "x1.1 augment speed", Source = "AugmentBP.cs:123 / Extensions.cs:248" },
             new Gate { Key = "TC",    Name = "Troll Challenge", Needed = 5, Multiplier = 0,

@@ -83,9 +83,8 @@ namespace NGUAdvisor.Managers
                 var cases = new OsCase[3];
                 for (int os = 0; os < 3; os++)
                 {
-                    // 1 level per tick max (the game adds progress once per 0.02s tick)
-                    double rateE = Math.Min(capE * speedE.Value / baseTimes[os], 1.0) * 50.0;
-                    double rateM = Math.Min(capM * speedM.Value / baseTimes[os], 1.0) * 50.0;
+                    double rateE = AtMath.LevelsPerTick(capE * speedE.Value / baseTimes[os]) * 50.0;
+                    double rateM = AtMath.LevelsPerTick(capM * speedM.Value / baseTimes[os]) * 50.0;
                     double lE = rateE * seconds, lM = rateM * seconds;
                     // The current OS keeps its already-banked levels; the other two correctly
                     // start from 0 because switching to them wipes their levels (changeOS zeroes
@@ -174,7 +173,7 @@ namespace NGUAdvisor.Managers
                 // cheapest. Under-booted reads are unstable, so keep the lane.
                 double? speed = FullBootSpeed(c, energy ? c.totalWandoosEnergySpeed() : c.totalWandoosMagicSpeed());
                 if (!speed.HasValue) return true;
-                double rate = Math.Min(alloc * speed.Value / BaseTimes(c)[os], 1.0) * 50.0;
+                double rate = AtMath.LevelsPerTick(alloc * speed.Value / BaseTimes(c)[os]) * 50.0;
                 double levels = rate * RunSeconds();
 
                 double bonus = energy ? BonusFor(os, levels, 0.0) : BonusFor(os, 0.0, levels);

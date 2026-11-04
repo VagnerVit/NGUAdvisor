@@ -131,7 +131,7 @@ namespace NGUAdvisor.Managers
                 var result = Math.Floor(Math.Pow(bloodPoints, 0.25));
                 if (_character.settings.rebirthDifficulty >= difficulty.evil)
                     result *= _character.adventureController.itopod.ironPillBonus();
-                return result;
+                return Math.Min(result, 100000000.0);
             }
 
             protected override void CastSpell() => _bloodSpells.castAdventurePowerupSpell();

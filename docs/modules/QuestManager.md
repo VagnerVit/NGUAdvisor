@@ -15,7 +15,7 @@ major already idling (e.g. the in-game toggle left on when it started).
 `slots = maxBankedQuests − curBankedQuests + 1`; time until the bank overflows =
 `slots × timerThreshold() − dailyQuestTimer`; ETA to finish the current quest =
 `expectedTimePerDrop() × idleDropFactor() × remainingDrops` (average drops 50 with perk 94 ≥ 610,
-else 54.5). Overfill = `time × 1.1 < eta`. Overfill forces questing (banked regen must never be
+else 54.5); `idleDropFactor()` applies only when the quest runs idle (in flight: `idleMode`; otherwise a minor with `!ManualMinors`), manual quests use 1. `ManageQuests` is gated on `buttons.beast.interactable` like `PerformSlowActions`. Overfill = `time × 1.1 < eta`. Overfill forces questing (banked regen must never be
 wasted) and is the hard veto on the capstone hold.
 
 ## Capstone hold (`CapstoneHold`) — opt-in

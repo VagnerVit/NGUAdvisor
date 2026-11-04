@@ -4,6 +4,27 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Gold shortage for augments is read from the augment actually being funded** — the check took
+  the cheapest upgrade of all seven, which an unfunded augment always offers, so a run stalled on
+  its upgrade gold still counted as funded (TM freeze, money-pit hold, gold farming).
+- **The best-augment pick counts the gold blood rituals spend** — it planned with digger drain only.
+- **Wishes 28 and 45 are skipped until the Evil Troll completions unlock them**, and wishes and
+  quests are left alone until the game unlocks them.
+- **Quest-bank overflow is timed by how the quest runs** — a manual quest finishes 3–8× sooner
+  than the idle estimate, which pulled combat to questing early.
+- **Titan beard swaps keep the Golden Beard** when the list is longer than the beard slots;
+  dropping it turned every digger off.
+- **A full inventory no longer unprotects an END card** the game refused to cast.
+- **The money pit no longer waits for reward tiers above 1e30 without wish 4**, which merges them.
+- **Magic Cap can be bought with EXP below 100K magic cap**, as the game allows.
+- **Troll Challenge ×1 is described as ×3 magic NGU speed** — energy needs a Sadistic completion.
+- **AT, Wandoos and NGU level forecasts count the game's whole ticks per level**, so slots just
+  short of one level per tick are no longer forecast up to twice too fast.
+- **The Number NGU is valued with the run's time multiplier**, as the game applies it.
+- **Iron Pill gains are capped at 1e8**, as in the game.
+
 ## [1.13.0] - 2026-11-04
 
 ### Added

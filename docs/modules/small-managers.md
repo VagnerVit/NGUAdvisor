@@ -9,7 +9,8 @@ quick swap). Mode presets: Titan {5,1,6}, Ygg {6}, Pit {6}. `EquipBeards(int[])`
 - **Golden Beard (6) special-case**: with Troll ≥ 7 (Golden unlocked) and beard 6 both requested
   and active, the OTHER beards are deactivated individually instead of `clearActiveBeards()` —
   clearing would drop Golden's accumulated bonus. Without Troll ≥ 7, beard 6 is stripped from the
-  request. Returns whether EVERYTHING requested fit (`capBeards` truncation → false).
+  request. Returns whether EVERYTHING requested fit (`capBeards` truncation → false). Truncation to `capBeards` keeps beard 6
+  (moved to the front): deactivating it clears all active diggers.
 
 ## CookingManager (`Managers/CookingManager.cs`)
 

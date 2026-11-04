@@ -314,8 +314,11 @@ namespace NGUAdvisor.Managers
 
                 // Tier-ETA: hold when the next log10 reward tier is within 15 minutes of net gps.
                 double curTier = 0, nextTier = 0;
+                // PitController.oneTossReward: without wish 4 everything >= 1e30 is the 1e30 tier.
+                bool highTiersOpen = c.wishes.wishes[4].level > 0;
                 foreach (var t in moneyPitThresholds)
                 {
+                    if (t >= 1e50 && !highTiersOpen) break;
                     if (gold >= t) curTier = t;
                     else { nextTier = t; break; }
                 }

@@ -55,17 +55,20 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void ASlowLaneHighUpBarelySlowsDown()
         {
+            // 1/p = 180.00004 ticks per level, and the bar discards its overflow: 181 ticks each.
             double gained = NguGain.LevelsInHour(5_000_000, 1_000);
-            Assert.InRange(gained, 999.0, 1_000.0);
+            Assert.InRange(gained, 994.0, 995.0);
         }
 
         [Fact]
         public void CappedStartFallsBackToTheSlowdownOnceTheLevelOutgrowsTheBar()
         {
-            // Progress 2/tick at L999 (K=2000): 1 level/tick until L1999, then sqrt growth.
+            // Progress 2/tick at L999 (K=2000): 1 tick per level for k = 1000..2000 (1001 ticks), then
+            // 2 ticks for each of the next 2000 levels, 3 for the next 2000, ... Worked by hand: levels
+            // with 2..12 ticks cost 155001 ticks in all (23001 levels), the remaining 24999 ticks buy
+            // 1923 levels at 13 ticks each.
             double gained = NguGain.LevelsInHour(999, 2.0 * 180_000);
-            double expected = Math.Sqrt(2000.0 * 2000.0 + 2 * 2000.0 * (180_000 - 1000)) - 1 - 999;
-            Assert.Equal(expected, gained, 0);
+            Assert.Equal(24_924.0, gained, 3);
         }
     }
 }

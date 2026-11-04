@@ -166,11 +166,15 @@ namespace NGUAdvisor.Managers
 
         // Bonus-multiplier ratio for dL more levels on the game's own curve (NguGain: linear to the
         // softcap, a power past it). Respawn has its own capped time-reduction curve.
+        private const int NumberNguId = 3;
+
         private static double ValueRatio(Character c, bool magic, int id, double level, double dL)
         {
             if (dL <= 0) return 1.0;
             if (!magic && id == 2) return RespawnRatio(c, level, dL);
             double f = Factor(c, magic, id);
+            // AllNGUController.numberBonus*: the whole level term is scaled by the run's timeMulti.
+            if (magic && id == NumberNguId && c.timeMulti > 0) f *= c.timeMulti;
             if (f > 0) return NguGain.Ratio(magic, id, Track(c), level, dL, f);
             return (level + dL + 1.0) / (level + 1.0);
         }

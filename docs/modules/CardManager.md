@@ -24,7 +24,7 @@ Trashes first (so only castable cards remain). Walks the deck casting anything a
 `reservedMayo[]` marks a mana type as reserved once a card couldn't afford it, so later cards
 can't drain the mana a queued card is waiting for. `isProtected` is cleared right before
 `tryConsumeCard` (the game refuses protected consumption). Count is decremented on a successful
-cast because the list shrinks.
+cast because the list shrinks. An END card is skipped (not logged, protection kept) while `inventoryController.freeSpace()` is false, as `tryConsumeCard` refuses it.
 
 ## Mana routing (`CheckManas`)
 

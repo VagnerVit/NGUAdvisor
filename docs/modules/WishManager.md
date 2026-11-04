@@ -25,7 +25,7 @@ the REMAINING pool by the remaining slot count (with a `Math.Sign(remainder)` +1
 lost to integer division), picks the best wish, allocates, and subtracts what the game actually
 took.
 
-Valid wishes = difficulty requirement met, level below max, not in `Settings.WishBlacklist`.
+Valid wishes = difficulty requirement met, level below max, not game-locked (`wishLocked(id)`: 28 / 45 until Evil troll completions 4 / 6), not in `Settings.WishBlacklist`. `CustomAllocation` runs wish allocation only while `buttons.wishes.interactable` (= `wishes.wishesOn`).
 
 ## Wish modes (`BestWishId`)
 

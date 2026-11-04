@@ -89,7 +89,7 @@ namespace NGUAdvisor.Managers
             var tg = Targets(c, magicUnlocked);
             phase = tg.Phase;
             double pe = tg.PoolE, pm = tg.PoolM;
-            // Cap buys are gated by the game until the cap crosses 100k; a gated stat can't be walked,
+            // Energy CAP is gated by the game until the cap crosses 100k; a gated stat can't be walked,
             // so it's excluded from the balance so it never pins the % at 0 forever.
             var stats = new[]
             {
@@ -97,7 +97,7 @@ namespace NGUAdvisor.Managers
                 new Stat { Name = "Energy CAP", ExpSpent = eC, TargetShare = pe * tg.ShareC, Index = 1, Buyable = c.capEnergy >= 100000 },
                 new Stat { Name = "Energy BARS", ExpSpent = eB, TargetShare = pe * tg.ShareB, Index = 2, Buyable = true },
                 new Stat { Name = "Magic POWER", ExpSpent = mP, TargetShare = pm * tg.ShareP, Index = 3, Buyable = magicUnlocked },
-                new Stat { Name = "Magic CAP", ExpSpent = mC, TargetShare = pm * tg.ShareC, Index = 4, Buyable = magicUnlocked && c.magic.capMagic >= 100000 },
+                new Stat { Name = "Magic CAP", ExpSpent = mC, TargetShare = pm * tg.ShareC, Index = 4, Buyable = magicUnlocked },
                 new Stat { Name = "Magic BARS", ExpSpent = mB, TargetShare = pm * tg.ShareB, Index = 5, Buyable = magicUnlocked },
             };
             return stats;
@@ -340,7 +340,6 @@ namespace NGUAdvisor.Managers
                 }
                 case "Magic CAP":
                 {
-                    if (c.magic.capMagic < 100000) return 0;
                     double units = Math.Floor((double)maxExp * 250 / 3);
                     units -= units % 250;
                     if (units < 250) return 0;

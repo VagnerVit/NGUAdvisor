@@ -78,8 +78,9 @@ Two guards used to make a small EXP bank permanently unspendable, and they compo
 
 - Custom purchases unlock permanently at **all-time `highestBoss ≥ 17`** (never re-lock on Evil —
   one of the few CORRECT uses of raw highestBoss); magic stats at ≥ 37.
-- Cap buys are game-gated until the cap crosses 100k — a gated stat is `Buyable=false` and
-  **excluded from the balance** so it can't pin the percentage at 0 forever.
+- **Energy** CAP buys are game-gated until `capEnergy` crosses 100k — a gated stat is
+  `Buyable=false` and **excluded from the balance** so it can't pin the percentage at 0 forever.
+  Magic CAP has no such gate (`MagicPurchases.tryCustomCap`/`buyCustomCap`).
 - `BuyStat` replicates the game's `buyCustom*` math exactly per stat: unit costs, cap rounded to
   250s, `hardCap()` clamp. `WriteCustomPlan` mirrors the reachable deficits into the game's
   custom-purchase boxes so the game's own "Buy ALL Custom" button reflects the walk.
