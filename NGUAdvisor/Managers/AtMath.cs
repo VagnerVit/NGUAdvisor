@@ -171,6 +171,17 @@ namespace NGUAdvisor.Managers
             return Math.Pow((multiplier - 1.0) / 0.1, 2.5);
         }
 
+        // Decomp Character.totalAdvHPRegen = pow(base * adventureToughnessBonus * ..., 0.4) * 0.1, so regen
+        // scales with the Toughness (slot 0) multiplier^0.4. Returns the factor that multiplier must grow by
+        // for regen to reach `required` — the same kind of ratio as an attack/defense need. 1 = already met.
+        public static double RegenToughnessNeed(double regenNow, double required)
+        {
+            if (required <= 0 || double.IsNaN(required) || double.IsNaN(regenNow)) return 1.0;
+            if (regenNow <= 0) return double.PositiveInfinity;
+            if (regenNow >= required) return 1.0;
+            return Math.Pow(required / regenNow, 2.5);
+        }
+
         // Below this the bootup factor is too small to divide out reliably (WandoosAdvisor uses the same floor).
         public const double MinWandoosBoot = 0.02;
 

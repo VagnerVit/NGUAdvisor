@@ -53,7 +53,10 @@ Two discontinuities matter: the energy base steps ×17 (aug) / ×12 (upgrade) pe
 formula's 1.6e12. Note: GO's closed form does not special-case *upgrade* gold for tiers 5-6 and the
 guide's table disagrees with it — read those from the game (`getUpgradeCost()`), never from either.
 
-Difficulty scales every energy base by the same factor (Evil ×2.5e12, Sadistic ~×2e27), so the
+Difficulty scales every energy base by the same factor (Evil ×2.5e12; Sadistic ×2.5e27 — the scene
+divider ratio is 2.5e24, but the Sadistic path in `AugmentController` skips the `/50000` and instead
+divides by `sadisticDivider()` = 5e7, a further ×1000; measured 2026-11-04 on Safety Scissors, N 400 /
+E 1e15 / S 1e27), so the
 optimal choice is unchanged **when expressed in level counts**.
 
 ## The single variable

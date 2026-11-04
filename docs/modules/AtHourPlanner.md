@@ -111,7 +111,10 @@ worst, the same cost this planner already pays.
 
 ## Decision details
 
-- Regen-gated titan stages are declared `blocked` — AT can't raise regen.
+- Regen is NOT outside AT's reach: `totalAdvHPRegen = pow(… * adventureToughnessBonus * …, 0.4) * 0.1`, so a
+  regen shortfall needs the Toughness multiplier to grow by `(reqR/regenNow)^2.5`
+  (`AtMath.RegenToughnessNeed`). That folds into the Toughness (defense) need as `max(reqD/refDef, regenNeed)`
+  in both `Decide` and `GoalLevels`. Regen stays on the LIVE value — there is no projected-gear reference for it.
 - Zone candidates: only the NEXT unreachable zone (higher ones follow on later runs); thresholds
   ×1.0001 mirror FightType's strict `>` (need exactly 1.0 would "solve" at t=0).
 - Winner gets a 10 % schedule buffer, clamped to [NormalEnd, MaxEnd] — never earlier than the

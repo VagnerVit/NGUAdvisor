@@ -85,6 +85,17 @@ namespace NGUAdvisor.Tests
         }
 
         [Fact]
+        public void RegenToughnessNeedInvertsTheFourTenthsPower()
+        {
+            // regen ~ multiplier^0.4: raising the multiplier by need must raise regen by required/now.
+            double need = AtMath.RegenToughnessNeed(10000, 14000);
+            Assert.Equal(14000.0 / 10000.0, System.Math.Pow(need, 0.4), 9);
+            Assert.Equal(1.0, AtMath.RegenToughnessNeed(20000, 14000));
+            Assert.Equal(1.0, AtMath.RegenToughnessNeed(100, 0));
+            Assert.True(double.IsPositiveInfinity(AtMath.RegenToughnessNeed(0, 14000)));
+        }
+
+        [Fact]
         public void LevelForMultiplierRefusesToAnswerRatherThanInventALevel()
         {
             Assert.Null(AtMath.LevelForMultiplier(1.0));       // nothing to reach: already met

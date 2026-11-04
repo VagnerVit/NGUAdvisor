@@ -1,6 +1,6 @@
 {
   "Breakpoints": {
-    "_Preset": "Early Evil re-climb, guide chapter 5 sub-mode A (auto-installed). Entering Evil re-locks TM/AT/Wandoos, so this profile re-climbs them: short runs that push the boss wall while Basic Training and augments carry the energy, with a Blood Ritual on magic. Switches the NGU level track to Evil at hour 22. Use from Evil entry to roughly Boss 125, where T7 comes into reach. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Preset": "Early Evil re-climb, guide chapter 5 sub-mode A (auto-installed). Entering Evil re-locks TM/AT/Wandoos, so this profile re-climbs them: short runs that push the boss wall while Basic Training and augments carry the energy, with a Blood Ritual on magic. Augments run to the 3h mark, then Normal NGUs and AT; switches the NGU level track to Evil at hour 23 (one hour earlier per T7 version defeated). Use from Evil entry to roughly Boss 125, where T7 comes into reach. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
     "PriorityComment1": "CAP Allocations will use as much energy as it takes to cap, regular allocations evenly divide up the available idle energy. But allocations are individually applied left to right so there are some quirks",
     "PriorityComment2": "In practice CAP allocations make dividers between groups of non-CAP allocations.",
     "PriorityExample1": "For example, with priorities A, CAPB, C, D, E and total energy of 100",
@@ -35,7 +35,7 @@
       },
       {
         "Time": {
-          "h": 1
+          "h": 3
         },
         "Priorities": [
           "CAPALLNGU",
@@ -67,13 +67,13 @@
       },
       {
         "Time": {
-          "h": 22
+          "h": 23
         },
         "Priorities": [
           "ALLNGU"
         ],
         "Note": "Evil NGU time",
-        "Note2": "Add one hour per version of T7 defeated (ie: 22 at easy, 21 at normal, 20 at hard, 19 at brutal)",
+        "Note2": "Add one hour per version of T7 defeated (ie: 23 before T7, 22 after easy, 21 at normal, 20 at hard, 19 at brutal)",
         "Note3": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
         "Thresholds": "Magic-NGU or PP > x1.05, Respawn < x0.95, Gold > x1.2"
       }
@@ -96,7 +96,7 @@
       },
       {
         "Time": {
-          "h": 1
+          "h": 3
         },
         "Priorities": [
           "CAPALLNGU",
@@ -123,13 +123,13 @@
       },
       {
         "Time": {
-          "h": 22
+          "h": 23
         },
         "Priorities": [
           "ALLNGU"
         ],
         "Note": "Evil NGU time",
-        "Note2": "Add one hour per version of T7 defeated (ie: 22 at easy, 21 at normal, 20 at hard, 19 at brutal)",
+        "Note2": "Add one hour per version of T7 defeated (ie: 23 before T7, 22 after easy, 21 at normal, 20 at hard, 19 at brutal)",
         "Note3": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
         "Thresholds": "Energy-NGU or AdvB > x1.05, TM > x1.2"
       }
@@ -389,7 +389,7 @@
       },
       {
         "Time": {
-          "h": 22
+          "h": 23
         },
         "Diff": 1
       }

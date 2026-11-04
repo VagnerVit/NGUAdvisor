@@ -97,6 +97,13 @@ order:
   one-shot at rebirth hit 0 gold and never retried — user-caught in a BASIC challenge on the
   Evil climb); with a manual profile, challenge mode returns null (profile owns the set).
 - `NGU MARATHON` segment gets a growth-multiplier-first order {4,5,11,6,7,8,1,0}.
+  From chapter 7 (`ProgressionAnalyzer` canonical chapter) Beard diggers 6/7 are dropped from it
+  (guide ch.7: never run Beard diggers again); the fill loop leaves them at the tail.
+- **Farm order puts the NGU diggers (4/5) ahead of Daycare(9)** (guide ch.3: run Energy NGU digger;
+  NGU diggers pay (120+Level)% vs Daycare (105+Level/10)%). The lane law re-ranks 1/4/5 at the first
+  of them; an empty lane drops to the tail.
+- **EXP digger is also promoted when the Knowledge fruit (index 3) maxes within 60 s** — the digger
+  multiplies the harvest payout (`YggdrasilManager.KnowledgeExp`), regardless of farm/ceiling mode.
 - Beards: **a manual profile that names beards owns the set** (`BeardBreakpoints.ActiveProfileBeards`,
   profile order, Golden-gated, truncated to `capBeards`; user rule 2026-09-29 — ADVISOR had replaced
   a 6-beard profile list with its 4). The Beards rec grades against the same `CurrentBeardSet`.

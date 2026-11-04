@@ -114,7 +114,9 @@
         "GO Notes": "9mm Beretta + Power0AugmentationEBars1Power"
       },
       {
-        "Time": 5,
+        "Time": {
+          "m": 5
+        },
         "ID": [
           366,
           514,

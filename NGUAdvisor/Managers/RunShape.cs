@@ -19,6 +19,12 @@ namespace NGUAdvisor.Managers
         public const string Marathon = "NGU MARATHON";
 
         public const int EvilChapter = 5;
+        public const int LastEvilChapter = 7;
+
+        // Guide ch.6 (pre-Typo): "At most, run [Evil NGUs] in the last 5-6 hours of your rebirth" — a
+        // ceiling, since the advisor cannot run GO's "are they worth it" check. The post-HD1 rule
+        // (Evil NGUs all the time once the Evil -> Normal NGU quirk is owned) is not modelled.
+        public const double PostT8EvilNguTailSec = 5 * 3600;
 
         // Guide ch.5 "Evil Entry": 30-minute rebirths; anything up to 2h is still that cadence.
         public const double ShortRunMaxSec = 7200;
@@ -40,10 +46,10 @@ namespace NGUAdvisor.Managers
             public bool NumberCheap;
         }
 
-        // A timed long rebirth in Ch.5: the guide's Evil day, whose Evil NGU tail counts back from the
-        // rebirth. Without a time target (an LRB) there is no end to count from, so the file keeps the track.
+        // A timed long rebirth in an Evil chapter: the guide's Evil day, whose Evil NGU tail counts back from
+        // the rebirth. Without a time target (an LRB) there is no end to count from, so the file keeps the track.
         public static bool IsEvilDay(int chapter, double rebirthTargetSec)
-            => chapter == EvilChapter && rebirthTargetSec > ShortRunMaxSec;
+            => chapter >= EvilChapter && chapter <= LastEvilChapter && rebirthTargetSec > ShortRunMaxSec;
 
         public static bool IsShortRun(double rebirthTargetSec)
             => rebirthTargetSec > 0 && rebirthTargetSec <= ShortRunMaxSec;
@@ -54,10 +60,12 @@ namespace NGUAdvisor.Managers
             => IsShortRun(rebirthTargetSec) || (rebirthTargetSec <= 0 && rebirthsOnProgress);
 
         // Guide ch.5: Evil NGUs for the last hour, plus one hour per T7 version defeated
-        // ("After v1, that means 2 hours"). NaN when the run has no time target to count back from.
-        public static double EvilNguStartSec(double rebirthTargetSec, int t7VersionsBeaten)
+        // ("After v1, that means 2 hours"); ch.6-7 the PostT8EvilNguTailSec ceiling. NaN when the run has no
+        // time target to count back from.
+        public static double EvilNguStartSec(double rebirthTargetSec, int t7VersionsBeaten, int chapter = EvilChapter)
         {
             if (rebirthTargetSec <= 0) return double.NaN;
+            if (chapter > EvilChapter) return rebirthTargetSec - PostT8EvilNguTailSec;
             return rebirthTargetSec - (1 + Math.Max(0, t7VersionsBeaten)) * 3600.0;
         }
 

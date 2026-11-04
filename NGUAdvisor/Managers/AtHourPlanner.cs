@@ -143,7 +143,6 @@ namespace NGUAdvisor.Managers
             string bestLabel = null;
             string missLabel = null;      // nearest out-of-reach candidate, for the honest "no" line
             double missNeed = double.MaxValue;
-            string blocked = null;
 
             void Consider(double t, string label, double needPct)
             {
@@ -160,18 +159,16 @@ namespace NGUAdvisor.Managers
                     OptimizationAdvisor.StagedRequirementFor(obj.Index, obj.Version, refAtk, refDef,
                         out var reqA, out var reqD, out var reqR, out var stage);
                     string name = TitanName(obj.Index, obj.Version);
-                    if (refAtk >= reqA && refDef >= reqD)
+                    double needRegen = AtMath.RegenToughnessNeed(Regen(c), reqR);
+                    if (refAtk >= reqA && refDef >= reqD && needRegen <= 1)
                     {
                         // Stage already met in best gear — the kill happens without AT's help.
                     }
-                    else if (reqR > 0 && Regen(c) < reqR)
-                    {
-                        blocked = $"{name} {stage} is regen-gated (AT can't raise regen)";
-                    }
                     else
                     {
-                        double need = Math.Max(reqA / refAtk, reqD / refDef);
-                        double t = Solve(power, tough, reqA / refAtk, reqD / refDef, window);
+                        double needDef = Math.Max(reqD / refDef, needRegen);
+                        double need = Math.Max(reqA / refAtk, needDef);
+                        double t = Solve(power, tough, reqA / refAtk, needDef, window);
                         Consider(t, $"{name} {stage} ({ExpBalancer.Fmt(reqA)}/{ExpBalancer.Fmt(reqD)})", (need - 1) * 100);
                     }
                 }
@@ -241,8 +238,6 @@ namespace NGUAdvisor.Managers
             if (missLabel != null)
                 // "window" is the time left to MaxEnd from HERE, not a flat 4h — say what was projected.
                 why = $"{missLabel} needs +{missNeed:0}%; {window / 3600.0:0.#}h more of AT projects +{(Ratio(power, window) - 1) * 100:0}% P / +{(Ratio(tough, window) - 1) * 100:0}% T";
-            else if (blocked != null)
-                why = blocked;
             else
                 why = "no titan stage or farm zone within AT's reach";
             Rec("AT hour ends on time", why);
@@ -306,10 +301,12 @@ namespace NGUAdvisor.Managers
                 if (!References(c, out var refAtk, out var refDef, out _)) return false;
 
                 OptimizationAdvisor.StagedRequirementFor(obj.Index, obj.Version, refAtk, refDef,
-                    out var reqA, out var reqD, out _, out var stage);
+                    out var reqA, out var reqD, out var reqR, out var stage);
 
+                // Regen scales with the same Toughness multiplier, so a regen shortfall raises the
+                // Toughness goal; regen stays on the live value (no projected-gear reference exists).
                 double needAtk = reqA / refAtk;
-                double needDef = reqD / refDef;
+                double needDef = Math.Max(reqD / refDef, AtMath.RegenToughnessNeed(Regen(c), reqR));
                 if (double.IsNaN(needAtk) || double.IsNaN(needDef)) return false;
                 if (needAtk <= 1 && needDef <= 1)
                 {

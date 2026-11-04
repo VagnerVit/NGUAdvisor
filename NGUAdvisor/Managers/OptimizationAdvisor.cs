@@ -917,7 +917,8 @@ namespace NGUAdvisor.Managers
                 }
                 else
                 {
-                    string mode = Mode(ProgressionAnalyzer.Detect());
+                    ProgressionAnalyzer.Progression prog = ProgressionAnalyzer.Detect();
+                    string mode = Mode(prog);
                     // Defer to the profile only when a MANUAL profile owns diggers via challenge-tagged
                     // breakpoints. AutoProfile has none — so it must drive diggers (DIGGER LAWS + gold gate)
                     // during challenges too, else the whole set sits off (user-caught: diggers never fired
@@ -940,11 +941,16 @@ namespace NGUAdvisor.Managers
                     if (ChallengeOverlay.Segment == "NGU MARATHON")
                     {
                         order = new List<int> { 4, 5, 11, 6, 7, 8, 1, 0 };   // growth multipliers first
+                        if (prog.Known && prog.Chapter >= BeardDiggersRetiredChapter)
+                        {
+                            order.Remove(6);
+                            order.Remove(7);
+                        }
                     }
                     else
                     {
                         order = new List<int>(RecommendedDiggers(mode));
-                        if (mode == "farm" || ceiling0)
+                        if (mode == "farm" || ceiling0 || KnowledgeHarvestImminent(c))
                         {
                             int exp = FindDiggerByBonus("exp");
                             if (exp >= 0)
@@ -1096,6 +1102,25 @@ namespace NGUAdvisor.Managers
             catch { return null; }
         }
 
+        // Guide chapter 7: "You shouldn't need to ever run Beard diggers again."
+        private const int BeardDiggersRetiredChapter = 7;
+        private const int KnowledgeFruit = 3;
+        // Same width as the titan window: one 30 s digger tick lands ahead of the harvest.
+        private const double KnowledgeHarvestWindowSeconds = 60;
+
+        // The EXP digger multiplies the Fruit of Knowledge payout at harvest (YggdrasilManager.KnowledgeExp).
+        private static bool KnowledgeHarvestImminent(Character c)
+        {
+            try
+            {
+                Fruit fruit = c.yggdrasil.fruits[KnowledgeFruit];
+                if (fruit.maxTier < 1 || !(fruit.activated || fruit.permCostPaid)) return false;
+                double maxesIn = fruit.maxTier * (double)c.yggdrasilController.fruits[0].tierThreshold() - fruit.seconds;
+                return maxesIn < KnowledgeHarvestWindowSeconds;
+            }
+            catch (Exception) { return false; }
+        }
+
         private const int WandoosDigger = 1;
         private const int EnergyNguDigger = 4;
         private const int MagicNguDigger = 5;
@@ -1239,9 +1264,10 @@ namespace NGUAdvisor.Managers
             return "farm";
         }
 
-        // 2 Stats, 3 Adv, 8 PP, 10 Blood, 1 Wandoos (push) ; 3 Adv, 8 PP, 0 Drops, 9 Daycare (farm).
+        // 2 Stats, 3 Adv, 8 PP, 10 Blood, 1 Wandoos (push) ; 3 Adv, 8 PP, 0 Drops, 4/5 NGU, 9 Daycare (farm).
+        // NGU diggers (120+Level)% outrank Daycare (105+Level/10)%; an empty lane drops to the tail (ApplyLaneLaw).
         private static int[] RecommendedDiggers(string mode) =>
-            mode == "push" ? new[] { 2, 3, 8, 10, 1 } : new[] { 3, 8, 0, 9, 2 };
+            mode == "push" ? new[] { 2, 3, 8, 10, 1 } : new[] { 3, 8, 0, EnergyNguDigger, MagicNguDigger, 9, 2 };
 
         // 1 Drops, 5 Adv, 3 NGU, 0 Stats — one set for every mode (user rule). Number (2) takes the fifth
         // slot despite sharing a pool: its temp bonus multiplies the whole next Number (decomp

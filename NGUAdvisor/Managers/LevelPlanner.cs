@@ -74,8 +74,9 @@ namespace NGUAdvisor.Managers
                 if (obj.Known)
                 {
                     atSufficient = c.totalAdvAttack() >= obj.ReqAttack * 1.1
-                                   && c.totalAdvDefense() >= obj.ReqDefense * 1.1;
-                    atBasis = $"stats vs T{obj.Index + 1}v{obj.Version} {obj.Stage} x1.1";
+                                   && c.totalAdvDefense() >= obj.ReqDefense * 1.1
+                                   && (obj.ReqRegen <= 0 || c.totalAdvHPRegen() >= obj.ReqRegen * 1.1);
+                    atBasis = $"atk/def/regen vs T{obj.Index + 1}v{obj.Version} {obj.Stage} x1.1";
                 }
                 else if (obj.LadderComplete)
                 {
@@ -229,12 +230,13 @@ namespace NGUAdvisor.Managers
             try
             {
                 double target = ChallengeOverlay.RebirthTargetSec();
-                if (!RunShape.IsEvilDay(ChallengeOverlay.Chapter(), target)) return;
+                int chapter = ChallengeOverlay.Chapter();
+                if (!RunShape.IsEvilDay(chapter, target)) return;
 
                 int t7 = 0;
                 try { t7 = ZoneHelpers.TitanVersionsBeaten(6); } catch { }
-                double switchAt = RunShape.EvilNguStartSec(target, t7);
-                double evilHours = 1 + t7;
+                double switchAt = RunShape.EvilNguStartSec(target, t7, chapter);
+                double evilHours = (target - switchAt) / 3600.0;
                 var want = !double.IsNaN(switchAt) && c.rebirthTime.totalseconds >= switchAt
                     ? difficulty.evil : difficulty.normal;
 
@@ -243,7 +245,9 @@ namespace NGUAdvisor.Managers
                     c.settings.nguLevelTrack = want;
                     try { c.NGUController.refreshMenu(); } catch { }
                     ChallengeOverlay.Record("NGU track", $"→ {(want == difficulty.evil ? "EVIL" : "Normal")} NGUs",
-                        $"guide ch5: last {evilHours:0}h evil ({t7} T7 versions beaten)");
+                        chapter > RunShape.EvilChapter
+                            ? $"guide ch{chapter}: last {evilHours:0}h evil (pre-Typo ceiling)"
+                            : $"guide ch5: last {evilHours:0}h evil ({t7} T7 versions beaten)");
                 }
             }
             catch (Exception e) { Main.LogDebug($"LevelPlanner NGU track: {e.Message}"); }

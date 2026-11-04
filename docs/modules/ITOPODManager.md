@@ -127,8 +127,10 @@ every 7 actions (the game bumps its counter twice per tick action) — defense d
 ticks on both sides. The enemy side takes its WORST jitter and roll (1.02, 1.2) because a death
 ends the push; our side is the mean sustained rotation (`BoostValueMath.SustainedDamagePerSlot`),
 buffs, heals, block and parry left out — all of them only help. A fight past
-`MaxFightActions` counts as lost. The target is `max(fight floor, one-shot floor)`, rounded DOWN
-to a 10 (user rule 2026-09-23: 418 is not worth the climb over 410; 420 or stay on 410).
+`MaxFightActions` counts as lost. The target is the fight floor, rounded DOWN to a 10 (user rule
+2026-09-23: 418 is not worth the climb over 410; 420 or stay on 410). It is not raised to the
+one-shot floor: that one stacks charge, mega and ultimate, which are up for one kill per cooldown
+while a floor takes ten. The first-reach bonus climb uses the same reach.
 
 **Push finishes by itself.** Once the push set is worn (`ItopodPushGearPending()` false) and the
 target is no longer above `highestItopodLevel − 1`, `UpdateMaxFloor` sets the floor mode back to

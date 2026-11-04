@@ -1,6 +1,6 @@
 {
   "Breakpoints": {
-    "_Preset": "Mid Evil 24h cadence, guide chapters 5-6 (auto-installed). The same four-phase Evil day, tuned for a post-Interdimensional-Party account where the Evil NGU track carries most of the run. Use from Boss 166 up to the T9 window. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Preset": "Mid Evil 24h cadence, guide chapters 5-6 (auto-installed). The same Evil day, tuned for a post-Interdimensional-Party account: augments to the 3h mark, then BB AT and Normal NGUs, with the Evil NGU track only for the last 5 hours (hour 19 on). Use from Boss 166 up to the T9 window. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
     "PriorityComment1": "CAP Allocations will use as much energy as it takes to cap, regular allocations evenly divide up the available idle energy. But allocations are individually applied left to right so there are some quirks",
     "PriorityComment2": "In practice CAP allocations make dividers between groups of non-CAP allocations.",
     "PriorityExample1": "For example, with priorities A, CAPB, C, D, E and total energy of 100",
@@ -57,7 +57,7 @@
       },
       {
         "Time": {
-          "h": 1
+          "h": 3
         },
         "Priorities": [
           "CAPALLAT",
@@ -65,7 +65,7 @@
           "ALLNGU",
           "CAPTM"
         ],
-        "Note1": "Evil NGU time",
+        "Note1": "Normal NGUs until the Evil tail (NGUDiff switches to Evil for the last 5 hours)",
         "Note2": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
         "Thresholds": "Magic-NGU or PP > x1.05, Respawn < x0.95, Gold > x1.2"
       }
@@ -105,7 +105,7 @@
       },
       {
         "Time": {
-          "h": 1
+          "h": 3
         },
         "Priorities": [
           "CAPWAN",
@@ -113,7 +113,7 @@
           "ALLNGU",
           "CAPTM"
         ],
-        "Note1": "Evil NGU time",
+        "Note1": "Normal NGUs until the Evil tail (NGUDiff switches to Evil for the last 5 hours)",
         "Note2": "Use this time to boost up NGUs which are lagging behind according to the Gear Optimizer",
         "Thresholds": "Energy-NGU or AdvB > x1.05, TM > x1.2"
       }
@@ -422,6 +422,12 @@
     "NGUDiff": [
       {
         "Time": 0,
+        "Diff": 0
+      },
+      {
+        "Time": {
+          "h": 19
+        },
         "Diff": 1
       }
     ],

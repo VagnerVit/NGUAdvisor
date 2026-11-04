@@ -1,6 +1,6 @@
 {
   "Breakpoints": {
-    "_Preset": "Late Evil 24h cadence, guide chapters 6-7 (auto-installed). Evil day shape with the hack lane live and the Evil NGU track dominant, aimed at the T9 push. Use past Boss 250. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
+    "_Preset": "Late Evil 24h cadence, guide chapters 6-7 (auto-installed). Evil day shape with the hack lane live, AT capped alongside Normal NGUs and the Evil NGU track dominant, aimed at the T9 push. Use past Boss 250. Requires Manage Gear + Manage Energy/Magic ON and Auto Rebirth ON.",
     "PriorityComment1": "CAP Allocations will use as much energy as it takes to cap, regular allocations evenly divide up the available idle energy. But allocations are individually applied left to right so there are some quirks",
     "PriorityComment2": "In practice CAP allocations make dividers between groups of non-CAP allocations.",
     "PriorityExample1": "For example, with priorities A, CAPB, C, D, E and total energy of 100",
@@ -20,6 +20,7 @@
         "Time": 0,
         "Priorities": [
           "CAPALLBT",
+          "CAPALLAT",
           "CAPTM"
         ]
       },
@@ -28,6 +29,7 @@
           "m": 15
         },
         "Priorities": [
+          "CAPALLAT",
           "CAPWAN",
           "AUG-10",
           "AUG-11",

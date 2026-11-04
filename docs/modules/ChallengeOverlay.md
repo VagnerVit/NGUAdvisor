@@ -51,7 +51,14 @@ clock owns the shape; the number rule only gets a bounded window.
 guide's "24HR RB Schedule" is written for the climb TO Boss 125 ("while you're climbing up to Boss
 125"), after the 30-minute rebirths stop at Boss 60–80. The old gate ran EVIL CLIMB for every run
 below Boss 125, so a 24 h profile at Boss 70 got a 24-hour climb: no TM half-hour, no augment phase,
-no Evil NGU tail. AT HOUR and RECOVERY are Normal-shape segments and do not exist on the Evil day.
+no Evil NGU tail. AT HOUR and RECOVERY are Normal-shape segments and do not exist on the ch.5 Evil day.
+
+**Evil ch.6–7 keep the Normal segments** (guide ch.6: 24 h rebirths, "BB AT, Normal NGUs, and
+Beards all rebirth"; ch.7 "push at least one boss per rebirth") — the guide gives them no TM/augment
+schedule. What they share with ch.5 is the Evil NGU tail (`RunShape.IsEvilDay`, chapters 5–7), here
+the guide's pre-Typo ceiling of 5 h (`PostT8EvilNguTailSec`). The ch.5-only `CAPALLAT:40` cap and
+the T7 prep stay ch.5: ch.6 BBs AT. Not modelled: post-HD1 "Evil NGUs all the time" (needs the
+Evil → Normal NGU quirk id, scene data) and GO's "are Evil NGUs worth it" check.
 
 **Ch.5 NGU MARATHON energy**: `CAPALLAT` ahead of the NGU lanes while pre-T7 at Boss 115+ (guide: "BB
 AT P/T for the entire rebirth to prep for T7"); otherwise the hot `NGU-*` and warm `CAPNGU-*` lanes

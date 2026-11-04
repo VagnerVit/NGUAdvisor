@@ -106,6 +106,17 @@ namespace NGUAdvisor.Tests
         }
 
         [Theory]
+        [InlineData(6)]
+        [InlineData(7)]
+        public void PostT8EvilNguTailIsTheGuidesFiveHourCeiling(int chapter)
+        {
+            Assert.Equal(19 * Hour, RunShape.EvilNguStartSec(24 * Hour, 2, chapter));
+        }
+
+        [Theory]
+        [InlineData(6, EvilDayTarget, true)]
+        [InlineData(7, EvilDayTarget, true)]
+        [InlineData(8, EvilDayTarget, false)]
         [InlineData(RunShape.EvilChapter, EvilDayTarget, true)]
         [InlineData(RunShape.EvilChapter, EvilStartTarget, false)]
         [InlineData(RunShape.EvilChapter, -1, false)]

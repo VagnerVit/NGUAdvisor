@@ -65,8 +65,9 @@ snapshotted targets.
 
 ## Sufficiency freezes (marathon segment only)
 
-- **P/T (slots 0–1)**: frozen while adventure stats beat `OptimizationAdvisor.NextObjective()`
-  ×1.1 — the realistic, difficulty-capped objective (never Evil content on Normal — the T7
+- **P/T (slots 0–1)**: frozen while adventure attack, defense AND (for auto-kill stages,
+  `ReqRegen > 0`) HP regen beat `OptimizationAdvisor.NextObjective()` ×1.1 — regen scales with the
+  Toughness slot, so AT can close it. The CapDbg `atBasis` reads `atk/def/regen vs …`. The realistic, difficulty-capped objective (never Evil content on Normal — the T7
   overreach bug). New titan/version target automatically thaws.
   **The unknown-objective case is split, not dropped** (2026-08-10): the test used to read
   `!obj.Known || stats ≥ req×1.1`, so an objective that could not be READ meant "sufficient" and
@@ -102,6 +103,8 @@ Guide ch5 Evil day: Normal NGUs most of the run, EVIL NGUs the LAST N hours wher
 included, because the guide's 24 h schedule is written for that climb. The old gate (boss ≥ 125 and
 N = versions with no base hour) never switched before T7. Elsewhere the profile's NGUDiff owns the
 track; on the Evil day `CustomAllocation` skips the file's NGUDiff swap so the two do not fight.
+Evil ch.6–7 count as an Evil day too, with N = 5 h (guide ch.6 pre-Typo "at most the last 5-6
+hours", `RunShape.PostT8EvilNguTailSec`).
 
 **Settings › NGU track** (`SavedSettings.NguTrack`, user rule 2026-10-22) sits above both. "Advisor"
 is the rule above. "Normal" / "Evil" / "Sadistic" (`PinnedNguTrack`) skips `TickNguTrack` and the

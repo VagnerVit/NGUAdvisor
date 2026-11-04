@@ -38,6 +38,22 @@ All notable changes to NGU Advisor are documented in this file.
   limited to unlocked challenges on Normal, where those completions count.
 - **Quirks for Resource 3, cards and wishes wait until the system is unlocked**, as the game does.
 - **Wandoos and its AT slots get nothing while Wandoos is off or still installing.**
+- **ITOPOD push climbs only to floors whose whole fight is won** — the one-shot floor it also
+  accepted needs every buff at once, which lasts one kill of the ten a floor takes.
+- **A titan auto-kill gated on HP regen keeps training Toughness AT** — the game scales regen with
+  Toughness, but the planner froze it once attack and defense were met and the AT hour treated
+  regen as out of AT's reach.
+- **Bundled presets follow the guide's schedules**: the 24 h Evil presets run augments to the 3 h
+  mark, MidEvil runs Normal NGUs with Evil only in the last 5 h, EndEvil trains AT, EarlyEvil starts
+  Evil NGUs at 23 h before T7, CBlock2 leaves 24 Hour 6 to CBlock3, and PostEND's Wandoos gear waits
+  5 minutes, not 5 seconds. Profiles already installed are not overwritten.
+- **Diggers**: NGU diggers rank ahead of Daycare outside the marathon, the EXP digger runs for the
+  Knowledge fruit harvest, and beard diggers leave the marathon from chapter 7.
+
+### Changed
+
+- **Evil chapters 6–7 switch to Evil NGUs for the last 5 hours of a timed rebirth**, the guide's
+  pre-Typo ceiling; before, only chapter 5 had an Evil NGU tail.
 
 ## [1.13.0] - 2026-11-04
 

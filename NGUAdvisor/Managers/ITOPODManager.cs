@@ -432,8 +432,7 @@ namespace NGUAdvisor.Managers
             bonusClaimNextCheck = DateTime.UtcNow + BonusClaimCheckEvery;
 
             ItopodConstants.Fighter fighter = PushFighter();
-            int reach = Math.Min(_ac.maxItopodLevel(),
-                Math.Max(ItopodConstants.BestWinnableFloor(fighter), SolvedMaxFloor()));
+            int reach = Math.Min(_ac.maxItopodLevel(), ItopodConstants.BestWinnableFloor(fighter));
             int next = ItopodRewards.NextBonusFloor(highest);
             if (reach < next)
             {
@@ -501,12 +500,13 @@ namespace NGUAdvisor.Managers
             return floor - floor % 10;
         }
 
-        // The floor a Push climbs to: the highest one whose fight is won against every ITOPOD AI, or the
-        // one-shot floor when that is higher (one-shots never let the enemy swing). Read-only.
+        // The floor a Push climbs to: the highest one whose fight is won against every ITOPOD AI. Not the
+        // one-shot floor: that stacks every buff, which is up for one kill per cooldown, and a floor takes
+        // ten. Read-only.
         public static int PushTargetFloor()
         {
             int won = ItopodConstants.BestWinnableFloor(PushFighter());
-            int target = Math.Min(_ac.maxItopodLevel(), Math.Max(won, SolvedMaxFloor()));
+            int target = Math.Min(_ac.maxItopodLevel(), won);
             return target - target % PushFloorStep;
         }
 
