@@ -4,6 +4,8 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-04
+
 ### Added
 
 - **Systems › AT** — the five Advanced Training level targets can be set from the advisor (0 = no
