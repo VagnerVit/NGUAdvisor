@@ -114,6 +114,16 @@ namespace NGUAdvisor
         public static void RequestTitanFight(int titanIndex, int version)
             => System.Threading.Interlocked.Exchange(ref _titanFightRequest, Tuple.Create(titanIndex, version));
 
+        // Systems > AT "Set target" buttons: levelTarget is save state, so the write waits for Update().
+        private static readonly object _atTargetLock = new object();
+        private static readonly long?[] _atTargetRequests = new long?[5];
+        private static volatile bool _atTargetPending;
+        public static void RequestAtTarget(int slot, long target)
+        {
+            lock (_atTargetLock) _atTargetRequests[slot] = target;
+            _atTargetPending = true;
+        }
+
         // HOTKEYS ARE UNITY INPUT, so Update() only ever sees them while the GAME window is the
         // foreground window. The advisor is its own top-level HWND (Mono WinForms), so with the advisor
         // focused Unity receives no keystroke at all and every F-key was dead there (user-reported
@@ -584,6 +594,20 @@ namespace NGUAdvisor
             {
                 try { Managers.ZoneHelpers.ArmTitanFight(fight.Item1, fight.Item2); }
                 catch (Exception e) { LogDebug($"Deferred titan fight failed: {e.Message}"); }
+            }
+            if (_atTargetPending)
+            {
+                _atTargetPending = false;
+                lock (_atTargetLock)
+                {
+                    for (int slot = 0; slot < _atTargetRequests.Length; slot++)
+                    {
+                        if (!_atTargetRequests[slot].HasValue) continue;
+                        try { Managers.LevelPlanner.ApplyUserAtTarget(Character, slot, _atTargetRequests[slot].Value); }
+                        catch (Exception e) { LogDebug($"Deferred AT target failed: {e.Message}"); }
+                        _atTargetRequests[slot] = null;
+                    }
+                }
             }
 
             _formUpdateCooldown -= Time.deltaTime;

@@ -37,22 +37,15 @@
         public const string Gold = "Economy";
         public const string Pit = "Economy";
 
-        // The three read-only planner readouts — AP purchases, the perk-point plan, and the Advanced
-        // Training calculator — all live on Economy's PLANNERS rail sub-page. They were at the bottom of
-        // the Economy and Combat canvases, below the fold, where the owner could not find them; a rail
-        // child is a nameable place, so they moved onto one. AT is combat-flavoured (its output is the
-        // adventure Power/Toughness/Block multipliers) but it is the same kind of advisory readout, which
-        // is what decides the home.
-        //
-        // "Economy/Planners" resolves by exactly the same machinery as the other deep links here:
-        // RailChildren (SettingsForm:154) declares Economy's children as { "Overview", "Planners" }, the
-        // rail loop registers each one in _sectionNav (SettingsForm:1004), and NavigateTo looks the path up
-        // there. Three names, one route — and they keep separate names because sharing a route is not being
-        // the same destination.
+        // The read-only planner readouts — next buy, AP purchases, the perk-point plan — live on Economy's
+        // PLANNERS rail sub-page (RailChildren in SettingsForm declares it; the rail loop registers it in
+        // _sectionNav). They keep separate names because sharing a route is not being the same destination.
         public const string NextBuy = "Economy/Planners";
         public const string ApPurchases = "Economy/Planners";
         public const string PerkPoints = "Economy/Planners";
-        public const string AdvancedTraining = "Economy/Planners";
+
+        // AT has its own Systems page: it carries the level-target editor, not only the calculator readout.
+        public const string AdvancedTraining = "Systems/AT";
 
         public const string Quests = "Systems/Quests";
         public const string Blood = "Systems/Blood";

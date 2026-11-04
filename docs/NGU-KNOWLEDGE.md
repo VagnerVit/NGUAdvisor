@@ -173,7 +173,7 @@ hour of hour-1 allocation:
 | `AT-0, AT-1` | ½ | ~22 700 | 6.53× |
 
 - **`AT-2` (Block) does not belong in the AT hour.** It buys damage reduction only, and `LevelPlanner`
-  caps it at 99 % reduction (a few hundred levels) the moment `AutoProfile` is on — so under the auto
+  caps it at 99.9 % reduction (`f·L ≥ 499`) the moment `AutoProfile` is on — so under the auto
   profile it is already out, and a hand-written list that keeps it is paying a quarter of the hour for
   a target the advisor itself would have met immediately.
 - **`TM` in the AT hour is a real trade, not a mistake**: −6.5 % on the AT multiplier against another

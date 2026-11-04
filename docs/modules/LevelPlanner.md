@@ -8,8 +8,10 @@ snapshotted targets.
 
 ## Purpose-driven AT caps (slots 2–4, live every tick)
 
-- **Block (2)**: stop at 99 % damage reduction. Game: `blockBonus = 0.5/(1 + f·L)` (remaining
-  damage; tooltip reduction = 1 − that) → 99 % needs `f·L ≥ 49`. Reads **only**
+- **Block (2)**: stop at 99.9 % damage reduction. Game: `blockBonus = 0.5/(1 + f·L)` (remaining
+  damage, applied in `PlayerController.takeDamage` while blocking, further ÷ charge; no cap) →
+  99.9 % needs `f·L ≥ 499`. Raised from 99 % on 2026-11-03 (owner's call): a blocked exploder hit
+  (×1000) still landed as 10 normal hits at 99 %; at 99.9 % it is about one. Reads **only**
   `advancedTrainingController.block.levelFactor` — no gear at all — so unlike the Wandoos stops below
   it keeps running through mode locks.
 - **Wandoos ATs (3=E, 4=M)**: stop once Wandoos' cap-speed dump costs ≤ 1 % of max E/M. Dump cost
@@ -53,6 +55,11 @@ snapshotted targets.
     **Why everything else is paused, not left alone** (2026-10-03, user-caught): the game keeps
     `levelTarget` across rebirths, so a stale stop kept drawing an equal `CAPALLAT` share (Wandoos
     Magic AT fed up to L90k against a live stop of ~20k).
+- **User writes** come from Systems › AT through `ApplyUserAtTarget`, refused for any slot
+  `AtTargetOwner` names (2–4 under the auto profile, 0–1 while `AtFrozen`). A slot written there while
+  the planner held it would be clobbered — next tick, or by `ThawPurpose` restoring a stale snapshot.
+  That snapshot path is how a planner `-1` survives as "the user's target": the game persists
+  `levelTarget`, so the next auto-on snapshots the old pause and auto-off restores it.
 - Return value `long.MinValue` = unknown → leave the current target alone; −1 = hold at zero
   (target 0 means UNCAPPED in the game's semantics — the reason freezes write `lvl > 0 ? lvl : −1`).
 

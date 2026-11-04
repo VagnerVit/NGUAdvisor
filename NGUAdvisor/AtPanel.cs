@@ -6,14 +6,13 @@ using static NGUAdvisor.Main;
 
 namespace NGUAdvisor
 {
-    // Economy > PLANNERS — the read-only port of iboj88's AT Calculator: where each slot's
+    // Systems > AT, below AtTargetsPanel — the read-only port of iboj88's AT Calculator: where each slot's
     // blitz-boost ceiling sits at the energy it is holding right now, when a level target lands, how
     // much cap it would take to blitz-boost for a whole hour or a whole day, and the sheet's Time
     // Machine tab.
     //
-    // NOTHING HERE FEEDS ENERGY OR WRITES A LEVEL TARGET. AdvancedTrainingBP owns the feed and
-    // LevelPlanner owns the targets; a second writer on an advice surface would be two owners for one
-    // allocation, and AT levels cannot be un-bought.
+    // NOTHING HERE FEEDS ENERGY OR WRITES A LEVEL TARGET. AdvancedTrainingBP owns the feed; the
+    // targets belong to LevelPlanner under the auto profile and to the user (AtTargetsPanel) otherwise.
     //
     // EVERY NUMBER IS ASKED OF THE GAME, NOT REDERIVED. The rate comes from
     // advancedTrainingController.getProgressPerTick(id) — the game's own progress per tick, energy,
@@ -46,7 +45,7 @@ namespace NGUAdvisor
         private static readonly string[] HorizonNames = { "1h", "24h" };
 
         // Slot ids exactly as AtHourPlanner (0 = Toughness, 1 = Power) and AdvancedTrainingBP use them.
-        private static readonly string[] SlotNames = { "Toughness", "Power", "Block", "Wandoos Energy", "Wandoos Magic" };
+        internal static readonly string[] SlotNames ={ "Toughness", "Power", "Block", "Wandoos Energy", "Wandoos Magic" };
 
         // The two slots that feed adventure Power/Toughness, i.e. the only two with a GOAL: the titan
         // ladder is what "does more AT still buy progress" is measured against.
@@ -410,7 +409,7 @@ namespace NGUAdvisor
         private void RenderCap(Character c, int id, bool locked, double epow, double atSpeed)
         {
             Label row = _caps[id];
-            double baseTime = Read(() => (double)Controller(c, id).baseTime);
+            double baseTime = Read(() => (double)LevelPlanner.AtController(c, id).baseTime);
             if (locked)
             {
                 row.ForeColor = UiTheme.Faint;
@@ -543,21 +542,6 @@ namespace NGUAdvisor
         {
             try { return c.wishes.wishes[BlitzWishId].level >= 1; }
             catch { return false; }
-        }
-
-        // Same id -> controller mapping AdvancedTrainingBP.ControllerFor uses; needed here only for
-        // baseTime, the one input getProgressPerTick cannot give back.
-        private static AdvancedTrainingController Controller(Character c, int id)
-        {
-            switch (id)
-            {
-                case 0: return c.advancedTrainingController.defense;
-                case 1: return c.advancedTrainingController.attack;
-                case 2: return c.advancedTrainingController.block;
-                case 3: return c.advancedTrainingController.wandoosEnergy;
-                case 4: return c.advancedTrainingController.wandoosMagic;
-            }
-            return null;
         }
 
         // Every live game read on this panel goes through here: a slot whose read throws degrades its

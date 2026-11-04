@@ -115,6 +115,7 @@ namespace NGUAdvisor
         private ApPanel _apPanel;
         private PpPanel _ppPanel;
         private AtPanel _atPanel;
+        private AtTargetsPanel _atTargetsPanel;
         private ChallengesPanel _challengesPanel;
         private LightsPanel _lights;
         private ActionsPanel _actions;
@@ -159,7 +160,7 @@ namespace NGUAdvisor
             {
                 { "Advisors", new[] { "Overview", "Priorities" } },
                 { "Economy", new[] { "Overview", "Planners" } },
-                { "Systems", new[] { "Yggdrasil", "Quests", "Boosts", "Inventory", "Cooking", "Blood" } },
+                { "Systems", new[] { "Yggdrasil", "Quests", "Boosts", "Inventory", "Cooking", "Blood", "AT" } },
                 { "Loadouts", new[] { "Titan", "Gold", "Quest", "Yggdrasil", "Cooking", "Loot Hunter", "Shockwave" } },
                 { "Logs", new[] { "Advisor", "Loot", "Session", "Diagnostic" } },
                 { "Cards", new[] { "Cards", "Wishes" } },
@@ -440,6 +441,7 @@ namespace NGUAdvisor
                         if (_apPanel != null) UiLayout.Audit(_apPanel, "AP");
                         if (_ppPanel != null) UiLayout.Audit(_ppPanel, "PP");
                         if (_atPanel != null) UiLayout.Audit(_atPanel, "AT");
+                        if (_atTargetsPanel != null) UiLayout.Audit(_atTargetsPanel, "AT targets");
                         if (_challengesPanel != null) UiLayout.Audit(_challengesPanel, "Challenges");
                         if (_yggPanel != null) UiLayout.Audit(_yggPanel, "Yggdrasil");
                         if (_questsPanel != null) UiLayout.Audit(_questsPanel, "Quests");
@@ -545,7 +547,8 @@ namespace NGUAdvisor
             catch (Exception titEx) { LogDebug($"Titans section init failed: {titEx.Message}"); }
             try
             {
-                _atPanel = new AtPanel(CanvasW);   // full-width row, third on Economy > PLANNERS
+                _atTargetsPanel = new AtTargetsPanel(CanvasW);   // Systems > AT, above the readout
+                _atPanel = new AtPanel(CanvasW);
             }
             catch (Exception atEx) { LogDebug($"AT section init failed: {atEx.Message}"); }
 
@@ -705,11 +708,8 @@ namespace NGUAdvisor
             Place(combat, _combatSliver, UiTheme.S(20), combatSliverY, CanvasW, UiTheme.S(130));
 
             // Economy is split into two rail sub-pages (A1 pattern, same as Advisors): OVERVIEW keeps the
-            // gold/pit columns and the pit log tail exactly as they were; PLANNERS is the new home of the
-            // three read-only advisory readouts (AP, PP, AT). They used to sit at the bottom of the Economy
-            // and Combat canvases, below the fold, where nobody found them — a sub-page is a rail entry, so
-            // they are now nameable and reachable in one click. AT lives here despite being combat-flavoured:
-            // it is the same kind of advisory readout, not a control surface.
+            // gold/pit columns and the pit log tail exactly as they were; PLANNERS holds the read-only
+            // advisory readouts (next buy, AP, PP). AT moved to Systems > AT once it gained its target editor.
             var economy = NewSection("Economy");
             economy.Scrollable = false;   // the sub-pages scroll, not the host
             // OVERVIEW is the first entry in RailChildren["Economy"], which is what makes it the default
@@ -725,9 +725,9 @@ namespace NGUAdvisor
             if (_pitPanel != null) Place(ecoOverview, _pitPanel, UiTheme.S(560), UiTheme.S(12), UiTheme.S(490), UiTheme.S(520));
             _pitSliver = new LogSliver("PIT & SPIN LOG — live tail of pitspin.log", "pitspin.log", CanvasW, UiTheme.S(190));
             Place(ecoOverview, _pitSliver, UiTheme.S(20), UiTheme.S(544), CanvasW, UiTheme.S(190));
-            // PLANNERS: the three readouts stacked, each asking for its own ContentHeight — none of them
-            // scrolls (the sub-page is the one scroll owner), so a tuned height would clip the AP queue rows,
-            // the PP plan lines or AT's last Time Machine lines at real DPI. Each row chains off the previous
+            // PLANNERS: the readouts stacked, each asking for its own ContentHeight — none of them
+            // scrolls (the sub-page is the one scroll owner), so a tuned height would clip the AP queue rows
+            // or the PP plan lines at real DPI. Each row chains off the previous
             // row's Bottom for the same reason: a tuned offset would overlap them.
             int ecoY = UiTheme.S(12);
             if (_spendPanel != null)
@@ -741,12 +741,7 @@ namespace NGUAdvisor
                 ecoY = _apPanel.Bottom + UiTheme.S(12);
             }
             if (_ppPanel != null)
-            {
                 Place(ecoPlanners, _ppPanel, UiTheme.S(20), ecoY, CanvasW, _ppPanel.ContentHeight);
-                ecoY = _ppPanel.Bottom + UiTheme.S(12);
-            }
-            if (_atPanel != null)
-                Place(ecoPlanners, _atPanel, UiTheme.S(20), ecoY, CanvasW, _atPanel.ContentHeight);
 
             // Systems C1 (user pick): one system, one full-canvas page, navigated by rail children.
             var systems = NewSection("Systems");
@@ -758,8 +753,18 @@ namespace NGUAdvisor
             var pgInv = NewSubPage(systems, "Systems/Inventory");
             var pgCook = NewSubPage(systems, "Systems/Cooking");
             var pgBlood = NewSubPage(systems, "Systems/Blood");
-            foreach (var key in new[] { "Systems/Yggdrasil", "Systems/Quests", "Systems/Boosts", "Systems/Inventory", "Systems/Cooking", "Systems/Blood" })
+            var pgAt = NewSubPage(systems, Destinations.AdvancedTraining);
+            foreach (var key in new[] { "Systems/Yggdrasil", "Systems/Quests", "Systems/Boosts", "Systems/Inventory", "Systems/Cooking", "Systems/Blood", Destinations.AdvancedTraining })
                 _childNav[key] = ShowSubPage("Systems", key);
+            // Both AT panels ask for their own height and chain: neither scrolls, the sub-page does.
+            int atY = UiTheme.S(12);
+            if (_atTargetsPanel != null)
+            {
+                Place(pgAt, _atTargetsPanel, UiTheme.S(20), atY, CanvasW, _atTargetsPanel.ContentHeight);
+                atY = _atTargetsPanel.Bottom + UiTheme.S(12);
+            }
+            if (_atPanel != null)
+                Place(pgAt, _atPanel, UiTheme.S(20), atY, CanvasW, _atPanel.ContentHeight);
             if (_yggPanel != null) Place(pgYgg, _yggPanel, UiTheme.S(20), UiTheme.S(12), CanvasW, UiTheme.S(560));
             if (_questsPanel != null) Place(pgQuests, _questsPanel, UiTheme.S(20), UiTheme.S(12), CanvasW, UiTheme.S(360));
             // Boosts asks for its own height: its lists are specified in ROWS now, so a tuned 460 would
@@ -1682,6 +1687,7 @@ namespace NGUAdvisor
                 _spendPanel?.SyncFromSettings();
                 _apPanel?.SyncFromSettings();
                 _ppPanel?.SyncFromSettings();
+                _atTargetsPanel?.SyncFromSettings();
                 _atPanel?.SyncFromSettings();
                 _challengesPanel?.SyncFromSettings();
                 _actions?.SyncFromSettings();

@@ -446,13 +446,11 @@ namespace NGUAdvisor.Managers
                 "pp perk points perks itopod perks next perk perk plan spend pp when can i afford perk eta",
                 Destinations.PerkPoints));
 
-            // Advanced Training is a Reference for the same reason the two above are: the panel is a pure
-            // readout with no control on it at all, so it owns no setting and has no automation or
-            // advisor/manual choice. The AT feed belongs to AdvancedTrainingBP and the level targets to
-            // LevelPlanner. Fields stay EMPTY — naming a setting this panel cannot write would put a
-            // duplicate surface behind it and trip the catalogue's duplicate audit.
+            // Advanced Training is a Reference: its one control writes the game's own levelTarget, which is
+            // save state, not a Settings key, and it has no automation or advisor/manual choice. Fields stay
+            // EMPTY — there is no Settings identifier behind the page.
             e.Add(Ref("AdvancedTraining", "Advanced Training",
-                "AT level times, blitz-boost ceilings and the cap it takes to hold them — advice only, nothing feeds energy.",
+                "AT level targets, level times, blitz-boost ceilings and the cap it takes to hold them — nothing feeds energy.",
                 "",
                 "at advanced training blitz boost bb ceiling at calculator level target eta toughness power block wandoos at time machine cap",
                 Destinations.AdvancedTraining));

@@ -4,6 +4,18 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Systems › AT** — the five Advanced Training level targets can be set from the advisor (0 = no
+  cap, -1 = paused, a number stops the slot there). A slot the level planner rewrites while the auto
+  profile is on is shown but locked, with who holds it. The AT calculator moved here from Economy ›
+  Planners.
+
+### Changed
+
+- **The auto profile trains AT Block to 99.9 % damage reduction instead of 99 %** — at 99 % a
+  blocked exploder hit still did ten normal hits' worth of damage.
+
 ### Fixed
 
 - **Blood is split evenly again on profiles that rebirth on a boss number** — without a rebirth

@@ -332,9 +332,17 @@ without a conversion that would be wrong for half a run.
 ## Read-only: it never feeds energy and never writes a target
 
 There is no button, numeric or combo on this panel; `SyncFromSettings` only reads, and the sole
-handler is `VisibleChanged` calling that same read-only refresh. `AdvancedTrainingBP` owns the feed
-and `LevelPlanner` owns the level targets. A second writer on an advice surface would be two owners
-for one allocation — and **AT levels cannot be un-bought**, so there is no undo to fall back on.
+handler is `VisibleChanged` calling that same read-only refresh. `AdvancedTrainingBP` owns the feed.
+**AT levels cannot be un-bought**, so there is no undo to fall back on.
+
+The level targets are written by the separate `AtTargetsPanel` above it on **Systems › AT** (added
+2026-11-03, user request after a `-1` held Wandoos Energy/Magic with no way to change it from the
+advisor). One owner per slot at a time, decided by `LevelPlanner.AtTargetOwner`: under the auto
+profile slots 2–4 are the planner's every tick and 0–1 while `AtFrozen`; those rows are shown locked
+and name the owner. Editing them would last one tick, or be restored over later by the planner's
+purpose snapshot. The button only requests (`Main.RequestAtTarget`); `Update()` writes through
+`LevelPlanner.ApplyUserAtTarget`, which re-checks the owner and clamps like the game's own box
+(`checkTargetInput`: outside `[-1, 2e9]` → 0).
 
 ## Layout, threading, registration
 
@@ -356,21 +364,18 @@ for one allocation — and **AT levels cannot be un-bought**, so there is no und
   one `try/catch` that logs, because a throwing read in that pass aborts every panel after it, and
   each individual read additionally goes through the guarded `Read<T>` helper so a bad read degrades
   **its own row** only — the same contract `AtHourPlanner.ReadSlot` honours.
-- `Controller(c, id)` is a five-case switch duplicated from `AdvancedTrainingBP.ControllerFor`
-  (private there), needed only for `baseTime`. Slot ids are `AtHourPlanner`'s: 0 = Toughness,
+- `LevelPlanner.AtController(c, id)` maps a slot to its controller (shared with the target editor's
+  game-box refresh), needed here only for `baseTime`. Slot ids are `AtHourPlanner`'s: 0 = Toughness,
   1 = Power, 2 = Block, 3 = Wandoos Energy, 4 = Wandoos Magic.
 - `Duration()` is a private local formatter taking **seconds**, not hours (`PpPanel`'s takes hours):
   a blitz-boosted level lands in 0.02 s, so an hours-based formatter would collapse every short ETA
   to `<1m`.
-- Placed in **Combat**, not Economy: AT's whole output is the adventure Power/Toughness/Block
-  multipliers plus the Wandoos speeds, and `AtHourPlanner` — the module that owns AT feeding — is a
-  combat/segment concern.
-- **Registered as a `SettingsIndex` Reference with EMPTY fields** (`SettingsIndex.cs:439-443`), routed
-  to `Destinations.AdvancedTraining` (= `"Combat"`, `Destinations.cs:53`). A `Ref` and not a `Sys` for
-  the same reason `PerkPoints` and `ApPurchases` are: the panel is a pure readout, so it owns no
-  setting and has no automation or advisor/manual gate that a System entry would promise. The fields
-  column stays empty — naming a setting this panel cannot write would put a duplicate surface behind
-  it and trip the catalogue's duplicate audit.
+- Placed on **Systems › AT** (its own rail child, since 2026-11-03), below `AtTargetsPanel`; both
+  report a `ContentHeight` and chain, the sub-page is the one scroll owner.
+- **Registered as a `SettingsIndex` Reference with EMPTY fields**, routed to
+  `Destinations.AdvancedTraining` (= `"Systems/AT"`). A `Ref` and not a `Sys`: the target editor
+  writes the game's own `levelTarget` (save state, not a Settings key), and there is no automation or
+  advisor/manual gate that a System entry would promise.
 
 ## Tests, and the invalid audit baseline
 

@@ -9,7 +9,7 @@ namespace NGUAdvisor.Managers
     // AT/TM target boxes.
     //
     // AT slots are PURPOSE-DRIVEN (user rule): Toughness (0) and Power (1) are the titan push
-    // and stay uncapped; Block (2) stops at 99% damage reduction; the wandoos ATs (3/4) stop
+    // and stay uncapped; Block (2) stops at 99.9% damage reduction; the wandoos ATs (3/4) stop
     // once Wandoos' cap-speed dump costs <= 1% of max E/M. Past their stops, those slots'
     // shares flow to Toughness/Power.
     //
@@ -264,7 +264,7 @@ namespace NGUAdvisor.Managers
                     _purposeSnapshot = new[] { targets[2], targets[3], targets[4] };
                     _purposeOn = true;
                     ChallengeOverlay.Record("AT purpose caps on",
-                        "block → 99% reduction · wandoos ATs → 1% dump cost · rest to Power/Toughness");
+                        "block → 99.9% reduction · wandoos ATs → 1% dump cost · rest to Power/Toughness");
                 }
 
                 ApplyPurpose(targets, 2, BlockStopLevel(c));
@@ -330,21 +330,60 @@ namespace NGUAdvisor.Managers
             return Math.Min(liveStop, marathonStop);
         }
 
+        // The game's own target box (checkTargetInput) turns anything outside [-1, 2e9] into 0.
+        public const long MaxAtTarget = 2000000000;
+
+        // Who rewrites this AT slot's target every tick, or null when it is the user's to set. A user
+        // write the planner owns would be overwritten next tick — or, for 2..4, restored over by the
+        // purpose snapshot when the auto profile turns off.
+        public static string AtTargetOwner(int slot)
+        {
+            if (Main.Settings == null || !Main.Settings.AutoProfile) return null;
+            if (slot >= 2) return "level planner (auto profile on)";
+            return _frozenAt ? "level planner freeze (marathon)" : null;
+        }
+
+        // Main thread only (Main.Update drains the AT tab's requests here).
+        public static void ApplyUserAtTarget(Character c, int slot, long target)
+        {
+            if (AtTargetOwner(slot) != null) return;
+            if (target < PausedTarget || target > MaxAtTarget) target = 0;
+            c.advancedTraining.levelTarget[slot] = target;
+            AtController(c, slot)?.updateText();
+        }
+
+        // Slot ids as AdvancedTrainingBP.ControllerFor maps them.
+        internal static AdvancedTrainingController AtController(Character c, int id)
+        {
+            switch (id)
+            {
+                case 0: return c.advancedTrainingController.defense;
+                case 1: return c.advancedTrainingController.attack;
+                case 2: return c.advancedTrainingController.block;
+                case 3: return c.advancedTrainingController.wandoosEnergy;
+                case 4: return c.advancedTrainingController.wandoosMagic;
+            }
+            return null;
+        }
+
         private static void ApplyPurpose(long[] targets, int slot, long stop)
         {
             if (stop == long.MinValue) return;   // unknown — leave the current target alone
             if (targets[slot] != stop) targets[slot] = stop;
         }
 
-        // Block stops at 99% damage reduction. The game's blockBonus = 0.5 / (1 + f·L) (remaining
-        // damage fraction; tooltip shows reduction = 1 − that), so 99% needs f·L >= 49.
+        // Block stops at 99.9% damage reduction (owner's call 2026-11-03: at 99% a blocked exploder
+        // hit, x1000, still lands as 10 normal hits). The game's blockBonus = 0.5 / (1 + f·L) is the
+        // remaining damage fraction (PlayerController.takeDamage), so the stop is f·L >= 0.5/rest - 1.
+        private const double BlockRemainingDamage = 0.001;
+
         private static long BlockStopLevel(Character c)
         {
             try
             {
                 float f = c.advancedTrainingController.block.levelFactor;
                 if (f <= 0) return long.MinValue;
-                return (long)Math.Ceiling(49.0 / f);
+                return (long)Math.Ceiling((0.5 / BlockRemainingDamage - 1.0) / f);
             }
             catch { return long.MinValue; }
         }
