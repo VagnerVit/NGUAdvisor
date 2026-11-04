@@ -720,7 +720,12 @@ namespace NGUAdvisor.Managers
                     // Wandoos then Number. TM/Wandoos CAP tokens self-skip while still locked.
                     if (e) { list.Add("CAPALLBT"); list.Add("CAPTM:5"); list.Add("CAPWAN:30"); list.Add("BESTAUG"); list.Add("CAPALLAT"); }
                     else { list.Add("CAPWAN:30"); list.Add("NGU-3"); }   // magic: Wandoos (when unlocked) then Number NGU
-                    foreach (var t in ngus) if (!list.Contains(t)) list.Add(t);
+                    // Magic already holds NGU-3: its CAPNGU-3 twin would fund the same lane twice.
+                    foreach (string t in ChapterNguLanes(type, ngus))
+                    {
+                        string lane = t.StartsWith("CAP") ? t.Substring(3) : t;
+                        if (!list.Contains(lane) && !list.Contains("CAP" + lane)) list.Add(t);
+                    }
                     break;
                 case "AUGMENTATION":
                     // Guide ch5 phase 2 (0.5–3h): energy → best augment (cheap stat caps first); magic →

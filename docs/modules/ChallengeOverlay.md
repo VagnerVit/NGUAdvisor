@@ -90,6 +90,10 @@ since a rebirth is caught by the 600 s gate — and now keeps the last `Bosses30
 everything it could use and left them nothing. Guide ch.5: "run AT with <40% of your Energy cap.
 Prioritize NGUs first". EVIL CLIMB keeps the uncapped group: past boss 115 the guide BBs AT P/T.
 
+**EVIL CLIMB's NGU tail is `ChapterNguLanes`, surplus included** (user 2026-11-04: only Augs and Gold
+were filled — the deepen pair — while every other lane sat empty). The hot `NGU-*` pair still shares
+the equal split with `BESTAUG`; the `CAPNGU-*` lanes drink what the pair leaves at BB.
+
 **TM HOUR magic ends on the NGU lanes; TM HOUR energy does not.** Magic's TM HOUR tokens (`CAPTM`,
 `CAPWAN`, `BR`) all stop at a 1-per-tick cap, so without an NGU tail 95 % of the magic cap sat idle
 for the whole first hour (save 2026-10-08: 26.5B of 28B). Energy keeps `BESTAUG` as its sink: a

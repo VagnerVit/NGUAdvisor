@@ -9,6 +9,8 @@ All notable changes to NGU Advisor are documented in this file.
 - **Blood is split evenly again on profiles that rebirth on a boss number** — without a rebirth
   time the planner kept counting an hour of future blood towards Counterfeit, so it stayed ahead of
   NUMBER by that hour all run (1.7e11 vs 6e9).
+- **The Evil climb fills every worthwhile NGU, not just the top two** — energy the two picked lanes
+  leave over once they level every tick now goes to the other NGUs instead of staying unused.
 
 ## [1.12.0] - 2026-10-29
 
