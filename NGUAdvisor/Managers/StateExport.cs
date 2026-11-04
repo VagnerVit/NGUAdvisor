@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -407,6 +408,12 @@ namespace NGUAdvisor.Managers
                 var a = c.augments.augs[id];
                 sb.AppendLine($"  {names[id],-26} aug L{a.augLevel,-10} upgrade L{a.upgradeLevel}");
             }
+            // The speed dividers are scene data, so docs/AUGMENTS.md's Evil/Sadistic ratios can only be
+            // checked here.
+            AllAugsController ac = c.augmentsController;
+            for (int id = 0; id < names.Length && id < ac.normalAugSpeedDividers.Count; id++)
+                sb.AppendLine($"  divider {names[id],-26} aug N {ac.normalAugSpeedDividers[id]:E3} E {ac.evilAugSpeedDividers[id]:E3} S {ac.sadisticAugSpeedDividers[id]:E3}"
+                            + $" · upgrade N {ac.normalUpgradeSpeedDividers[id]:E3} E {ac.evilUpgradeSpeedDividers[id]:E3} S {ac.sadisticUpgradeSpeedDividers[id]:E3}");
         }
 
         // The plan the blood routing follows, plus the live inputs that shaped it.
@@ -433,8 +440,11 @@ namespace NGUAdvisor.Managers
             {
                 var d = c.diggers.diggers[id];
                 if (d.maxLevel <= 0) continue;   // never unlocked — noise in a state dump
+                // consumesGPS is scene data: totalGPSDrain() skips a digger whose flag is false.
+                List<bool> consumes = c.allDiggers.consumesGPS;
+                string gps = consumes != null && id < consumes.Count ? (consumes[id] ? "" : "  no gold drain") : "  gold drain ?";
                 sb.AppendLine($"  {OptimizationAdvisor.DiggerNames[id],-8} L{d.curLevel}/{d.maxLevel}"
-                            + (active != null && active.Contains(id) ? "  [ACTIVE]" : ""));
+                            + (active != null && active.Contains(id) ? "  [ACTIVE]" : "") + gps);
             }
             sb.AppendLine($"  slots in use  {(active != null ? active.Count : 0)}");
         }
@@ -513,7 +523,9 @@ namespace NGUAdvisor.Managers
                         desc = " · " + qc.quirkDesc[id].Replace("\r", " ").Replace("\n", " ").Trim();
                 }
                 catch { }
-                sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}{desc}");
+                string type = "";
+                try { if (id < qc.quirkType.Count) type = $" · type {qc.quirkType[id]}"; } catch { }
+                sb.AppendLine($"  [{id}] {qc.quirkName[id]?.Trim()} — L{levels[id]}{(max > 0 ? $"/{max}" : "")}{cost}{req}{type}{desc}");
             }
         }
 
