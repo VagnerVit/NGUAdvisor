@@ -410,7 +410,9 @@ namespace NGUAdvisor.Managers
                 double boot = c.wandoos98Controller.bootupSpeedFactor();
                 double fullBoot = c.inventory.itemList.wandoosComplete ? 1.1 : 1.0;
                 double digger = c.allDiggers.totalWandoosSpeedBonus();
-                inputs = $"cap={NumberFormatter.Abbrev(cap)} boot={boot:0.###} digger={digger:0.###}";
+                long gameBb = energy ? c.wandoos98Controller.capAmountEnergy() : c.wandoos98Controller.capAmountMagic();
+                inputs = $"cap={NumberFormatter.Abbrev(cap)} boot={boot:0.###} digger={digger:0.###}"
+                       + $" f={f:G4} speed={speed:G4} baseTime={baseTime:G3} gameBb={NumberFormatter.Abbrev(gameBb)}";
 
                 double? baseSpeed = AtMath.WandoosBaseSpeed(speed, 1.0 + f * lvl, boot, fullBoot, digger);
                 if (!baseSpeed.HasValue) return long.MinValue;
