@@ -4,6 +4,12 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Blood is split evenly again on profiles that rebirth on a boss number** — without a rebirth
+  time the planner kept counting an hour of future blood towards Counterfeit, so it stayed ahead of
+  NUMBER by that hour all run (1.7e11 vs 6e9).
+
 ## [1.12.0] - 2026-10-29
 
 ### Added

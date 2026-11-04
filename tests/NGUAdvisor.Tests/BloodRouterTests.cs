@@ -145,6 +145,30 @@ namespace NGUAdvisor.Tests
             Assert.Equal(BloodRoute.Idle, idle.Route);
         }
 
+        // A run without a clock (a Number/Bosses rebirth) has no end to project income to: a rolling
+        // horizon never shrinks, so Counterfeit would lead NUMBER by a whole projected hour at the rebirth
+        // (measured 2026-11-04 on CBlock3.2-E: 1.7e11 vs 6e9).
+        [Theory]
+        [InlineData(-1, 2289, 0)]
+        [InlineData(0, 2289, 0)]
+        [InlineData(3600, 2289, 1311)]
+        [InlineData(3600, 4000, 0)]
+        public void HorizonRunsOnlyToAClockedRebirth(double target, double elapsed, double horizon)
+            => Assert.Equal(horizon, BloodRouter.HorizonSec(target, elapsed));
+
+        [Fact]
+        public void FutureIncomeIsWhatCounterfeitLeadsNumberBy()
+        {
+            // Counterfeit and NUMBER hold the same blood: an hour of projected income still asks for gold.
+            double level = BloodRouter.GoldBloodFor(200, MinGold);
+            BudgetPlan rolling = BloodRouter.Plan(Run(Sink(SinkMode.On, level), Sink(SinkMode.Off, gold: false),
+                                                      bps: 4e7, horizon: 3600, rebirthPower: 1 + level));
+            Assert.Equal(BloodRoute.Gold, rolling.Route);
+            BudgetPlan realized = BloodRouter.Plan(Run(Sink(SinkMode.On, level), Sink(SinkMode.Off, gold: false),
+                                                       bps: 4e7, horizon: BloodRouter.HorizonSec(-1, 2289), rebirthPower: 1 + level));
+            Assert.Equal(BloodRoute.Number, realized.Route);
+        }
+
         [Fact]
         public void TargetPercentIsWhatTheShareBuys()
         {

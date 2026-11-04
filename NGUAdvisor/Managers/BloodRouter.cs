@@ -77,6 +77,12 @@ namespace NGUAdvisor.Managers
         public static double Income(double bps, double growth, double t) =>
             t <= 0 || bps <= 0 ? 0 : bps * t * (1.0 + growth * t / 2.0);
 
+        // Income is projected only up to a clocked rebirth. Without a clock the split runs over the blood
+        // that already exists: the in-run spells are filled first, so any projection is a lead NUMBER
+        // only makes up when the projected end actually arrives.
+        public static double HorizonSec(double rebirthTargetSec, double elapsedSec) =>
+            rebirthTargetSec > 0 ? Math.Max(0, rebirthTargetSec - elapsedSec) : 0;
+
         public static BudgetPlan Plan(in BudgetInput a)
         {
             BudgetPlan plan = new BudgetPlan();

@@ -80,8 +80,12 @@ level keeps what it has and the rest is levelled across the others (water-fillin
 `NUMBER` is only worth banking if a rebirth will cash it: not NORB, and either the profile
 arms an entry (`CustomAllocation.RebirthArmed`, `RebirthTime >= 0`) or money-pit run mode is on — or Auto Rebirth is off, because then the player rebirths by hand. A
 Number/Bosses entry without a `Time` key parses to `RebirthTime 0` — armed, no clock — which the old
-`NextRebirthTargetSeconds() > 0` test read as "no rebirth" and idled blood on CBlock profiles. Without
-a clock the plan projects one hour (`UnclockedHorizonSec`, BestAug's default) — an assumption.
+`NextRebirthTargetSeconds() > 0` test read as "no rebirth" and idled blood on CBlock profiles.
+
+**Without a clock the horizon is 0** (`BloodRouter.HorizonSec`): the split runs over blood that
+exists. The in-run spells are filled first, so projected income is a lead NUMBER makes up only when
+the projected end arrives; a rolling one-hour projection never arrives, and on CBlock3.2-E
+(`Number 1000`, 2026-11-04) Counterfeit sat at 1.7e11 against NUMBER's 6e9 — one hour of income.
 
 ## `BloodMatters()` — the deadlock fix
 

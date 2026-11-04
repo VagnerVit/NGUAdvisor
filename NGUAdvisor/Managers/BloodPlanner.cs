@@ -379,16 +379,10 @@ namespace NGUAdvisor.Managers
             }
         }
 
-        // Horizon when the rebirth has no clock (a Number/Bosses trigger, money-pit runs, or none at
-        // all): project one hour of income, the same default BestAug prices augments over.
-        private const double UnclockedHorizonSec = 3600;
-
         private static BudgetInput BudgetInputs(Character c, RebirthOutlook outlook)
         {
-            double elapsed = c.rebirthTime.totalseconds;
-            double target = Main.Profile != null ? Main.Profile.NextRebirthTargetSeconds() : -1;
-            bool clocked = target > 0 && outlook == RebirthOutlook.Coming;
-            double horizon = clocked ? Math.Max(0, target - elapsed) : UnclockedHorizonSec;
+            double target = Main.Profile != null && outlook == RebirthOutlook.Coming ? Main.Profile.NextRebirthTargetSeconds() : -1;
+            double horizon = BloodRouter.HorizonSec(target, c.rebirthTime.totalseconds);
 
             double bps = 0;
             try { bps = c.bloodMagicController.totalBloodGainedPerSecond(); } catch { }
