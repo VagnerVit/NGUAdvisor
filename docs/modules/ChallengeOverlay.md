@@ -61,11 +61,13 @@ the T7 prep stay ch.5: ch.6 BBs AT. Not modelled: post-HD1 "Evil NGUs all the ti
 Evil → Normal NGU quirk id, scene data) and GO's "are Evil NGUs worth it" check.
 
 **Ch.5 NGU MARATHON energy**: `CAPALLAT` ahead of the NGU lanes while pre-T7 at Boss 115+ (guide: "BB
-AT P/T for the entire rebirth to prep for T7"); otherwise the hot `NGU-*` and warm `CAPNGU-*` lanes
+AT P/T for the entire rebirth to prep for T7"), otherwise `CAPALLAT:15` there (every chapter); then the hot `NGU-*` and warm `CAPNGU-*` lanes
 interleaved in value-per-BB order (`ChapterNguLanes`, NGUAdvisors.md), then `CAPALLAT:40` ("run AT with <40% of your Energy cap. Prioritize NGUs first" —
 user 2026-10-27: Magic NGU sat at one level per 3 ticks while AT held 142B), then `CAPALLAT` and
-`CAPBESTAUG`. As NGU BB grows with level, warm lanes can squeeze AT toward nothing; that is the
-chosen trade.
+`CAPBESTAUG`. **The 15 % floor** (owner's call, 2026-11-09): as NGU BB grows with level, the lanes
+squeezed AT to nothing, and in the 2026-11-09 log Toughness, Power and both Wandoos ATs did not
+move all marathon. The `:15` caps what the five AT slots HOLD together (AdvancedTrainingBP
+`GroupShare`), so the NGU lanes still get at least 85 % of the cap.
 
 **AUGMENTATION's NGU tail is `CAPNGU-*`**: a plain `NGU-*` after `BESTAUG` joins the equal-share
 divisor and halves the augment (the TM HOUR rule below), and in magic it halves `BR-30`. The guide

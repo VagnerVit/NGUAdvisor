@@ -28,6 +28,8 @@ All notable changes to NGU Advisor are documented in this file.
 - **Wandoos ATs keep leveling toward the next OS** — with MEH (or XL) unlocked, the auto profile
   raises the Wandoos AT targets to the cheapest levels at which a whole run on the next OS beats the
   current one by the auto-switch margin. Before, they stopped as soon as the current OS was cheap.
+- **Advanced Training gets 15 % of the energy cap in the NGU marathon**, ahead of the NGU lanes,
+  which used to leave it nothing for the whole marathon.
 
 ### Fixed
 

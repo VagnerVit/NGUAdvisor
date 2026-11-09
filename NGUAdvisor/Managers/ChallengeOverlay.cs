@@ -697,6 +697,9 @@ namespace NGUAdvisor.Managers
             return ngus.Concat(ChapterNgusSurplus(type)).ToArray();
         }
 
+        // The marathon's AT group share ahead of the NGU lanes.
+        private const string MarathonAtFloor = "CAPALLAT:15";
+
         public static string[] AutoTokens(ResourceType type)
         {
             if (type == ResourceType.R3) return HackTokens();
@@ -779,6 +782,8 @@ namespace NGUAdvisor.Managers
                     // Guide ch.5: "When you reach Boss 115/120, BB AT P/T for the entire rebirth to prep
                     // for T7" — AT ahead of the NGUs until T7 falls.
                     if (e && evilDay && PrepsT7()) list.Add("CAPALLAT");
+                    // Owner's call 2026-11-09: the NGU lanes drank everything and AT stood still all marathon.
+                    if (e && !list.Contains("CAPALLAT")) list.Add(MarathonAtFloor);
                     // SURPLUS ABSORBERS (user 2026-07-11: 4.7B of a 5.4B pool sat idle once the hot
                     // lanes took their caps — one level per tick is the most a lane can use). Every
                     // absorber is CAP-type: out of the equal-share divisor. Warm NGU lanes interleave
