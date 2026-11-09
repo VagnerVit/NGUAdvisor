@@ -1553,7 +1553,7 @@ namespace NGUAdvisor.Managers
             // same >=1.25x threshold at which the advisor row turns red — the row and the auto agree.
             int horizon = WandoosAdvisor.RunHorizonMinutes();
             var v = WandoosAdvisor.Compare(horizon);
-            if (!v.Known || v.BestOs == v.CurrentOs || v.Advantage < 1.25) return;
+            if (!v.Known || v.BestOs == v.CurrentOs || v.Advantage < WandoosAdvisor.SwitchAdvantage) return;
 
             // Current REAL bonus (with the levels we'd be throwing away) vs the projected horizon
             // on the better OS starting from zero: the switch must pay for itself within the run.

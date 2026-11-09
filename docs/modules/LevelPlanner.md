@@ -26,6 +26,20 @@ snapshotted targets.
     HOUR on 2026-10-05, and a near-zero bootup at a fresh run's start produced the 2.8M stop of
     2026-10-03. The digger is divided out because it does not run in the marathon (owner's call),
     so the marathon's dump never sees it.
+  - **Next-OS prep** (`NextOsPrepLevel`, owner's call 2026-11-09): the stop is
+    `max(1 % stop, prep)`, clamped to `MaxAtTarget`. With the next OS unlocked (98 → MEH on
+    `jakeComplete`, MEH → XL on `XLLevels > 0`), prep is the cheapest Wandoos-AT pair (E, M) at which
+    a whole run on the next OS beats the current one by `WandoosAdvisor.SwitchAdvantage` (1.25, the
+    auto-switch's own gate). Without it the 1 % stop parked the ATs where 98 was cheap, and MEH, which
+    never reaches BB and so levels in proportion to the AT speed, could never overtake 98.
+    `AtMath.NextOsPrepLevels` solves it. Both OSs run from dump level 0 over the profile's rebirth
+    target, because `changeOS` wipes the dump. The allocation is the lane's real 30 %
+    (`CAPWAN:30` in every auto segment), not the whole cap `WandoosAdvisor.Compare` assumes. The E/M
+    split minimises `baseTime·L²` summed over both slots (the AT work, from `getDivisor`). **The
+    digger stays in the speed here** (owner's call: count it while it runs, so the target rises if it
+    switches off), unlike the 1 % stop. Prep is 0 with no unlocked next OS or no time-based rebirth
+    target. It feeds concurrently with P/T, also by owner's call. `[CapDbg]` appends
+    `next=<OS>:prep<E>/<M>`, or `:locked`, `:no-rebirth-target`, `:unbooted` or `:out-of-reach`.
   - **Gated on the worn gear being the gear we keep** (2026-08-10): the solve reads live
     gear-derived caps and speeds, but `Tick()` runs OUTSIDE `LockManager.CanSwap()`, so with a temp
     loadout equipped (gold set, titan set, pit, ygg, cooking — or the quest gear `CanSwap()`

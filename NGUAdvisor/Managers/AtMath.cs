@@ -210,6 +210,117 @@ namespace NGUAdvisor.Managers
             return levels <= 0 ? 0 : (long)Math.Ceiling(levels);
         }
 
+        // Decomp Wandoos98Controller.wandoosBonus with levels as inputs (os 0 = 98, 1 = MEH, 2 = XL).
+        public static double WandoosBonus(int os, double levelsE, double levelsM)
+        {
+            switch (os)
+            {
+                case 0: return Math.Pow((1.0 + levelsE / 100.0) * (1.0 + levelsM / 25.0), 0.8);
+                case 1: return (1.0 + levelsE / 5.0) * (1.0 + levelsM * 2.0);
+                default: return Math.Pow((1.0 + levelsE * 6.0) * (1.0 + levelsM * 40.0), 1.05);
+            }
+        }
+
+        // Decomp Wandoos98Controller.baseEnergyTime (baseMagicTime is identical).
+        public static double WandoosBaseTime(int os, bool evilOrHarder)
+        {
+            switch (os)
+            {
+                case 0: return evilOrHarder ? 1e21 : 1e9;
+                case 1: return evilOrHarder ? 1e27 : 1e12;
+                default: return evilOrHarder ? 1e33 : 1e15;
+            }
+        }
+
+        // Dump levels a run banks from zero: the bar's progress per tick is alloc·speed/baseTime, 50 ticks/s.
+        public static double WandoosRunLevels(double alloc, double speed, double baseTime, double seconds)
+            => LevelsPerTick(alloc * speed / baseTime) * 50.0 * seconds;
+
+        // Inputs of the next-OS prep solve. Speeds are WandoosBaseSpeed values, i.e. without the slot's own
+        // (1 + f·L); Alloc is what the dump lane gets of each resource.
+        public sealed class WandoosPrepInputs
+        {
+            public int FromOs, ToOs;
+            public bool Evil;
+            public double AllocE, AllocM;
+            public double BaseSpeedE, BaseSpeedM;
+            public double FactorE, FactorM;
+            public long LevelE, LevelM;
+            public double AtBaseTimeE, AtBaseTimeM;
+            public double RunSeconds;
+            public double Margin;
+            public long MaxLevel;
+        }
+
+        // Does a whole run on ToOs out-earn one on FromOs by Margin, both from dump level 0 (changeOS wipes
+        // the dump), with the Wandoos ATs at these levels?
+        public static bool NextOsAhead(WandoosPrepInputs p, double levelE, double levelM)
+        {
+            double speedE = p.BaseSpeedE * (1.0 + p.FactorE * levelE);
+            double speedM = p.BaseSpeedM * (1.0 + p.FactorM * levelM);
+            double fromBonus = RunBonus(p, p.FromOs, speedE, speedM);
+            double toBonus = RunBonus(p, p.ToOs, speedE, speedM);
+            return toBonus >= p.Margin * fromBonus;
+        }
+
+        private static double RunBonus(WandoosPrepInputs p, int os, double speedE, double speedM)
+        {
+            double baseTime = WandoosBaseTime(os, p.Evil);
+            return WandoosBonus(os,
+                WandoosRunLevels(p.AllocE, speedE, baseTime, p.RunSeconds),
+                WandoosRunLevels(p.AllocM, speedM, baseTime, p.RunSeconds));
+        }
+
+        private const double PrepGridStep = 1.02;
+
+        // The cheapest Wandoos-AT levels (E, M) at which the next OS beats the current one by Margin. AT
+        // work from L0 to L is baseTime·Σ(k+1) ≈ baseTime·(L² − L0²)/2 (AdvancedTrainingController
+        // getDivisor), so the split minimises AtBaseTimeE·LE² + AtBaseTimeM·LM²: a 2 % grid over LE, the
+        // smallest LM for each by bisection. Levels never drop, so the current levels are the floor. False
+        // when no level up to MaxLevel gets there or an input is unusable.
+        public static bool NextOsPrepLevels(WandoosPrepInputs p, out long levelE, out long levelM)
+        {
+            levelE = levelM = 0;
+            if (p == null || p.RunSeconds <= 0 || p.Margin <= 0 || p.MaxLevel <= 0) return false;
+            if (p.AllocE <= 0 || p.AllocM <= 0 || p.BaseSpeedE <= 0 || p.BaseSpeedM <= 0) return false;
+            if (p.FactorE <= 0 || p.FactorM <= 0 || p.AtBaseTimeE <= 0 || p.AtBaseTimeM <= 0) return false;
+
+            double max = p.MaxLevel;
+            double l0E = Math.Min(Math.Max(0, p.LevelE), max);
+            double l0M = Math.Min(Math.Max(0, p.LevelM), max);
+            if (NextOsAhead(p, l0E, l0M)) { levelE = (long)l0E; levelM = (long)l0M; return true; }
+            if (!NextOsAhead(p, max, max)) return false;
+
+            double bestCost = double.PositiveInfinity, bestE = 0, bestM = 0;
+            for (double e = l0E; ; e = Math.Min(max, Math.Max(e * PrepGridStep, e + 1.0)))
+            {
+                double? m = MinPrepLevelM(p, e, l0M, max);
+                if (m.HasValue)
+                {
+                    double cost = p.AtBaseTimeE * (e * e - l0E * l0E) + p.AtBaseTimeM * (m.Value * m.Value - l0M * l0M);
+                    if (cost < bestCost) { bestCost = cost; bestE = e; bestM = m.Value; }
+                }
+                if (e >= max) break;
+            }
+            if (double.IsInfinity(bestCost)) return false;
+            levelE = (long)Math.Ceiling(bestE);
+            levelM = (long)Math.Ceiling(bestM);
+            return true;
+        }
+
+        private static double? MinPrepLevelM(WandoosPrepInputs p, double levelE, double lo, double hi)
+        {
+            if (NextOsAhead(p, levelE, lo)) return lo;
+            if (!NextOsAhead(p, levelE, hi)) return null;
+            while (hi - lo > 1.0)
+            {
+                double mid = Math.Floor((lo + hi) / 2.0);
+                if (NextOsAhead(p, levelE, mid)) hi = mid;
+                else lo = mid;
+            }
+            return hi;
+        }
+
         // Highest level still blitz-boosting: progressPerTick >= 1 <=> L <= M/baseTime - 1.
         // The community sheet's equivalent cell omits the -1 (it solves for L+1), so it reads one
         // higher. The decomp is the authority here; do not "correct" this toward the spreadsheet.

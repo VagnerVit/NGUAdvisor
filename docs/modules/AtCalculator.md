@@ -46,6 +46,7 @@ needs no simulation. That gives the four functions in `AtMath.cs`:
 | `LevelForMultiplier(m)` | `((m − 1)/0.1)^2.5` — the exact inverse of `StatMultiplier` | — (the goal threshold) |
 | `BbCeiling(m, baseTime)` | `m / baseTime − 1` | `bb` / `bbtrue` |
 | `WandoosBaseSpeed(...)` / `WandoosStopLevel(...)` | the Wandoos-AT stop: `(baseTime / (share·cap·baseSpeed) − 1) / f` | — (`LevelPlanner` uses it; see LevelPlanner.md) |
+| `WandoosBonus` / `WandoosBaseTime` / `NextOsPrepLevels(...)` | decomp `wandoosBonus` and `baseEnergyTime` per OS; the cheapest Wandoos-AT (E, M) at which the next OS out-earns the current one over a run | — (`WandoosAdvisor` delegates its bonus and base times here; `LevelPlanner` next-OS prep) |
 | `SecondsToTarget(level, target, ppt, tickSeconds)` | the **piecewise** answer built on the two above | the sheet's three-branch ETA |
 | `LevelAtCapped(l0, ppt, t, tickSeconds)` | the piecewise **forward** projection — `SecondsToTarget`'s twin | — (`AtHourPlanner` uses it) |
 

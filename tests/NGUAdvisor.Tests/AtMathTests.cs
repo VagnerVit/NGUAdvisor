@@ -332,5 +332,86 @@ namespace NGUAdvisor.Tests
             Assert.Null(AtMath.WandoosStopLevel(1e15, 0.0, 1e6, 0.001, 0.01));
             Assert.Null(AtMath.WandoosStopLevel(1e300, 1.0, 1e-300, 1e-10, 0.01));
         }
+
+        [Fact]
+        public void WandoosBonusAndBaseTimeMatchTheDecomp()
+        {
+            Assert.Equal(4.0, AtMath.WandoosBonus(1, 5.0, 0.5), 12);
+            Assert.Equal(System.Math.Pow(2.0 * 2.0, 0.8), AtMath.WandoosBonus(0, 100.0, 25.0), 12);
+            Assert.Equal(1e21, AtMath.WandoosBaseTime(0, true));
+            Assert.Equal(1e27, AtMath.WandoosBaseTime(1, true));
+            Assert.Equal(1e33, AtMath.WandoosBaseTime(2, true));
+            Assert.Equal(1e12, AtMath.WandoosBaseTime(1, false));
+        }
+
+        // The 2026-11-09 [CapDbg] line: Evil, 98 running, ATs at 28 001 / 56 279 (f = 0.01), digger x4.315
+        // on, CAPWAN:30 of 6.77T / 3.24T, 24 h run. 98 sits at BB; MEH runs far below it.
+        private static AtMath.WandoosPrepInputs LoggedRun() => new AtMath.WandoosPrepInputs
+        {
+            FromOs = 0,
+            ToOs = 1,
+            Evil = true,
+            AllocE = 6.77e12 * 0.3,
+            AllocM = 3.24e12 * 0.3,
+            BaseSpeedE = 9.357e10 / (1.0 + 0.01 * 28001),
+            BaseSpeedM = 1.877e11 / (1.0 + 0.01 * 56279),
+            FactorE = 0.01,
+            FactorM = 0.01,
+            LevelE = 28001,
+            LevelM = 56279,
+            AtBaseTimeE = 1.0,
+            AtBaseTimeM = 1.0,
+            RunSeconds = 86400,
+            Margin = 1.25,
+            MaxLevel = 2000000000,
+        };
+
+        [Fact]
+        public void NextOsPrepIsTheCheapestPointWhereMehPaysForTheSwitch()
+        {
+            var p = LoggedRun();
+            Assert.False(AtMath.NextOsAhead(p, p.LevelE, p.LevelM));
+            Assert.True(AtMath.NextOsPrepLevels(p, out long e, out long m));
+
+            Assert.True(AtMath.NextOsAhead(p, e, m));
+            Assert.False(AtMath.NextOsAhead(p, e * 0.97, m * 0.97));
+            // Hand estimate with a common AT factor on both slots put this near 0.55M / 1.1M.
+            Assert.InRange((double)e, 2e5, 2e6);
+            Assert.InRange((double)m, 4e5, 4e6);
+        }
+
+        [Fact]
+        public void NextOsPrepLeansOnTheCheaperAtSlot()
+        {
+            var even = LoggedRun();
+            var dearE = LoggedRun();
+            dearE.AtBaseTimeE = 4.0;
+            AtMath.NextOsPrepLevels(even, out long e1, out long m1);
+            AtMath.NextOsPrepLevels(dearE, out long e2, out long m2);
+            Assert.True(e2 < e1);
+            Assert.True(m2 > m1);
+        }
+
+        [Fact]
+        public void NextOsPrepKeepsTheCurrentLevelsOnceTheSwitchAlreadyPays()
+        {
+            var p = LoggedRun();
+            p.LevelE = 5000000;
+            p.LevelM = 10000000;
+            Assert.True(AtMath.NextOsPrepLevels(p, out long e, out long m));
+            Assert.Equal(5000000L, e);
+            Assert.Equal(10000000L, m);
+        }
+
+        [Fact]
+        public void NextOsPrepRefusesWhenTheNextOsCannotGetThere()
+        {
+            var p = LoggedRun();
+            p.MaxLevel = 60000;
+            Assert.False(AtMath.NextOsPrepLevels(p, out _, out _));
+            p = LoggedRun();
+            p.RunSeconds = 0;
+            Assert.False(AtMath.NextOsPrepLevels(p, out _, out _));
+        }
     }
 }

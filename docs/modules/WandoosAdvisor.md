@@ -13,6 +13,9 @@ each OS's A/D bonus over a run-matched window and recommends the best.
 - Bonus (`wandoosBonus`): 98 `((1+E/100)(1+M/25))^0.8`; MEH `(1+E/5)(1+2M)`;
   XL `((1+6E)(1+40M))^1.05`.
 - Unlocks: MEH = `itemList.jakeComplete`; XL = `wandoos98.XLLevels > 0`.
+- The bonus and base-time tables live in `AtMath.WandoosBonus` / `WandoosBaseTime`. `BonusFor` keeps
+  its name because `DriftProbe` reaches it by reflection. `SwitchAdvantage` (1.25) is the one
+  threshold shared by the auto-switch, the advisor row and LevelPlanner's next-OS prep.
 
 ## Projection assumptions (documented, deliberate)
 

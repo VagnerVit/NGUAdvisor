@@ -10,7 +10,8 @@ namespace NGUAdvisor.Managers
     //
     // AT slots are PURPOSE-DRIVEN (user rule): Toughness (0) and Power (1) are the titan push
     // and stay uncapped; Block (2) stops at 99.9% damage reduction; the wandoos ATs (3/4) stop
-    // once Wandoos' cap-speed dump costs <= 1% of max E/M. Past their stops, those slots'
+    // once Wandoos' cap-speed dump costs <= 1% of max E/M and the next OS out-earns the current
+    // one (NextOsPrepLevel). Past their stops, those slots'
     // shares flow to Toughness/Power.
     //
     // Sufficiency freezes (marathon only):
@@ -422,9 +423,69 @@ namespace NGUAdvisor.Managers
                 if (!baseSpeed.HasValue) return long.MinValue;
                 long? stop = AtMath.WandoosStopLevel(baseTime, cap, baseSpeed.Value, f, WandoosDumpShare);
                 if (!stop.HasValue) return long.MinValue;
-                return stop.Value > 0 ? stop.Value : PausedTarget;   // already <= 1% at level 0: hold
+
+                long prep = NextOsPrepLevel(c, energy, out string prepText);
+                inputs += " " + prepText;
+                long target = Math.Min(Math.Max(stop.Value, prep), MaxAtTarget);
+                return target > 0 ? target : PausedTarget;   // already <= 1% at level 0: hold
             }
             catch { return long.MinValue; }
+        }
+
+        // The Wandoos lane's share of the cap in every auto-profile segment (ChallengeOverlay's CAPWAN:30).
+        private const double WandoosLaneShare = 0.30;
+
+        // Prep for the next OS (98 → MEH → XL, owner's call 2026-11-09): MEH/XL cannot reach the dump's
+        // one-level-per-tick allocation, so their levels scale with the Wandoos AT speed, and the switch
+        // only pays once both ATs are high enough. Solved for the whole run at the lane's real share and
+        // the auto-switch's own margin, with the digger kept in (owner's call: count it while it runs).
+        // 0 when there is no unlocked next OS or no time-based rebirth target to size the run.
+        private static long NextOsPrepLevel(Character c, bool energy, out string text)
+        {
+            int os = (int)c.wandoos98.os;
+            int next = os + 1;
+            if (os < 0 || next > 2) { text = "next=none"; return 0; }
+            string name = WandoosAdvisor.Names[next];
+            bool unlocked = next == 1 ? c.inventory.itemList.jakeComplete : c.wandoos98.XLLevels > 0;
+            if (!unlocked) { text = $"next={name}:locked"; return 0; }
+            double runSec = ChallengeOverlay.RebirthTargetSec();
+            if (runSec <= 0) { text = $"next={name}:no-rebirth-target"; return 0; }
+
+            var e = c.advancedTrainingController.wandoosEnergy;
+            var m = c.advancedTrainingController.wandoosMagic;
+            long lvlE = c.advancedTraining.level[3], lvlM = c.advancedTraining.level[4];
+            double boot = c.wandoos98Controller.bootupSpeedFactor();
+            double fullBoot = c.inventory.itemList.wandoosComplete ? 1.1 : 1.0;
+            double? speedE = AtMath.WandoosBaseSpeed(c.totalWandoosEnergySpeed(), 1.0 + e.levelFactor * lvlE, boot, fullBoot, 1.0);
+            double? speedM = AtMath.WandoosBaseSpeed(c.totalWandoosMagicSpeed(), 1.0 + m.levelFactor * lvlM, boot, fullBoot, 1.0);
+            if (!speedE.HasValue || !speedM.HasValue) { text = $"next={name}:unbooted"; return 0; }
+
+            var p = new AtMath.WandoosPrepInputs
+            {
+                FromOs = os,
+                ToOs = next,
+                Evil = (int)c.settings.rebirthDifficulty >= 1,
+                AllocE = c.totalCapEnergy() * WandoosLaneShare,
+                AllocM = c.totalCapMagic() * WandoosLaneShare,
+                BaseSpeedE = speedE.Value,
+                BaseSpeedM = speedM.Value,
+                FactorE = e.levelFactor,
+                FactorM = m.levelFactor,
+                LevelE = lvlE,
+                LevelM = lvlM,
+                AtBaseTimeE = e.baseTime,
+                AtBaseTimeM = m.baseTime,
+                RunSeconds = runSec,
+                Margin = WandoosAdvisor.SwitchAdvantage,
+                MaxLevel = MaxAtTarget,
+            };
+            if (!AtMath.NextOsPrepLevels(p, out long prepE, out long prepM))
+            {
+                text = $"next={name}:out-of-reach";
+                return 0;
+            }
+            text = $"next={name}:prep{prepE}/{prepM}";
+            return energy ? prepE : prepM;
         }
 
         private static void ThawPurpose(Character c)

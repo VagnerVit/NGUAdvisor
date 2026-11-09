@@ -35,7 +35,10 @@ namespace NGUAdvisor.Managers
             public OsCase[] Cases;
         }
 
-        private static readonly string[] Names = { "98", "MEH", "XL" };
+        public static readonly string[] Names = { "98", "MEH", "XL" };
+
+        // Best/current projected bonus at which the auto-switch acts and the advisor row turns red.
+        public const double SwitchAdvantage = 1.25;
 
         // Projection window matched to the RUN, not a fixed hour: remaining time to the profile's
         // time-based rebirth target (clamped 10m-4h); 120m when rebirth is off/unset (NORB, LRB).
@@ -126,7 +129,7 @@ namespace NGUAdvisor.Managers
         private static double[] BaseTimes(Character c)
         {
             bool evil = (int)c.settings.rebirthDifficulty >= 1;
-            return evil ? new[] { 1e21, 1e27, 1e33 } : new[] { 1e9, 1e12, 1e15 };
+            return new[] { AtMath.WandoosBaseTime(0, evil), AtMath.WandoosBaseTime(1, evil), AtMath.WandoosBaseTime(2, evil) };
         }
 
         // Whole-run length, not the remainder: the run-level question below has ONE answer per run.
@@ -198,15 +201,7 @@ namespace NGUAdvisor.Managers
         }
 
         // The game's Wandoos98Controller.wandoosBonus(), with levels as inputs.
-        private static double BonusFor(int os, double levelsE, double levelsM)
-        {
-            switch (os)
-            {
-                case 0: return Math.Pow((1.0 + levelsE / 100.0) * (1.0 + levelsM / 25.0), 0.8);
-                case 1: return (1.0 + levelsE / 5.0) * (1.0 + levelsM * 2.0);
-                default: return Math.Pow((1.0 + levelsE * 6.0) * (1.0 + levelsM * 40.0), 1.05);
-            }
-        }
+        private static double BonusFor(int os, double levelsE, double levelsM) => AtMath.WandoosBonus(os, levelsE, levelsM);
 
         public static string FmtX(double ratio)
         {

@@ -146,7 +146,7 @@ namespace NGUAdvisor.Managers
                     var w = WandoosAdvisor.Compare(WandoosAdvisor.RunHorizonMinutes());
                     if (w.Known && w.BestOs != w.CurrentOs)
                     {
-                        bool big = w.Advantage >= 1.25;
+                        bool big = w.Advantage >= WandoosAdvisor.SwitchAdvantage;
                         list.Add(new Rec
                         {
                             System = "Wandoos",
