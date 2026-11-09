@@ -12,10 +12,11 @@ game's exact math.
   tick at most (180 000/hr — the game drops the overfill), and the `/(level+1)` slows every later
   level: a level costs `max(1, ceil((L+1)/K))` whole ticks (`AtMath.LevelsInTicks`; the bar is reset, not decremented). GO's `vreachable` simulates the same; the uncapped
   quote overstated every fast lane (Gold at L1.29M "reached" 1.2×/hr, which needs 258k levels).
-- **The multiplier stack matches the game term for term**: totalNGUSpeedBonus, itopod E/M NGU,
-  macguffin[4]/[5], NGU-speed NGUs, diggers, hacks, beast quirks, wishes, cards, troll-challenge
-  ×3 (Normal completions for magic / SADISTIC completions for energy), sadistic divider on the
-  sadistic track. The old version missed the last six — keep the stack complete.
+- **The speed stack is the game's, not a copy.** `NGUAdvisors.ProgressPerUnit` = the NGU's
+  `progressPerTick1000()` (whole cap allocated, current track, full stack incl. troll ×3 and the
+  sadistic divider) ÷ `totalCapEnergy/Magic()`: levels per tick per unit at the current level. Both
+  `LphPerUnit` and every BB derive from it (`NguLaneRank.BbCost`: a deeper level or a hypothetical
+  gear `speedScale` only rescales it). It is a float, and 0 (lane skipped) when power or cap is 0.
 - Value: an NGU bonus is `1 + level × boostFactor` only up to its softcap; past it the game uses
   `1 + level^e × c × boostFactor` (decomp `AllNGUController.<x>BonusNormal/Evil/Sadistic`, table in
   `NguGain` — e.g. Ygg 400 / 0.33 / 55.4, EXP 2000 / 0.4 / 95.66, Adv-α and DC 1000 / 0.5 / 31.7).
@@ -55,8 +56,8 @@ one tree span ~10 000× at the same level (live 2026-10-29, energy cap 1.08T: PP
 Drop Chance 4.34B, Augs/Wandoos/Gold/Power-α ~64M). Rating (growth at the full cap) ignores that, so a
 short pool (early marathon, after a rebirth or a gear swap) spent itself on the dear lanes first.
 
-- **Score** = `ln(RatioAtBb) / BbCost`. `BbCost` mirrors `NGUBP.EnergyBb/MagicBb(500)` term for term
-  (`ceil(divider × (L+1+500) / (power × speed stack))`, the BB a one-level-per-tick lane is sized with,
+- **Score** = `ln(RatioAtBb) / BbCost`. `BbCost` is `NGUBP.Bb(500)`, both off `ProgressPerUnit`
+  (`ceil((L+1+500) / ((L+1) × per-unit rate))`, the BB a one-level-per-tick lane is sized with,
   decomp `NGUController.updateNGU`); `RatioAtBb` is the hour at that allocation on the NguGain curve.
 - **Used for**: the order of the prune's hot set, the "deepen" pair, the surplus order and
   `Plan.<E|M>LaneOrder` — targets and surplus interleaved, which ChallengeOverlay emits as

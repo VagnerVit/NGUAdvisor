@@ -76,9 +76,15 @@ namespace NGUAdvisor.Tests
         [Fact]
         public void BbCostIsTheGameBreakpointAtTheAllocationLookahead()
         {
-            // NGUBP.EnergyBb(500): ceil(divider × (level + 1 + 500) / (power × speed stack)), floored at 1.
-            Assert.Equal(Math.Ceiling(3e6 * 1500.0 / (2e5 * 4.0)), NguLaneRank.BbCost(3e6, 999, 2e5, 4.0));
-            Assert.Equal(1.0, NguLaneRank.BbCost(1, 0, 1e9, 1e9));
+            // progressPerTick1000 / cap is levels per tick per unit at level L: power x speed / (divider x (L+1)).
+            double perUnit = 2e5 * 4.0 / (3e6 * 1000.0);
+            Assert.Equal(perUnit, NguLaneRank.ProgressPerUnit(perUnit * 5e9, 5e9), 12);
+            // ceil(divider x (L+1+500) / (power x speed)) = 5625; the float-free division may land one above.
+            Assert.InRange(NguLaneRank.BbCost(perUnit, 999, 500), 5625.0, 5626.0);
+            Assert.InRange(NguLaneRank.BbCost(perUnit, 999, 500, 2.0), 2813.0, 2814.0);
+            Assert.Equal(1.0, NguLaneRank.BbCost(1e9, 0, 500));
+            Assert.Equal(0.0, NguLaneRank.ProgressPerUnit(5.0, 0));
+            Assert.True(double.IsPositiveInfinity(NguLaneRank.BbCost(0, 10, 500)));
         }
 
         [Fact]

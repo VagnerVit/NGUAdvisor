@@ -2888,7 +2888,8 @@ namespace NGUAdvisor
             resources.GetString("WishMode.Items"),
             resources.GetString("WishMode.Items1"),
             resources.GetString("WishMode.Items2"),
-            resources.GetString("WishMode.Items3")});
+            resources.GetString("WishMode.Items3"),
+            "Value"});
             this.WishMode.Name = "WishMode";
             this.WishMode.SelectedIndexChanged += new System.EventHandler(this.WishMode_SelectedIndexChanged);
             // 

@@ -1,8 +1,11 @@
 # ItopodFarmAdvisor + ItopodRewards (`Managers/ItopodFarmAdvisor.cs`, `ItopodRewards.cs`)
 
 What ITOPOD pays per second, in all four currencies it produces. `ItopodRewards` is the Unity-free
-game-truth layer (linked into `tests/NGUAdvisor.Tests`); `ItopodFarmAdvisor` weights it by
-`ITOPODManager.ProfileForMode`'s rotation slices.
+game-truth layer (linked into `tests/NGUAdvisor.Tests`); `ItopodFarmAdvisor` weights the per-kill rewards by
+`ITOPODManager.ProfileForMode`'s rotation slices. The live callers (`ForMode`, the bonus-claim planner) read
+them from the game — `LootDrop.itopodTier/killsPerAP/killsPerEXP/itopodEXPAwarded`,
+`ItopodPerkController.baseProgressGained × totalPPBonus(false) / pointThreshold` — so the difficulty and
+`sadisticBase` plumbing is gone; `ItopodRewards` stays as the pure copy the tests pin and `BestBonusClaim` uses.
 
 ## Why this exists
 

@@ -86,13 +86,15 @@ namespace NGUAdvisor.Managers
         }
 
         // InventoryController.infinityCubeTier(): (int)(log10(rawPower + rawToughness) − 1) on the RAW,
-        // un-softcapped sum, 0 below 100, at most 10.
+        // un-softcapped sum, 0 below 100, at most 10. Computed in float like the game (its sum and Mathf.Log10
+        // are float), so a sum on a tier boundary lands on the same side; DriftProbe checks it.
         public const int MaxCubeTier = 10;
 
         public static int CubeTier(double rawSum)
         {
             if (rawSum < 100.0) return 0;
-            int tier = (int)(Math.Log10(rawSum) - 1.0);
+            float sum = (float)rawSum;
+            int tier = (int)((float)Math.Log10(sum) - 1f);
             return Math.Max(0, Math.Min(MaxCubeTier, tier));
         }
 

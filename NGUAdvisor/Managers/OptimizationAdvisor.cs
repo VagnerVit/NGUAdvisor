@@ -244,6 +244,7 @@ namespace NGUAdvisor.Managers
                     list.Add(new Rec { System = "Beards", AutoKey = "beards", Text = "Set by the challenge block", Optimal = true });
                 else
                 {
+                    LogBeardValue(c, recommended);
                     var missing = recommended.Where(r => !active.Contains(r)).Select(i => Name(BeardNames, i)).ToList();
                     if (missing.Count == 0)
                         list.Add(new Rec { System = "Beards", AutoKey = "beards", Text = "Ideal set is running", Optimal = true });
@@ -1275,6 +1276,40 @@ namespace NGUAdvisor.Managers
         // Golden (6) takes the sixth (user rule 2026-10-04: fill the slots) although it only feeds TM gold/s.
         // Wandoos (4) is out: its bonus feeds wandoos98Controller only.
         private static int[] RecommendedBeards() => new[] { 1, 5, 3, 0, 2, 6 };
+
+        // Value view beside the set above (which stays what gets equipped): the perm bonus each beard would
+        // bank at the scheduled rebirth if it ran from now on. Without a clocked rebirth it is the bank at
+        // current levels.
+        public static string BeardValueSummary { get; private set; }
+
+        private static void LogBeardValue(Character c, List<int> recommended)
+        {
+            try
+            {
+                double elapsed = c.rebirthTime.totalseconds;
+                double target = ChallengeOverlay.RebirthTargetSec();
+                double ticks = target > elapsed ? (target - elapsed) * 50.0 : 0.0;
+                double timeFactor = BeardValue.TimeFactor(Math.Max(elapsed, target), (int)c.adventure.itopod.perkLevel[21]);
+                List<KeyValuePair<int, double>> gains = new List<KeyValuePair<int, double>>();
+                for (int id = 0; id < BeardValue.Count && id < c.beards.beards.Count; id++)
+                {
+                    if (id == BeardValue.Golden && !GoldenUnlocked()) continue;
+                    double level = c.beards.beards[id].beardLevel;
+                    double ppt = c.allBeards.beardProgressPerTick(id);
+                    double atRebirth = level + (ppt > 0 ? AtMath.LevelsInTicks(level, ppt * (level + 1.0), ticks) : 0.0);
+                    gains.Add(new KeyValuePair<int, double>(id, BeardValue.LastingGain(id, atRebirth, c.beards.beards[id].permLevel, timeFactor)));
+                }
+                gains.Sort((a, b) => b.Value.CompareTo(a.Value));
+                string ranked = string.Join(", ", gains.Select(g => $"{Name(BeardNames, g.Key)} ×{g.Value:0.###}"));
+                KeyValuePair<int, double> outside = gains.FirstOrDefault(g => !recommended.Contains(g.Key));
+                string summary = $"Beard lasting gain this run (each feeds a different stat, not 1:1): {ranked}"
+                    + (outside.Value > 1.0 ? $"; best outside the set: {Name(BeardNames, outside.Key)} ×{outside.Value:0.###}" : "");
+                if (summary == BeardValueSummary) return;
+                BeardValueSummary = summary;
+                Main.LogDebug($"[BeardValue] {summary}");
+            }
+            catch (Exception e) { Main.LogDebug($"Beard value view: {e.Message}"); }
+        }
 
         // The game's usesEnergy[] — which resource pool a beard grows from. null = unreadable.
         private static bool? UsesEnergy(Character c, int id)

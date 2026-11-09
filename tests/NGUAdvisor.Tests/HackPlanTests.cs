@@ -66,6 +66,62 @@ namespace NGUAdvisor.Tests
             Assert.Equal(new[] { 1 }, HackPlan.Order(true, true, levels, broken, HardCaps));
         }
 
+        private static HackPlan.Lane MakeLane(int id, long level, long saturation, double b = 0.01,
+            double m = 1.0, long threshold = 50, long hardCap = 7000)
+        {
+            return new HackPlan.Lane
+            {
+                Id = id, Level = level, HardCap = hardCap, BaseEffectPerLevel = b,
+                MilestoneEffect = m, MilestoneThreshold = threshold, Saturation = saturation,
+            };
+        }
+
+        [Fact]
+        public void RankByValue_CheaperLaneWins()
+        {
+            HackPlan.Lane[] lanes = { MakeLane(1, 100, 1000), MakeLane(2, 100, 10) };
+            Assert.Equal(new[] { 2, 1 }, HackPlan.RankByValue(lanes));
+        }
+
+        [Fact]
+        public void RankByValue_TieKeepsIdOrder()
+        {
+            HackPlan.Lane[] lanes = { MakeLane(3, 100, 500), MakeLane(2, 100, 500) };
+            Assert.Equal(new[] { 2, 3 }, HackPlan.RankByValue(lanes));
+        }
+
+        [Fact]
+        public void RankByValue_DropsCappedAndUnreadableLanes()
+        {
+            HackPlan.Lane[] lanes =
+            {
+                MakeLane(1, 7000, 10), MakeLane(2, 10, 0), MakeLane(3, 10, 10, b: 0.0), MakeLane(4, 10, 10),
+            };
+            Assert.Equal(new[] { 4 }, HackPlan.RankByValue(lanes));
+        }
+
+        [Fact]
+        public void LaneValue_MilestoneStepRaisesValueNearTheMilestone()
+        {
+            double far = HackPlan.LaneValue(MakeLane(2, 1, 100, m: 1.5, threshold: 50));
+            double near = HackPlan.LaneValue(MakeLane(2, 48, 100, m: 1.5, threshold: 50));
+            Assert.True(near > far);
+        }
+
+        [Fact]
+        public void ValueRatio_BestOverGuide()
+        {
+            HackPlan.Lane[] lanes = { MakeLane(1, 100, 1000), MakeLane(2, 100, 10) };
+            Assert.Equal(100.0, HackPlan.ValueRatio(lanes, 2, 1), 6);
+        }
+
+        [Fact]
+        public void ValueRatio_GuideLaneWithoutValueIsZero()
+        {
+            HackPlan.Lane[] lanes = { MakeLane(1, 7000, 1000), MakeLane(2, 100, 10) };
+            Assert.Equal(0.0, HackPlan.ValueRatio(lanes, 2, 1));
+        }
+
         [Fact]
         public void ShortArraysAreSkippedNotThrown()
         {

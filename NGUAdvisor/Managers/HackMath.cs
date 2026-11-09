@@ -125,6 +125,80 @@ namespace NGUAdvisor.Managers
             return double.IsNaN(r) || double.IsInfinity(r) || r < 0 ? 0.0 : r;
         }
 
+        // ── WISH VALUE MODE: which wishes the game multiplies into a total*Bonus product ──────────
+        //
+        // Source: WishesController.cs:1122-1494 (every wishEffect(id) factor of every total*Bonus()), plus
+        // respawn1 (:1371) as the 1 - L*e reducer. Wishes outside these lists are flat or unlock wishes
+        // (inventory slots, deck size, card tags, base PP, sadistic boss, portraits) and have no relative gain.
+        //
+        // ⚠ Ranking by relative gain treats one percent of any product as one percent of any other (energy cap
+        // against exp against stat), the same caveat as MarginalDensity. Wish 110 (boost ratio divider) is
+        // capped at 2.0 by the game (:1460) and that cap is not modelled.
+        private static readonly int[] ProductWishIds =
+        {
+            5, 30, 105, 106, 189, 191, 192, 219,                    // stat
+            6, 29, 103, 104, 188, 218, 226,                         // adventure
+            9, 31, 48, 64, 82, 91, 193,                             // energy power
+            10, 32, 49, 65, 84, 93, 195,                            // energy cap
+            11, 33, 50, 66, 83, 92, 194,                            // energy bar
+            12, 34, 51, 67, 85, 94, 196,                            // magic power
+            13, 35, 52, 68, 87, 96, 198,                            // magic cap
+            14, 36, 53, 69, 86, 95, 197,                            // magic bar
+            15, 37, 54, 70, 88, 97, 199,                            // res3 power
+            16, 38, 55, 71, 90, 99, 201,                            // res3 cap
+            17, 39, 56, 72, 89, 98, 200,                            // res3 bar
+            1, 21, 43,                                              // wish speed
+            18, 42, 63,                                             // hack speed
+            27, 46, 47, 59, 60, 61, 110,                            // daycare, respawn, QP, blood/fruit guff, exp, boost ratio
+            111, 112, 113, 114,                                     // NGU speed
+            154, 156, 158, 160, 222, 224,                           // mayo speed (cards on only)
+            155, 157, 159, 161, 223, 225,                           // card speed (cards on only)
+        };
+
+        private static readonly int[] WishSpeedWishIds = { 1, 21, 43 };
+        private static readonly int[] CardWishIds = { 154, 156, 158, 160, 222, 224, 155, 157, 159, 161, 223, 225 };
+        public const int RespawnWishId = 46;
+
+        public static bool IsProductWish(int id) => Array.IndexOf(ProductWishIds, id) >= 0;
+        public static bool IsWishSpeedWish(int id) => Array.IndexOf(WishSpeedWishIds, id) >= 0;
+        public static bool IsCardWish(int id) => Array.IndexOf(CardWishIds, id) >= 0;
+
+        // Relative gain of one more level of a wish, using whichever form the game's product uses for it.
+        public static double WishGainPerLevel(int id, double effectPerLevel, long level) =>
+            id == RespawnWishId ? ReducerGainPerLevel(effectPerLevel, level) : RelativeGainPerLevel(effectPerLevel, level);
+
+        // Wish speed is not a stat of its own: one more level multiplies EVERY wish's rate, so it is worth its
+        // relative gain times the summed value rate of the wishes it would speed up.
+        public static double WishSpeedValueRate(double gainPerLevel, double othersValueRate, double progressPerTick)
+        {
+            if (gainPerLevel <= 0 || othersValueRate <= 0 || progressPerTick <= 0) return 0.0;
+            double r = gainPerLevel * othersValueRate * progressPerTick;
+            return double.IsNaN(r) || double.IsInfinity(r) ? 0.0 : r;
+        }
+
+        // progressPerTick = K * (E*M*R)^(3*0.17) for a wish that gets the same fraction f of all three pools
+        // (energyBias = magicBias = res3Bias = 0.17, WishesController.cs:811-844), so its value is w * f^0.51.
+        // Maximising the sum of w_i * f_i^0.51 under sum f_i = 1 gives f_i proportional to w_i^(1/(1-0.51)).
+        public const double WishSplitExponent = 1.0 / (1.0 - 3.0 * 0.17);
+
+        public static double[] WishSplitFractions(double[] weights)
+        {
+            double[] f = new double[weights.Length];
+            double max = 0.0;
+            for (int i = 0; i < weights.Length; i++)
+                if (weights[i] > max && !double.IsInfinity(weights[i])) max = weights[i];
+            double sum = 0.0;
+            for (int i = 0; i < weights.Length; i++)
+            {
+                double w = weights[i];
+                f[i] = max > 0 && w > 0 && !double.IsNaN(w) ? Math.Pow(Math.Min(w, max) / max, WishSplitExponent) : 0.0;
+                sum += f[i];
+            }
+            for (int i = 0; i < f.Length; i++)
+                f[i] = sum > 0 ? f[i] / sum : 1.0 / f.Length;
+            return f;
+        }
+
         public static double MarginalDensity(double baseEffectPerLevel, long level, long saturation)
         {
             if (saturation <= 0) return 0.0;

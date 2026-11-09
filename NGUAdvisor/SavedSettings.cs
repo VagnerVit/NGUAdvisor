@@ -516,7 +516,7 @@ namespace NGUAdvisor
             AssignValue(ref _wishEnergy, other?.WishEnergy, (value) => value >= 0.0 && value <= 100.0);
             AssignValue(ref _wishMagic, other?.WishMagic, (value) => value >= 0.0 && value <= 100.0);
             AssignValue(ref _wishR3, other?.WishR3, (value) => value >= 0.0 && value <= 100.0);
-            AssignValue(ref _wishMode, other?.WishMode, (mode) => mode >= 0 && mode <= 3);
+            AssignValue(ref _wishMode, other?.WishMode, (mode) => mode >= 0 && mode <= 4);
             _weakPriorities = other?.WeakPriorities ?? false;
             AssignValues(ref _wishPriorities, other?.WishPriorities, (id) => id >= 0 && id <= Consts.MAX_WISH_ID);
             AssignValues(ref _wishBlacklist, other?.WishBlacklist, (id) => id >= 0 && id <= Consts.MAX_WISH_ID);

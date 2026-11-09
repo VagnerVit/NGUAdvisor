@@ -735,6 +735,39 @@ namespace NGUAdvisor.Managers
             _yc.changePage(curPage);
         }
 
+        public sealed class SeedUpgrade
+        {
+            public int Id;
+            public string Name;
+            public int Tier;
+            public long Cost;
+            public double GainPerSeed;
+        }
+
+        // Owned fruits below the tier cap, best relative effect gain per seed first. Advisory: the buy
+        // order is SpendPlanner's; this is the value model a seed-spending order can be checked against.
+        public static List<SeedUpgrade> SeedUpgradeRanking()
+        {
+            int cap = _yc.capTier();
+            List<SeedUpgrade> rows = new List<SeedUpgrade>();
+            for (int id = 0; id < Fruits.Count && id < _yc.baseSeedCost.Count; id++)
+            {
+                int tier = (int)Fruits[id].maxTier;
+                double gain = FruitUpgradeValue.RelativeGainPerSeed(_yc.baseSeedCost[id], tier, cap);
+                if (gain <= 0.0)
+                    continue;
+                rows.Add(new SeedUpgrade
+                {
+                    Id = id,
+                    Name = id < _yc.fruitName.Count ? _yc.fruitName[id]?.Trim() : $"fruit {id}",
+                    Tier = tier,
+                    Cost = FruitUpgradeValue.UpgradeCost(_yc.baseSeedCost[id], tier),
+                    GainPerSeed = gain
+                });
+            }
+            return rows.OrderByDescending(r => r.GainPerSeed).ToList();
+        }
+
         private static int ChangePage(int slot)
         {
             var page = slot / 9;

@@ -68,18 +68,17 @@ namespace NGUAdvisor.Managers
         }
 
         // The Infinity Cube - a fixed "item" present in every loadout. Power/Toughness from the game;
-        // Drop/Gold/Hack/Wish from the tier formulas (ported from the gear-optimizer's cubeBaseItemData).
+        // Drop/Gold/Hack/Wish from the game's cube*Bonus() getters (fractions, hence * 100).
         public static GearScorer.Item BuildCubeItem()
         {
             var ic = Main.InventoryController;
             var item = new GearScorer.Item { IsWeapon = false };
             Add(item, GearObjectives.Stat.Power, ic.cubePower());
             Add(item, GearObjectives.Stat.Toughness, ic.cubeToughness());
-            int tier = ic.infinityCubeTier();
-            double drop = tier <= 0 ? 0 : tier == 1 ? 50 : 50 + (tier - 1) * 20;
-            double gold = tier <= 1 ? 0 : tier == 2 ? 50 : Math.Pow(tier - 1, 1.3) * 50;
-            double hack = tier <= 7 ? 0 : tier < 10 ? (tier - 8) * 5 + 10 : 20;
-            double wish = tier <= 8 ? 0 : tier == 9 ? 10 : 20;
+            double drop = ic.cubeLootBonus() * 100.0;
+            double gold = ic.cubeGoldBonus() * 100.0;
+            double hack = ic.cubeHackBonus() * 100.0;
+            double wish = ic.cubeWishBonus() * 100.0;
             if (drop != 0) Add(item, GearObjectives.Stat.DropChance, drop);
             if (gold != 0) Add(item, GearObjectives.Stat.GoldDrops, gold);
             if (hack != 0) Add(item, GearObjectives.Stat.HackSpeed, hack);

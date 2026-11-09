@@ -627,6 +627,7 @@ namespace NGUAdvisor
             // must keep sampling with the window closed (the graph is a session history), so it moved out
             // here. Self-throttled to 60s, so per-frame cost is one timestamp comparison.
             GrowthTracker.Tick();
+            DriftProbe.Tick();
 
             // Coalesced settings write (see SavedSettings.SaveSettings): setters mark dirty, the file is
             // written here at most once a second. Flushed unconditionally on Unload.

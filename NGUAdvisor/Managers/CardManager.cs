@@ -63,6 +63,50 @@ namespace NGUAdvisor.Managers
             }
         }
 
+        // Guide default when two types are within TieTolerance of each other: Adv / Hack / Wish.
+        private static readonly cardBonus[] DefaultTagOrder =
+            { cardBonus.adventureStat, cardBonus.hackSpeed, cardBonus.wishSpeed };
+        private const float TieTolerance = 0.01f;
+
+        // Effect is a*cost + 0.001*cost*tierFactor*variance, so per mana it does not depend on the
+        // card's cost; what differs by type is the tier the player's perks allow and the bonus already held.
+        private static float RelativeGainPerMana(cardBonus bonus)
+        {
+            float perMana = _cc.generateCardEffect(bonus, _cc.generateCardTier(bonus), 1, 1f, false);
+            float held = _character.cards.bonuses[(int)bonus];
+            return held <= 0f ? 0f : perMana / held;
+        }
+
+        // Gains within TieTolerance share a bucket, so the guide order decides between them.
+        private static int TieBucket(float gain)
+            => gain <= 0f ? int.MinValue : (int)Math.Round(Math.Log(gain) / Math.Log(1.0 + TieTolerance));
+
+        private static int DefaultRank(cardBonus bonus)
+        {
+            int index = Array.IndexOf(DefaultTagOrder, bonus);
+            return index < 0 ? DefaultTagOrder.Length : index;
+        }
+
+        // The advisor never sets tags (they are the player's choice); this only says which bonus types
+        // a tag would buy the most relative gain per mana in, best first, and what is tagged now.
+        public static string TagAdvice()
+        {
+            List<cardBonus> ranked = new List<cardBonus>();
+            foreach (cardBonus bonus in typeof(cardBonus).GetEnumValues())
+                if (bonus != cardBonus.none)
+                    ranked.Add(bonus);
+            Dictionary<cardBonus, float> gain = ranked.ToDictionary(b => b, RelativeGainPerMana);
+            ranked = ranked.OrderByDescending(b => TieBucket(gain[b])).ThenBy(DefaultRank).ToList();
+
+            string tagged = _character.cards.taggedBonuses.Count == 0
+                ? "none"
+                : string.Join(", ", _character.cards.taggedBonuses.Select(b => b.ToString()).ToArray());
+            int slots = _cc.maxTagSize();
+            string best = string.Join(", ", ranked.Take(slots)
+                .Select(b => $"{b} {gain[b] * 100f:0.####}%/mana").ToArray());
+            return $"tag slots {slots} · tagged: {tagged} · best gain per mana: {best}";
+        }
+
         public static bool WouldBeTrashed(Card card, out string reason)
         {
             reason = "";

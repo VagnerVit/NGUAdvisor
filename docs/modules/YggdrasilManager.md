@@ -127,3 +127,15 @@ already-active fruits. Activation needs the resource dumped first
 (`removeMostEnergy/removeMostMagic`) because the game charges from the idle pool. Page math:
 9 fruits/page — `ChangePage(slot)` switches page and returns the on-page index; the original page
 is restored at the end.
+
+## Seed upgrade ranking (`SeedUpgradeRanking`, `FruitUpgradeValue`)
+
+Pure value model for spending seeds on tiers (decomp `FruitController.upgrade`, `tierFactor`): the next
+tier costs `baseSeedCost × ceil((tier+1)²)` and the effect scales with `ceil(tier^1.5)`, so the
+relative gain per seed is `(tf(T+1) − tf(T)) / tf(T) / cost` — falling with tier, 0 at the cap (10, or
+24 at Troll ×3) and for locked fruits. Assumes the effect is linear in tierFactor (true for the
+`tierFactor(harvestTier)` consumers; fruits with a different effect shape are not modelled). It compares
+relative growth, not worth across fruits: a +x % Gold and a +x % Power are not the same value.
+**Not wired into the buy order**: SpendPlanner owns that; it can call `SeedUpgradeRanking()` (or
+`FruitUpgradeValue.RelativeGainPerSeed`) to break ties between fruit steps that are both unlocked.
+Exported by StateExport.

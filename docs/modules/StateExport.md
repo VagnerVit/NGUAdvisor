@@ -104,3 +104,16 @@ all four were wrong.
 - **`EXP ... buying toward <phase>`** — which guide ratio the EXP walk is aiming at. It is derived
   from the chapter and the T6 version, both a step removed from anything else in the dump, so without
   it a wrong ratio shows up only as EXP going somewhere surprising.
+
+## ACHIEVEMENTS, CARDS, rebirth line, fruit upgrade ranking
+
+- **ACHIEVEMENTS**: total BP / max BP, AP bonus (`bonusAP = 1 + totalBP/10000`) and every unfinished
+  achievement with its BP (scene data `achievementBP`) and the in-code `achievementHint` text, biggest first.
+- **CARDS**: `CardManager.TagAdvice()` (see CardManager.md).
+- **PROGRESSION `rebirth` line**: `RebirthLength.Describe` — marginal Number gain of the next hour vs the
+  compounded per-hour gain of the run so far. Advisory; changes no rebirth.
+- **YGGDRASIL FRUITS `next tier` lines**: `YggdrasilManager.SeedUpgradeRanking()`, owned fruits below the
+  cap, best relative effect gain per seed first (see YggdrasilManager.md).
+- **DAYCARE**: daycare contents with levels/h (`daycareTime` sped up by the daycare digger) and, when the
+  shockwave set is empty, the fastest-growing owned items no advisor loadout names. Advisory only: the
+  advisor fills daycare from `Settings.Shockwave` alone, since an item in daycare cannot be worn.

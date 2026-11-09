@@ -88,7 +88,9 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             foreach (NGUBP lane in lanes)
                 pool += lane.Held();
 
-            NguBbSplit.Result plan = NguBbSplit.Plan((i, k) => lanes[i].BbAt(k), lanes.Count, pool);
+            // The per-unit rate does not depend on k or on what a lane holds, so it is read once per lane.
+            double[] perUnit = lanes.Select(l => l.PerUnit()).ToArray();
+            NguBbSplit.Result plan = NguBbSplit.Plan((i, k) => lanes[i].BbAt(k, perUnit[i]), lanes.Count, pool);
             foreach (NGUBP lane in lanes)
                 lane.Release();
             for (int i = 0; i < lanes.Count; i++)
@@ -109,7 +111,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
 
         // BB at one level per tick with every NGU-speed term scaled by speedScale: the BB this lane
         // would face under another gear set (NguBbGear).
-        public double BbWithSpeed(double speedScale) => Type == ResourceType.Magic ? MagicBb(500, speedScale) : EnergyBb(500, speedScale);
+        public double BbWithSpeed(double speedScale) => Bb(NguLaneRank.BbLookaheadLevels, speedScale);
 
         private long Held() => Type == ResourceType.Magic
             ? _character.NGU.magicSkills[Index].magic
@@ -124,11 +126,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         }
 
         // BB at one level per k ticks, with the same 10 s lookahead the cap calc uses at that speed.
-        private double BbAt(int k)
-        {
-            int offset = 500 / k;
-            return Type == ResourceType.Magic ? MagicBb(offset) : EnergyBb(offset);
-        }
+        private double BbAt(int k, double perUnit) => Bb(500 / k, 1, perUnit);
 
         private long CalculateNGUEnergyCap()
         {
@@ -158,7 +156,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         {
             var ret = new CapCalc(1, 0);
 
-            var num3 = EnergyBb(offset);
+            var num3 = Bb(offset);
             var num4 = Math.Ceiling(num3 / Math.Ceiling(num3 / MaxAllocation) * 1.00000202655792);
             long num;
             if (num4 > _character.idleEnergy)
@@ -172,34 +170,18 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             return ret;
         }
 
-        private double EnergyBb(int offset, double speedScale = 1)
-        {
-            var num1 = 0.0f;
-            if (_character.settings.nguLevelTrack == difficulty.normal)
-                num1 = _character.NGU.skills[Index].level + 1L + offset;
-            else if (_character.settings.nguLevelTrack == difficulty.evil)
-                num1 = _character.NGU.skills[Index].evilLevel + 1L + offset;
-            else if (_character.settings.nguLevelTrack == difficulty.sadistic)
-                num1 = _character.NGU.skills[Index].sadisticLevel + 1L + offset;
+        private double Bb(int offset, double speedScale = 1) => Bb(offset, speedScale, PerUnit());
 
-            var num2 = _character.totalEnergyPower() * (double)_character.totalNGUSpeedBonus() * speedScale;
-            num2 *= _character.adventureController.itopod.totalEnergyNGUBonus() * _character.inventory.macguffinBonuses[4];
-            num2 *= _character.NGUController.energyNGUBonus() * _character.allDiggers.totalEnergyNGUBonus();
-            num2 *= _character.hacksController.totalEnergyNGUBonus() * _character.beastQuestPerkController.totalEnergyNGUSpeed();
-            num2 *= _character.wishesController.totalEnergyNGUSpeed() * _character.cardsController.getBonus(cardBonus.energyNGUSpeed);
-            if (_character.allChallenges.trollChallenge.sadisticCompletions() >= 1)
-                num2 *= 3.0;
-            if (_character.settings.nguLevelTrack >= difficulty.sadistic)
-                num2 /= _character.NGUController.NGU[0].sadisticDivider();
-            var num3 = Math.Ceiling(_character.NGUController.energySpeedDivider(Index) * (double)num1 / num2);
-            return num3 < 1.0 ? 1.0 : num3;
-        }
+        private double Bb(int offset, double speedScale, double perUnit)
+            => NguLaneRank.BbCost(perUnit, NGUAdvisors.Level(_character, Type == ResourceType.Magic, Index), offset, speedScale);
+
+        private double PerUnit() => NGUAdvisors.ProgressPerUnit(_character, Type == ResourceType.Magic, Index);
 
         private CapCalc GetNGUMagicCapCalc(int offset)
         {
             var ret = new CapCalc(1, 0);
 
-            var num3 = MagicBb(offset);
+            var num3 = Bb(offset);
             var num4 = Math.Ceiling(num3 / Math.Ceiling(num3 / MaxAllocation) * 1.00000202655792);
             long num;
             if (num4 > _character.magic.idleMagic)
@@ -211,29 +193,6 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             ret.Num = num;
             ret.PPT = ppt;
             return ret;
-        }
-
-        private double MagicBb(int offset, double speedScale = 1)
-        {
-            var num1 = 0.0f;
-            if (_character.settings.nguLevelTrack == difficulty.normal)
-                num1 = _character.NGU.magicSkills[Index].level + 1L + offset;
-            else if (_character.settings.nguLevelTrack == difficulty.evil)
-                num1 = _character.NGU.magicSkills[Index].evilLevel + 1L + offset;
-            else if (_character.settings.nguLevelTrack == difficulty.sadistic)
-                num1 = _character.NGU.magicSkills[Index].sadisticLevel + 1L + offset;
-
-            var num2 = _character.totalMagicPower() * (double)_character.totalNGUSpeedBonus() * speedScale;
-            num2 *= _character.adventureController.itopod.totalMagicNGUBonus() * _character.inventory.macguffinBonuses[5];
-            num2 *= _character.NGUController.magicNGUBonus() * _character.allDiggers.totalMagicNGUBonus();
-            num2 *= _character.hacksController.totalMagicNGUBonus() * _character.beastQuestPerkController.totalMagicNGUSpeed();
-            num2 *= _character.wishesController.totalMagicNGUSpeed() * _character.cardsController.getBonus(cardBonus.magicNGUSpeed);
-            if (_character.allChallenges.trollChallenge.completions() >= 1)
-                num2 *= 3.0;
-            if (_character.settings.nguLevelTrack >= difficulty.sadistic)
-                num2 /= _character.NGUController.NGUMagic[0].sadisticDivider();
-            var num3 = Math.Ceiling(_character.NGUController.magicSpeedDivider(Index) * (double)num1 / num2);
-            return num3 < 1.0 ? 1.0 : num3;
         }
     }
 }

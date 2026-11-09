@@ -11,6 +11,12 @@ namespace NGUAdvisor.Managers
         private static readonly Character _character = Main.Character;
         private static readonly WishesController _wc = _character.wishesController;
 
+        private const int ValueMode = 4;
+
+        // Kickass (0), Faster Wishes (1) and Money Pit (4) come first in the guide (ch.6); they are the
+        // one-shot unlocks the value score cannot price.
+        private static readonly int[] GuideFirstWishes = { 0, 1, 4 };
+
         private static long energy;
         private static long magic;
         private static long res3;
@@ -79,6 +85,12 @@ namespace NGUAdvisor.Managers
             if (remainingRes3 > _character.res3.idleRes3)
                 remainingRes3 = _character.res3.idleRes3;
 
+            if (Settings.WishMode == ValueMode)
+            {
+                AllocateByValue(remainingEnergy, remainingMagic, remainingRes3);
+                return;
+            }
+
             var validWishes = GetValidWishes();
             for (var slots = MaxSlots() - _wc.numAllocatedWishes(); slots > 0; slots--)
             {
@@ -103,6 +115,108 @@ namespace NGUAdvisor.Managers
                 remainingMagic -= wish.magic;
                 remainingRes3 -= wish.res3;
             }
+        }
+
+        private static void AllocateByValue(long remainingEnergy, long remainingMagic, long remainingRes3)
+        {
+            int slots = MaxSlots() - _wc.numAllocatedWishes();
+            if (slots <= 0)
+                return;
+
+            energy = Math.Max(0L, remainingEnergy / slots + Math.Sign(remainingEnergy % slots));
+            magic = Math.Max(0L, remainingMagic / slots + Math.Sign(remainingMagic % slots));
+            res3 = Math.Max(0L, remainingRes3 / slots + Math.Sign(remainingRes3 % slots));
+            if (energy <= 0L && magic <= 0L && res3 <= 0L)
+                return;
+
+            List<int> ordered = ValueOrder(GetValidWishes(), out Dictionary<int, double> weights);
+            if (ordered.Count > slots)
+                ordered = ordered.GetRange(0, slots);
+            if (ordered.Count == 0)
+                return;
+
+            ordered = ordered.OrderByDescending(id => weights[id]).ToList();
+            double[] fractions = HackMath.WishSplitFractions(ordered.Select(id => weights[id]).ToArray());
+            double remainingFraction = 1.0;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                double share = remainingFraction > 0.0 ? Math.Min(1.0, fractions[i] / remainingFraction) : 1.0 / (ordered.Count - i);
+                remainingFraction -= fractions[i];
+
+                energy = Math.Min(remainingEnergy, (long)Math.Ceiling(remainingEnergy * share));
+                magic = Math.Min(remainingMagic, (long)Math.Ceiling(remainingMagic * share));
+                res3 = Math.Min(remainingRes3, (long)Math.Ceiling(remainingRes3 * share));
+
+                AllocateToWish(ordered[i]);
+                Wish wish = Wishes[ordered[i]];
+                remainingEnergy -= wish.energy;
+                remainingMagic -= wish.magic;
+                remainingRes3 -= wish.res3;
+            }
+        }
+
+        private static bool HasValueScore(int id) =>
+            HackMath.IsProductWish(id) && (!HackMath.IsCardWish(id) || _character.cards.cardsOn);
+
+        // Value rate = relative gain of the next level x levels per tick, per wish. Wish-speed wishes are
+        // priced as their gain times what they would speed up, so they need the others' sum first.
+        private static Dictionary<int, double> ValueRates(List<int> ids, bool unclamped)
+        {
+            Dictionary<int, double> rates = new Dictionary<int, double>();
+            double othersSum = 0.0;
+            foreach (int id in ids)
+            {
+                if (!HasValueScore(id) || HackMath.IsWishSpeedWish(id))
+                    continue;
+                double ppt = unclamped ? BaseProgressPerTick(id) : ProgressPerTick(id, out _);
+                double rate = HackMath.WishGainPerLevel(id, _wc.properties[id].effectPerLevel, Wishes[id].level) * ppt;
+                rates[id] = rate;
+                othersSum += rate;
+            }
+            foreach (int id in ids)
+            {
+                if (!HasValueScore(id) || !HackMath.IsWishSpeedWish(id))
+                    continue;
+                double ppt = unclamped ? BaseProgressPerTick(id) : ProgressPerTick(id, out _);
+                double gain = HackMath.WishGainPerLevel(id, _wc.properties[id].effectPerLevel, Wishes[id].level);
+                rates[id] = HackMath.WishSpeedValueRate(gain, othersSum, ppt);
+            }
+            return rates;
+        }
+
+        // Best first. weights holds each wish's unclamped value rate for the pool split; wishes without a
+        // score take the largest weight present so the cheapest-first fallback is not starved.
+        private static List<int> ValueOrder(List<int> wishIds, out Dictionary<int, double> weights)
+        {
+            List<int> live = wishIds.Where(id => ProgressPerTick(id, out _) > 0).ToList();
+            weights = new Dictionary<int, double>();
+            if (live.Count == 0)
+                return live;
+
+            bool hasPriorities = Settings.WishPriorities.Length > 0;
+            if (!Settings.WeakPriorities && live.Any(id => Settings.WishPriorities.Contains(id)))
+                live = live.Where(id => Settings.WishPriorities.Contains(id)).ToList();
+
+            Dictionary<int, double> rates = ValueRates(live, false);
+            Dictionary<int, double> baseRates = ValueRates(live, true);
+
+            List<int> ordered = live
+                .OrderByDescending(id => !hasPriorities && Array.IndexOf(GuideFirstWishes, id) >= 0)
+                .ThenByDescending(id => rates.TryGetValue(id, out double r) && r > 0.0)
+                .ThenByDescending(id => rates.TryGetValue(id, out double r) ? r : 0.0)
+                .ThenBy(id => _wc.wishSpeedDivider(id))
+                .ThenBy(id =>
+                {
+                    int i = Array.IndexOf(Settings.WishPriorities, id);
+                    return i == -1 ? int.MaxValue : i;
+                })
+                .ThenByDescending(id => Wishes[id].progress)
+                .ToList();
+
+            double maxWeight = baseRates.Values.DefaultIfEmpty(0.0).Max();
+            foreach (int id in ordered)
+                weights[id] = baseRates.TryGetValue(id, out double w) && w > 0.0 ? w : maxWeight;
+            return ordered;
         }
 
         private static List<int> GetValidWishes()

@@ -40,6 +40,7 @@
     <Compile Include="..\..\NGUAdvisor\Managers\GearChain.cs" Link="Linked\GearChain.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\ApTierTable.cs" Link="Linked\ApTierTable.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\PpEta.cs" Link="Linked\PpEta.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\SpendValue.cs" Link="Linked\SpendValue.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\AtMath.cs" Link="Linked\AtMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\HackMath.cs" Link="Linked\HackMath.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\HackPlan.cs" Link="Linked\HackPlan.cs" />
@@ -53,6 +54,9 @@
     <Compile Include="..\..\NGUAdvisor\Managers\NguGain.cs" Link="Linked\NguGain.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\NguLaneRank.cs" Link="Linked\NguLaneRank.cs" />
     <Compile Include="..\..\NGUAdvisor\Managers\RunShape.cs" Link="Linked\RunShape.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\RebirthLength.cs" Link="Linked\RebirthLength.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\FruitUpgradeValue.cs" Link="Linked\FruitUpgradeValue.cs" />
+    <Compile Include="..\..\NGUAdvisor\Managers\BeardValue.cs" Link="Linked\BeardValue.cs" />
   </ItemGroup>
 
 </Project>

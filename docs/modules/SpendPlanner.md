@@ -63,7 +63,7 @@ while the guide still had buys queued (user-reported).
   guide perk order — ahead of BB2, while ICB and the whole Evil-prep set were missing; auto-buy spent
   PP on inventory slots a fully automated run never uses. Wandoos Lover is the one guide step left
   out on purpose (the run feeds no Wandoos). Guide shorthand → live name: "Adventure Perk" =
-  Adventure Boost For Rich Perks I (guide ch6 numbers it 55; III costs 100× for half the effect),
+  Adventure Boost For Rich Perks I (guide ch6 numbers it 55; numbers in "Value view" below),
   "NGU 2" = Faster NGU Energy/Magic II, "Adventure Quirk" = Adventure Boost For Rich Quirks I.
 - `CanUnlockFruit` mirrors `FruitController.upgrade()`: Rage needs `itopodOn`, MacGuffin **α** (not β)
   needs achievement 145, Quirks needs `beastOn`, the six mayo fruits need `cardsOn`, and Numbers is
@@ -108,6 +108,31 @@ the guide's numbered ch6/ch8 entries resolve to exactly the indices it prints.
 - The chapter numbers are the guide's: ch6 opens on the T8 kill, ch7 on T9 (ProgressionAnalyzer.md).
 - Left out on purpose: Truly Idle Questing and The Beast's Fertilizer (the automation already
   covers what they do), Wandoos Lover (no Wandoos in the run).
+
+## Value view (`SpendValue.cs`, `PerkValue/QuirkValue/…ValueLine`) — ranks, never buys
+
+The guide order above is what gets bought (including the ch.5 2:2:1 stage). Next to it the planner
+exposes a ranking of every perk/quirk whose effect is one factor `(1 + L·e)` of a product: marginal
+relative gain of the product per point = `e / ((1 + L·e) · cost)`, independent of the other factors.
+`SpendPlanner.PerkValue()/QuirkValue()` return a `SpendValue.View` (guide buy, its group, best buy in
+THAT group, ratio best/guide, plus the best across all groups); `…ValueLine()` renders it and logs one
+`SpendPlanner perk|quirk value: …` debug.log line per change. PpPanel shows the perk line under "Queued".
+
+- **Mapping source: the decompile.** `ItopodPerkController.total{Energy,Magic,Res3}{Power,Bar,Cap}Bonus`,
+  `totalBoostBonus`, `totalStatBonus`, `total{Energy,Magic}NGUBonus`, `totalAdventureBonus`,
+  `totalSeedBonus` … and `BeastQuestPerkController.total*Bonus`, `total*NGUSpeed`, `ygg1`, `blood1`
+  hard-code which `perkLevel[i]`/`quirkLevel[i]` feeds which product; `SpendValue` copies those id lists
+  (ids match the live state export). `effectPerLevel`, `perkCost`/`quirkCost`, `capLevel`, difficulty
+  requirement and Res3 unlock are read live. Exception: perks 6-11 (Generic I) use a literal 0.01 in the game.
+- **Groups are not exchangeable 1:1.** "+1% E power" and "+1% adventure stats" multiply different things;
+  the ratio is only taken inside the guide buy's group. The "best overall" figure is shown for orientation
+  only. Fixed bonuses (Fibonacci thresholds, Newbie perks) and non-product perks (banks, slots) are outside
+  the model; a guide buy outside it reads "feeds no ranked product".
+- **Adventure I vs II vs III, settled** (live catalog: I = perk 55, 100 PP, +0.1%/lvl; II = 83, 1K PP,
+  +0.1%, needs evil; III = 150, 10K PP, +0.05%, needs evil). At L0: I = 1%/1K PP, II = 0.1%/1K PP,
+  III = 0.005%/1K PP — I is 10× II and 200× III (100× the cost, half the effect). Even I's last level
+  (factor already ×2: 0.5%/1K PP) beats II's first, because II only catches up at L = 9000, past its
+  1000 cap. So the guide's "Adventure Perk" is I, and III is never the buy while I/II have levels left.
 
 Consumers: OptimizationAdvisor rows; AdvisorApply auto-buy toggles (`perks`, `quirks`,
 `yggbuys`).

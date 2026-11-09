@@ -20,7 +20,7 @@ A lane holding `BB/k` levels one every `k` ticks; anything between two such amou
 ## Invariants
 
 - **Never walk `k` one tick at a time.** Right after a rebirth the pool is a sliver of BB, so `k` lands in
-  the millions, and each `bbAt` call is `NGUBP.MagicBb`/`EnergyBb` — dozens of game getters. A linear
+  the millions, and each `bbAt` call is `NGUBP.Bb` (the per-unit rate is read once per lane in `Rebalance`, the level per call). A linear
   walk froze the game at a rebirth (2026-10-13, found from a live managed stack). `Cost(k)` never
   rises with `k` (BB only shrinks as the `500 / k` lookahead does), so `FastestWithin` bisects; both
   steps 2 and 3 go through it. `PoolFarBelowBbFindsTheSpeedWithoutWalkingEveryTick` caps the call count.

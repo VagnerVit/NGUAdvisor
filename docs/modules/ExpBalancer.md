@@ -40,8 +40,7 @@ EXP purchase planner: walks purchased E/M power/cap/bars toward the guide's rati
 - Magic locked (all-time `highestBoss < 37`) forces energy-only regardless of phase.
 - The guide's ch.1-3 "only buy magic cap for Ygg unlocks/auto-activations" is a manual one-off
   call, so those phases are modelled as energy-only rather than reserving a magic share.
-- Not auto-detected: the pre-T7 "energy only once you can BB Normal NGU Ygg/EXP" window, the
-  ch.6+ R3 phases, and the T9 absolute targets (3M/1M power etc. — a different model entirely).
+- Not auto-detected: the pre-T7 "energy only once you can BB Normal NGU Ygg/EXP" window.
 - A phase change makes `WriteCustomPlan` zero the boxes a phase doesn't want (e.g. the magic
   custom-purchase boxes in ch.1-2). It used to switch `Main`'s `AutoBuyEM` path off for them too —
   that path is **gone** (2026-08-14): it spent EXP with the amounts this class writes, so the two
@@ -49,6 +48,30 @@ EXP purchase planner: walks purchased E/M power/cap/bars toward the guide's rati
   (user-reported: EXP kept draining while they banked for a digger). `Settings.AdvisorExpBuys` — the
   ADVISOR toggle on the EXP row — is the only control over EXP spent on energy/magic/R3 now. Off
   means EXP banks.
+
+## Resource 3 and the Hack Day phases (guide ch.6 "EXP Spending")
+
+- R3 is a third pool (`Targets.PoolR`), ratio 4/150k/1 = 600:600:80 in EXP-space. Costs come from the
+  game's public `energyPurchases` / `magicPurchases` / `res3Purchases` `custom*Cost` methods (R3 is
+  the E/M cost x100 000: power 15M, bars 8M, 250 cap 100k); the stat mutation stays ours because
+  `buyCustom*` is private. R3 is only in the walk when `res3.res3On`; R3 speed (max 50) is not in
+  the ratio — the guide gives an order for it, not a ratio — and stays a manual buy.
+- `ExpRatioTables.For(..., HackDayPhase, emFloorReached)`: BeforeHd1 = R3 only; AfterHd1 = E/M walk
+  until power 3M/1M and cap/bars at 75 % of the ratio-implied value, then R3 only; AfterHd2 = same
+  with 6M/2M. A cap at the hard cap or a gated stat counts as satisfied.
+- **Hack Day completion is NOT detectable** — the game has no flag or counter, so `DetectHackDay`
+  returns Unknown and the balancer keeps the pre-R3 E/M-only behaviour. Wiring a detector (or a
+  user setting) is the only missing piece; the tables and tests are in place.
+
+## Rich Jerks (StatBoostPurchases attack/defense boost)
+
+Permanent multiplier on FIGHT BOSS attack/defense (`Character.cs` attack/defense recompute), not on
+adventure stats. 3 EXP per 1 % (`customAttackCost`). Milestones (`RichJerksTargetPct`): 1k % once
+T5 is beaten (ch.3 "after getting CCoD from T5"), 10k % from ch.4 (CBlock 2 Prep), 100k % once T6v4
+is beaten (ch.4 Evil Prep: "100k Rich Jerks" within the 1m % combined with perks). `BuyTick` fills a
+milestone before the E/M/R3 walk, from the same tick budget. Above the milestone nothing is bought:
+no clean marginal Fight-Boss-gain-per-EXP comparison against power/cap/bars exists. `Verdict` carries
+the current value and the Phase text shows "Rich Jerks now / target".
 
 ## Walk-toward-ratio model (replaces "catch the runaway leader")
 

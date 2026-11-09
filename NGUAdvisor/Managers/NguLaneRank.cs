@@ -27,11 +27,19 @@ namespace NGUAdvisor.Managers
             public double BbCost;      // energy/magic that holds it there
         }
 
-        // Mirrors NGUBP.EnergyBb/MagicBb(BbLookaheadLevels) term for term: speedMult is the same
-        // speed stack, without power.
-        public static double BbCost(double speedDivider, double level, double power, double speedMult)
+        // Levels per tick per allocated unit at the current level, read off the game's own
+        // progressPerTick1000 (the whole cap allocated), so the speed stack is the game's, not a copy.
+        // The game returns a float, and 0 for a lane without power.
+        public static double ProgressPerUnit(double progressPerTick1000, double totalCap)
+            => totalCap > 0 && progressPerTick1000 > 0 ? progressPerTick1000 / totalCap : 0.0;
+
+        // The allocation that levels a lane once per tick with `lookaheadLevels` of headroom. The game
+        // divides progress by level+1, so a deeper level needs proportionally more. speedScale multiplies
+        // the whole speed side (a hypothetical gear set).
+        public static double BbCost(double progressPerUnit, double level, double lookaheadLevels, double speedScale = 1.0)
         {
-            double bb = Math.Ceiling(speedDivider * (level + 1.0 + BbLookaheadLevels) / (power * speedMult));
+            if (progressPerUnit <= 0 || speedScale <= 0) return double.PositiveInfinity;
+            double bb = Math.Ceiling((level + 1.0 + lookaheadLevels) / ((level + 1.0) * progressPerUnit * speedScale));
             return bb < 1.0 ? 1.0 : bb;
         }
 

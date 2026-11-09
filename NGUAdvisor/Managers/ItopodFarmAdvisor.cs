@@ -35,14 +35,18 @@ namespace NGUAdvisor.Managers
             public double ExpPerSecond;     // raw EXP award, before addExp's own bonuses
         }
 
-        internal static ItopodRewards.Difficulty CurrentDifficulty()
+        // Per-kill rewards come from the game's own LootDrop and ItopodPerkController methods; ItopodRewards'
+        // pure copies exist for the tests and the floor-climb planner.
+        internal static double PpPerKill(ItopodPerkController perks, int floor, double ppBonus)
+            => perks.baseProgressGained(Math.Max(0, floor)) * ppBonus / perks.pointThreshold();
+
+        internal static double ApPerKill(LootDrop loot, int floor)
+            => 1.0 / loot.killsPerAP(loot.itopodTier(floor));
+
+        internal static double ExpPerKill(LootDrop loot, int floor)
         {
-            switch (Main.Character.settings.rebirthDifficulty)
-            {
-                case difficulty.evil: return ItopodRewards.Difficulty.Evil;
-                case difficulty.sadistic: return ItopodRewards.Difficulty.Sadistic;
-                default: return ItopodRewards.Difficulty.Normal;
-            }
+            int tier = loot.itopodTier(floor);
+            return tier < 1 ? 0.0 : (double)loot.itopodEXPAwarded(tier) / loot.killsPerEXP(tier);
         }
 
         // Without sinks the boost component cannot be priced, so it stays zero — for callers that
@@ -57,24 +61,23 @@ namespace NGUAdvisor.Managers
                 ITOPODManager.Profile p = ITOPODManager.ProfileForMode(combatMode);
                 if (!p.Known || p.Slices == null || p.Slices.Length == 0) return r;
 
-                ItopodRewards.Difficulty diff = CurrentDifficulty();
                 ItopodPerkController perks = Main.Character.adventureController.itopod;
+                LootDrop loot = Main.Character.adventureController.lootDrop;
                 // usePills: false — the pill multiplier only applies while buffedKills remains, so
                 // it is a burst, not a farm rate.
                 double ppBonus = perks.totalPPBonus(false);
-                double sadisticBase = diff == ItopodRewards.Difficulty.Sadistic ? perks.totalBasePPBonus() : 0.0;
 
                 double boost = 0.0, pp = 0.0, ap = 0.0, exp = 0.0;
                 foreach (ITOPODManager.RotationSlice s in p.Slices)
                 {
                     if (s.Fraction <= 0.0) continue;
-                    int tier = ItopodRewards.Tier(s.Floor);
+                    int tier = loot.itopodTier(s.Floor);
                     if (sinks != null)
                         boost += s.Fraction * ItopodRewards.BoostDropChance
                                * BoostSinks.ValueOfDrop(ItopodRewards.BoostLadderIndex(tier), sinks);
-                    pp += s.Fraction * ItopodRewards.PpPerKill(s.Floor, diff, ppBonus, sadisticBase);
-                    ap += s.Fraction * ItopodRewards.ApPerKill(s.Floor);
-                    exp += s.Fraction * ItopodRewards.ExpPerKill(s.Floor);
+                    pp += s.Fraction * PpPerKill(perks, s.Floor, ppBonus);
+                    ap += s.Fraction * ApPerKill(loot, s.Floor);
+                    exp += s.Fraction * ExpPerKill(loot, s.Floor);
                 }
 
                 r.Known = true;

@@ -587,6 +587,7 @@ namespace NGUAdvisor.Managers
                 }
             }
             catch (Exception e) { Main.LogDebug($"SpendPlanner buy perks: {e.Message}"); }
+            if (bought > 0) PerkValueLine();
             return bought;
         }
 
@@ -711,7 +712,98 @@ namespace NGUAdvisor.Managers
                 }
             }
             catch (Exception e) { Main.LogDebug($"SpendPlanner buy quirks: {e.Message}"); }
+            if (bought > 0) QuirkValueLine();
             return bought;
+        }
+
+        // ---------- VALUE VIEW (ranks, never buys) ----------
+
+        // Guide buy vs the best-value buy inside the SAME product. Groups are not exchangeable 1:1
+        // (SpendValue), so the ratio is only ever taken within one.
+        public static SpendValue.View PerkValue()
+        {
+            try
+            {
+                Character c = Main.Character;
+                if (c == null) return new SpendValue.View { Ratio = double.NaN };
+                ItopodPerkController ipc = c.adventureController.itopod;
+                List<long> levels = c.adventure.itopod.perkLevel;
+                difficulty diff = c.settings.rebirthDifficulty;
+                List<SpendValue.Candidate> all = new List<SpendValue.Candidate>();
+                foreach (KeyValuePair<string, int[]> g in SpendValue.PerkIds())
+                {
+                    if (g.Key.StartsWith(SpendValue.GroupR3Prefix, StringComparison.Ordinal) && !c.res3.res3On) continue;
+                    foreach (int id in g.Value)
+                    {
+                        if (id >= levels.Count || id >= ipc.maxLevel.Count || id >= ipc.effectPerLevel.Count || id >= ipc.perkDifficultyReq.Count) continue;
+                        if (ipc.perkDifficultyReq[id] > diff || levels[id] >= ipc.capLevel(id)) continue;
+                        double e = id >= 6 && id <= 11 ? SpendValue.GenericOneEffect : ipc.effectPerLevel[id];
+                        long cost = ipc.perkCost(id);
+                        if (e <= 0 || cost <= 0) continue;
+                        all.Add(new SpendValue.Candidate
+                        {
+                            Group = g.Key, Id = id, Name = ipc.perkName[id]?.Trim(),
+                            Level = levels[id], EffectPerLevel = e, Cost = cost,
+                        });
+                    }
+                }
+                Buy guide = NextPerk();
+                return SpendValue.Compare(all, guide.Known, guide.Id, guide.Name?.Trim());
+            }
+            catch (Exception e) { Main.LogDebug($"SpendPlanner perk value: {e.Message}"); }
+            return new SpendValue.View { Ratio = double.NaN };
+        }
+
+        public static SpendValue.View QuirkValue()
+        {
+            try
+            {
+                Character c = Main.Character;
+                if (c == null) return new SpendValue.View { Ratio = double.NaN };
+                BeastQuestPerkController qc = c.beastQuestPerkController;
+                List<long> levels = c.beastQuest.quirkLevel;
+                if (qc == null || levels == null) return new SpendValue.View { Ratio = double.NaN };
+                difficulty diff = c.settings.rebirthDifficulty;
+                List<SpendValue.Candidate> all = new List<SpendValue.Candidate>();
+                foreach (KeyValuePair<string, int[]> g in SpendValue.QuirkIds())
+                {
+                    foreach (int id in g.Value)
+                    {
+                        if (id >= levels.Count || id >= qc.maxLevel.Count || id >= qc.effectPerLevel.Count || id >= qc.quirkDifficultyReq.Count) continue;
+                        if (qc.quirkDifficultyReq[id] > diff || levels[id] >= qc.capLevel(id) || QuirkSystemLocked(c, qc, id)) continue;
+                        double e = qc.effectPerLevel[id];
+                        long cost = qc.quirkCost(id);
+                        if (e <= 0 || cost <= 0) continue;
+                        all.Add(new SpendValue.Candidate
+                        {
+                            Group = g.Key, Id = id, Name = qc.quirkName[id]?.Trim(),
+                            Level = levels[id], EffectPerLevel = e, Cost = cost,
+                        });
+                    }
+                }
+                Buy guide = NextQuirk();
+                return SpendValue.Compare(all, guide.Known, guide.Id, guide.Name?.Trim());
+            }
+            catch (Exception e) { Main.LogDebug($"SpendPlanner quirk value: {e.Message}"); }
+            return new SpendValue.View { Ratio = double.NaN };
+        }
+
+        private static string _lastPerkValueLine = "";
+        private static string _lastQuirkValueLine = "";
+
+        // One debug.log line per CHANGE of the answer; the panel and the buy path both call it.
+        public static string PerkValueLine()
+        {
+            string line = SpendValue.Describe(PerkValue(), "PP");
+            if (line != _lastPerkValueLine) { _lastPerkValueLine = line; Main.LogDebug("SpendPlanner perk " + line); }
+            return line;
+        }
+
+        public static string QuirkValueLine()
+        {
+            string line = SpendValue.Describe(QuirkValue(), "QP");
+            if (line != _lastQuirkValueLine) { _lastQuirkValueLine = line; Main.LogDebug("SpendPlanner quirk " + line); }
+            return line;
         }
 
         // ---------- YGGDRASIL FRUIT TIERS ----------

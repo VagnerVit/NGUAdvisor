@@ -40,3 +40,14 @@ sum unless `CastProtectedCards`.
 `GetCardValue` = `(change − 1) / totalManaCost` (gain per mana); `GetCardNormalValue` = value ÷ the
 type's reference value (cross-type comparable). `CompareCards` applies `Settings.CardSortOrder`
 in order, falling back to card name.
+
+## Tag advice (`TagAdvice`)
+
+Card effect is `a*cost + 0.001*cost*tierFactor*variance` (decomp `CardsController.calculate*Effect`),
+so effect per mana does not depend on cost: the trash rule's cost ceiling is value-blind, but it is a
+user setting and stays as is. The advisor never sets tags (`cards.taggedBonuses` is the player's
+choice, `maxTagSize()` slots, each tag biases `generateBonusType`). `TagAdvice()` ranks bonus types by
+`generateCardEffect(type, generateCardTier(type), 1, 1, false) / cards.bonuses[type]` (relative gain
+per mana at the perk-allowed tier). Types within 1 % share a bucket, ordered by the guide default
+Adv / Hack / Wish. It is a within-formula ranking: it does not weigh what +x % NGU speed is worth against
++x % PP. Printed in state-export's CARDS section.

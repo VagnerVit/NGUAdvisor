@@ -30,6 +30,8 @@ namespace NGUAdvisor.Managers
             public string NextNames;    // stats the next walk chunk will feed, e.g. "Magic CAP, Magic BARS"
             public string NextShort;    // same, abbreviated for tight tiles, e.g. "M.Cap, M.Bar"
             public string Phase;        // guide phase the targets came from, e.g. "3:1 E:M (5:160k:4)"
+            public double RichJerksPct; // current Rich Jerks attack/defense boost, % (the lower of the two)
+            public double RichJerksTargetPct; // guide milestone for the current chapter, 0 = none
         }
 
         // Compact stat labels for narrow readouts (the GROWTH tile sub-line).
@@ -43,6 +45,9 @@ namespace NGUAdvisor.Managers
                 case "Magic POWER": return "M.Pow";
                 case "Magic CAP": return "M.Cap";
                 case "Magic BARS": return "M.Bar";
+                case "R3 POWER": return "R3.Pow";
+                case "R3 CAP": return "R3.Cap";
+                case "R3 BARS": return "R3.Bar";
             }
             return name;
         }
@@ -50,20 +55,48 @@ namespace NGUAdvisor.Managers
         // Levels within this fraction of the leader count as balanced (matches the advisor tolerance).
         private const double BalanceTolerance = 0.75;
 
-        // Read the phase signals off the live character and let ExpRatioTables pick the targets.
+        // Order of the nine purchasable stats; Stat.Index and the cost table share it.
+        private static readonly string[] StatNames =
+        {
+            "Energy POWER", "Energy CAP", "Energy BARS",
+            "Magic POWER", "Magic CAP", "Magic BARS",
+            "R3 POWER", "R3 CAP", "R3 BARS",
+        };
+
+        // Used only if the game's pricing methods cannot be reached; mirrors their current bodies.
+        private static readonly double[] FallbackCosts = { 150, 1, 80, 450, 3, 240, 15000000, 100000, 8000000 };
+
+        // EXP per power unit, per 250 cap and per bar, read from the game's own custom*Cost methods.
+        private static double[] UnitCosts(Character c)
+        {
+            try
+            {
+                return new double[]
+                {
+                    c.energyPurchases.customPowerCost(1), c.energyPurchases.customCapCost(250), c.energyPurchases.customBarCost(1),
+                    c.magicPurchases.customPowerCost(1), c.magicPurchases.customCapCost(250), c.magicPurchases.customBarCost(1),
+                    c.res3Purchases.customPowerCost(1), c.res3Purchases.customCapCost(250), c.res3Purchases.customBarCost(1),
+                };
+            }
+            catch { return FallbackCosts; }
+        }
+
+        // The game stores no Hack Day completion (no counter, no flag) and the guide defines it as an
+        // event, not a state, so there is nothing reliable to read. Unknown keeps the E/M-only walk.
+        private static ExpRatioTables.HackDayPhase DetectHackDay(Character c) => ExpRatioTables.HackDayPhase.Unknown;
+
         // Each read is individually guarded: an unreadable signal must degrade to the table's
         // conservative default, not throw the whole balancer away.
-        private static ExpRatioTables.Targets Targets(Character c, bool magicUnlocked)
+        private static void ReadSignals(out int chapter, out bool t5Beaten, out int t6VersionsBeaten)
         {
-            int chapter = 0;
+            chapter = 0;
             try { var prog = ProgressionAnalyzer.Detect(); if (prog.Known) chapter = prog.Chapter; } catch { }
-            bool t5Beaten = false;
+            t5Beaten = false;
             try { t5Beaten = ProgressionAnalyzer.TitanBeaten(4); } catch { }
             // Versions of T6 BEATEN, not the version selected in the zone — `titan6Version` is the
             // difficulty dropdown and never moves on its own (user-reported 2026-09-12).
-            int t6v = 0;
-            try { t6v = ZoneHelpers.TitanVersionsBeaten(5); } catch { }
-            return ExpRatioTables.For(chapter, t5Beaten, t6v, magicUnlocked);
+            t6VersionsBeaten = 0;
+            try { t6VersionsBeaten = ZoneHelpers.TitanVersionsBeaten(5); } catch { }
         }
 
         private struct Stat
@@ -71,7 +104,7 @@ namespace NGUAdvisor.Managers
             public string Name;
             public double ExpSpent;    // current units × unit cost
             public double TargetShare; // fraction of total EXP this stat should hold
-            public int Index;          // 0..5 = ePow,eCap,eBar,mPow,mCap,mBar
+            public int Index;          // 0..8 = ePow,eCap,eBar,mPow,mCap,mBar,rPow,rCap,rBar
             public bool Buyable;       // false when the game gate blocks a buy right now (excluded from balance)
         }
 
@@ -79,44 +112,86 @@ namespace NGUAdvisor.Managers
         {
             // magic RESOURCE + custom purchases are permanent (never re-lock on Evil) → all-time highestBoss.
             bool magicUnlocked = c.highestBoss >= 37;
-            double eP = Math.Max(0, c.energyPower) * 150.0;
-            double eC = c.capEnergy / 250.0;
-            double eB = c.energyBars * 80.0;
-            double mP = magicUnlocked ? Math.Max(0, c.magic.magicPower) * 450.0 : 0;
-            double mC = magicUnlocked ? c.magic.capMagic * 3.0 / 250.0 : 0;
-            double mB = magicUnlocked ? c.magic.magicPerBar * 240.0 : 0;
+            bool r3On = c.res3 != null && c.res3.res3On;
+            double[] cost = UnitCosts(c);
+            long hardCap = c.hardCap();
+            double[] spent = new double[9];
+            spent[0] = Math.Max(0, c.energyPower) * cost[0];
+            spent[1] = c.capEnergy / 250.0 * cost[1];
+            spent[2] = c.energyBars * cost[2];
+            spent[3] = magicUnlocked ? Math.Max(0, c.magic.magicPower) * cost[3] : 0;
+            spent[4] = magicUnlocked ? c.magic.capMagic / 250.0 * cost[4] : 0;
+            spent[5] = magicUnlocked ? c.magic.magicPerBar * cost[5] : 0;
+            spent[6] = r3On ? Math.Max(0, c.res3.res3Power) * cost[6] : 0;
+            spent[7] = r3On ? c.res3.capRes3 / 250.0 * cost[7] : 0;
+            spent[8] = r3On ? c.res3.res3PerBar * cost[8] : 0;
 
-            var tg = Targets(c, magicUnlocked);
-            phase = tg.Phase;
-            double pe = tg.PoolE, pm = tg.PoolM;
             // Energy CAP is gated by the game until the cap crosses 100k; a gated stat can't be walked,
-            // so it's excluded from the balance so it never pins the % at 0 forever.
-            var stats = new[]
+            // so it's excluded from the balance so it never pins the % at 0 forever. A cap at the hard
+            // cap cannot grow either.
+            bool[] buyable =
             {
-                new Stat { Name = "Energy POWER", ExpSpent = eP, TargetShare = pe * tg.ShareP, Index = 0, Buyable = true },
-                new Stat { Name = "Energy CAP", ExpSpent = eC, TargetShare = pe * tg.ShareC, Index = 1, Buyable = c.capEnergy >= 100000 },
-                new Stat { Name = "Energy BARS", ExpSpent = eB, TargetShare = pe * tg.ShareB, Index = 2, Buyable = true },
-                new Stat { Name = "Magic POWER", ExpSpent = mP, TargetShare = pm * tg.ShareP, Index = 3, Buyable = magicUnlocked },
-                new Stat { Name = "Magic CAP", ExpSpent = mC, TargetShare = pm * tg.ShareC, Index = 4, Buyable = magicUnlocked },
-                new Stat { Name = "Magic BARS", ExpSpent = mB, TargetShare = pm * tg.ShareB, Index = 5, Buyable = magicUnlocked },
+                true, c.capEnergy >= 100000 && c.capEnergy < hardCap, true,
+                magicUnlocked, magicUnlocked && c.magic.capMagic < hardCap, magicUnlocked,
+                r3On, r3On && c.res3.capRes3 < hardCap, r3On,
             };
+
+            int chapter; bool t5Beaten; int t6v;
+            ReadSignals(out chapter, out t5Beaten, out t6v);
+            ExpRatioTables.Targets baseTargets = ExpRatioTables.For(chapter, t5Beaten, t6v, magicUnlocked);
+            ExpRatioTables.HackDayPhase hd = r3On ? DetectHackDay(c) : ExpRatioTables.HackDayPhase.Unknown;
+            double[] floorSpent = new double[6];
+            for (int i = 0; i < 6; i++) floorSpent[i] = buyable[i] ? spent[i] : double.PositiveInfinity;
+            bool floorReached = ExpRatioTables.EmFloorReached(hd, floorSpent, cost[0], cost[3], baseTargets);
+            ExpRatioTables.Targets tg = ExpRatioTables.For(chapter, t5Beaten, t6v, magicUnlocked, hd, floorReached);
+            phase = tg.Phase;
+
+            double[] share =
+            {
+                tg.PoolE * tg.ShareP, tg.PoolE * tg.ShareC, tg.PoolE * tg.ShareB,
+                tg.PoolM * tg.ShareP, tg.PoolM * tg.ShareC, tg.PoolM * tg.ShareB,
+                tg.PoolR * ExpRatioTables.R3ShareP, tg.PoolR * ExpRatioTables.R3ShareC, tg.PoolR * ExpRatioTables.R3ShareB,
+            };
+            Stat[] stats = new Stat[9];
+            for (int i = 0; i < 9; i++)
+                stats[i] = new Stat { Name = StatNames[i], ExpSpent = spent[i], TargetShare = share[i], Index = i, Buyable = buyable[i] };
             return stats;
         }
 
         private static double Level(Stat s) => s.TargetShare > 0 ? s.ExpSpent / s.TargetShare : 0;
 
+        private struct RichJerks
+        {
+            public double NowPct;
+            public double TargetPct;
+        }
+
+        private static RichJerks ReadRichJerks(Character c)
+        {
+            int chapter; bool t5Beaten; int t6v;
+            ReadSignals(out chapter, out t5Beaten, out t6v);
+            return new RichJerks
+            {
+                NowPct = Math.Min(c.attackBoost, c.defenseBoost) * 100.0,
+                TargetPct = ExpRatioTables.RichJerksTargetPct(chapter, t5Beaten, t6v),
+            };
+        }
+
         public static Verdict Analyze()
         {
-            var v = new Verdict();
+            Verdict v = new Verdict();
             try
             {
-                var c = Main.Character;
+                Character c = Main.Character;
                 if (c == null || c.highestBoss < 17) return v;   // custom purchases (permanent unlock) before boss 17
 
-                var stats = Snapshot(c, out var phase);
-                v.Phase = phase;
+                Stat[] stats = Snapshot(c, out string phase);
+                RichJerks rj = ReadRichJerks(c);
+                v.RichJerksPct = rj.NowPct;
+                v.RichJerksTargetPct = rj.TargetPct;
+                v.Phase = rj.TargetPct > 0 ? $"{phase} · Rich Jerks {Fmt(rj.NowPct)}% / {Fmt(rj.TargetPct)}%" : phase;
                 double minL = double.MaxValue, maxL = 0;
-                foreach (var s in stats)
+                foreach (Stat s in stats)
                 {
                     if (!s.Buyable || s.TargetShare <= 0) continue;
                     double L = Level(s);
@@ -129,20 +204,21 @@ namespace NGUAdvisor.Managers
                 v.BalancePct = minL / maxL * 100.0;
                 v.Balanced = v.BalancePct >= BalanceTolerance * 100.0;
 
-                if (!v.Balanced)
+                List<string> names = new List<string>();
+                List<string> shorts = new List<string>();
+                if (rj.NowPct < rj.TargetPct) { names.Add("Rich Jerks A/D"); shorts.Add("RJ A/D"); v.Balanced = false; }
+                if (v.BalancePct < BalanceTolerance * 100.0)
                 {
                     // The next chunk feeds the stats sitting below the balance line, most-behind first.
                     double line = maxL * BalanceTolerance;
-                    var lag = new List<Stat>();
-                    foreach (var s in stats)
+                    List<Stat> lag = new List<Stat>();
+                    foreach (Stat s in stats)
                         if (s.Buyable && s.TargetShare > 0 && Level(s) < line) lag.Add(s);
                     lag.Sort((a, b) => Level(a).CompareTo(Level(b)));
-                    var names = new List<string>();
-                    var shorts = new List<string>();
-                    for (int i = 0; i < lag.Count && i < 3; i++) { names.Add(lag[i].Name); shorts.Add(Abbrev(lag[i].Name)); }
-                    v.NextNames = string.Join(", ", names.ToArray());
-                    v.NextShort = string.Join(", ", shorts.ToArray());
+                    for (int i = 0; i < lag.Count && names.Count < 3; i++) { names.Add(lag[i].Name); shorts.Add(Abbrev(lag[i].Name)); }
                 }
+                v.NextNames = string.Join(", ", names.ToArray());
+                v.NextShort = string.Join(", ", shorts.ToArray());
             }
             catch (Exception e) { Main.LogDebug($"ExpBalancer: {e.Message}"); }
             return v;
@@ -156,9 +232,10 @@ namespace NGUAdvisor.Managers
         {
             try
             {
-                var stats = Snapshot(c, out _);
+                Stat[] stats = Snapshot(c, out _);
+                double[] cost = UnitCosts(c);
                 double totalSpent = 0, sumShare = 0;
-                foreach (var s in stats)
+                foreach (Stat s in stats)
                 {
                     if (!s.Buyable || s.TargetShare <= 0) continue;
                     totalSpent += s.ExpSpent;
@@ -167,42 +244,76 @@ namespace NGUAdvisor.Managers
                 if (sumShare <= 0) return;
                 double lbar = totalSpent / sumShare;   // balanced water line from what's already invested
 
-                long Deficit(int idx)
+                double Deficit(int idx)
                 {
-                    var s = stats[idx];
+                    Stat s = stats[idx];
                     if (!s.Buyable || s.TargetShare <= 0) return 0;
-                    return (long)Math.Max(0, s.TargetShare * lbar - s.ExpSpent);
+                    return Math.Max(0, s.TargetShare * lbar - s.ExpSpent);
                 }
                 int ClampI(double v2) => (int)Math.Max(0, Math.Min(int.MaxValue, v2));
+                long CapUnits(int idx) => (long)Math.Max(0, Deficit(idx) / cost[idx] * 250.0);
 
                 var set = c.settings;
-                set.customPowerAmount = ClampI(Deficit(0) / 150.0);
-                set.customCapAmount = (long)Math.Max(0, Deficit(1) * 250.0);
-                set.customBarAmount = ClampI(Deficit(2) / 80.0);
-                set.customMagicPowerAmount = ClampI(Deficit(3) / 450.0);
-                set.customMagicCapAmount = (long)Math.Max(0, Deficit(4) / 3.0 * 250.0);
-                set.customMagicBarAmount = ClampI(Deficit(5) / 240.0);
+                set.customPowerAmount = ClampI(Deficit(0) / cost[0]);
+                set.customCapAmount = CapUnits(1);
+                set.customBarAmount = ClampI(Deficit(2) / cost[2]);
+                set.customMagicPowerAmount = ClampI(Deficit(3) / cost[3]);
+                set.customMagicCapAmount = CapUnits(4);
+                set.customMagicBarAmount = ClampI(Deficit(5) / cost[5]);
+                set.customRes3PowerAmount = ClampI(Deficit(6) / cost[6]);
+                set.customRes3CapAmount = CapUnits(7);
+                set.customRes3BarAmount = ClampI(Deficit(8) / cost[8]);
             }
             catch { }
         }
 
-        // One walk step: waterfill up to `fraction` of banked EXP across the lagging stats — raise the
-        // lowest levels first to a common water line. Returns a log-worthy description, or null if
-        // nothing was bought. Replicates the game's buyCustom* math per stat (unit costs, rounding,
-        // hardCap clamp, unlock gates).
+        // Rich Jerks milestone buys: the shop is permanent and cheap next to the E/M/R3 pools, so a
+        // milestone below the chapter's target is filled first. Returns EXP spent; `budget` caps it.
+        private static double BuyRichJerks(Character c, double budget, List<string> log)
+        {
+            RichJerks rj = ReadRichJerks(c);
+            if (rj.TargetPct <= 0) return 0;
+            double spentTotal = 0;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                bool attack = pass == 0;
+                double nowPct = (attack ? c.attackBoost : c.defenseBoost) * 100.0;
+                double share = (budget - spentTotal) / (2 - pass);
+                float pct = (float)Math.Floor(Math.Min(rj.TargetPct - nowPct, share / 3.0));
+                if (pct < 1f) continue;
+                long cost = attack ? c.statBoostPurchases.customAttackCost(pct) : c.statBoostPurchases.customDefenseCost(pct);
+                if (cost < 1 || cost > c.realExp) continue;
+                c.realExp -= cost;
+                if (attack) c.attackBoost += pct / 100f; else c.defenseBoost += pct / 100f;
+                spentTotal += cost;
+                log.Add($"Rich Jerks {(attack ? "attack" : "defense")} +{Fmt(pct)}%");
+            }
+            return spentTotal;
+        }
+
+        // One walk step: Rich Jerks milestones first, then waterfill the rest of up to `fraction` of
+        // banked EXP across the lagging stats — raise the lowest levels first to a common water line.
+        // Returns a log-worthy description, or null if nothing was bought. Replicates the game's
+        // buyCustom* math per stat (unit costs, rounding, hardCap clamp, unlock gates).
         public static string BuyTick(double fraction)
         {
             try
             {
-                var c = Main.Character;
+                Character c = Main.Character;
                 if (c == null || c.highestBoss < 17) return null;   // custom purchases: permanent unlock
                 WriteCustomPlan(c);
 
-                var stats = Snapshot(c, out _);
-                var elig = new List<Stat>();
-                foreach (var s in stats)
+                double tickBudget = c.realExp * fraction;
+                List<string> rjLog = new List<string>();
+                double rjSpent = BuyRichJerks(c, tickBudget, rjLog);
+                string rjText = rjLog.Count > 0 ? string.Join(", ", rjLog.ToArray()) + $" for {Fmt(rjSpent)} EXP" : null;
+
+                Stat[] stats = Snapshot(c, out _);
+                double[] cost = UnitCosts(c);
+                List<Stat> elig = new List<Stat>();
+                foreach (Stat s in stats)
                     if (s.Buyable && s.TargetShare > 0) elig.Add(s);
-                if (elig.Count == 0) return null;
+                if (elig.Count == 0) return rjText;
 
                 elig.Sort((a, b) => Level(a).CompareTo(Level(b)));   // ascending by level
 
@@ -213,16 +324,16 @@ namespace NGUAdvisor.Managers
                 // purchase is an instant, permanent stat), so the floor is the cheapest unit actually on
                 // offer, clamped to what's banked.
                 double cheapest = double.MaxValue;
-                foreach (var s in elig)
+                foreach (Stat s in elig)
                 {
-                    double u = UnitCost(s.Name);
+                    double u = cost[s.Index];
                     if (u < cheapest) cheapest = u;
                 }
-                double budgetD = Math.Max(c.realExp * fraction, cheapest);
+                double budgetD = rjSpent > 0 ? tickBudget - rjSpent : Math.Max(tickBudget, cheapest);
                 if (budgetD > c.realExp) budgetD = c.realExp;
                 if (budgetD > long.MaxValue) budgetD = long.MaxValue;
                 long budget = (long)budgetD;
-                if (budget < cheapest) return null;   // genuinely can't afford a single unit yet
+                if (budget < cheapest) return rjText;   // genuinely can't afford a single unit yet
 
                 // Waterfill: raise the floor across the lowest levels until the budget runs out.
                 double remaining = budget;
@@ -247,120 +358,74 @@ namespace NGUAdvisor.Managers
                 }
 
                 long total = 0;
-                var fed = new List<string>();
-                foreach (var s in elig)
+                List<string> fed = new List<string>();
+                foreach (Stat s in elig)
                 {
                     double L = Level(s);
                     if (L >= w) continue;
                     long amt = (long)(s.TargetShare * (w - L));
                     if (amt < 1) continue;
-                    long spent = BuyStat(c, s.Name, amt);
+                    long spent = BuyStat(c, s, amt, cost);
                     if (spent > 0) { total += spent; fed.Add(s.Name); }
                 }
                 if (total <= 0)
                 {
                     // The waterfill can slice a small budget into per-stat crumbs that each round down
                     // to zero units. Spend it whole on the most-behind stat one unit is affordable for.
-                    foreach (var s in elig)
+                    foreach (Stat s in elig)
                     {
-                        if (UnitCost(s.Name) > budget) continue;
-                        long one = BuyStat(c, s.Name, budget);
-                        if (one > 0) return $"{s.Name} for {Fmt(one)} EXP (walking toward ratio)";
+                        if (cost[s.Index] > budget) continue;
+                        long one = BuyStat(c, s, budget, cost);
+                        if (one > 0) return Join(rjText, $"{s.Name} for {Fmt(one)} EXP (walking toward ratio)");
                     }
-                    return null;
+                    return rjText;
                 }
-                return $"{string.Join(", ", fed.ToArray())} for {Fmt(total)} EXP (walking toward ratio)";
+                return Join(rjText, $"{string.Join(", ", fed.ToArray())} for {Fmt(total)} EXP (walking toward ratio)");
             }
             catch (Exception e) { Main.LogDebug($"ExpBalancer buy: {e.Message}"); return null; }
         }
 
-        // Smallest EXP outlay that still moves a stat by the game's own rounding: power/bars are
-        // per-unit costs; cap is 250 units per 1 EXP (×3 for magic) and the game rounds to 250s, so
-        // 1 EXP (3 for magic) is the smallest cap buy that isn't rounded away. Mirrors BuyStat.
-        private static double UnitCost(string name)
-        {
-            switch (name)
-            {
-                case "Energy POWER": return 150;
-                case "Energy CAP": return 1;
-                case "Energy BARS": return 80;
-                case "Magic POWER": return 450;
-                case "Magic CAP": return 3;
-                case "Magic BARS": return 240;
-            }
-            return double.MaxValue;
-        }
+        private static string Join(string first, string second) => first == null ? second : first + "; " + second;
 
-        // Replicates the game's buyCustom* math for one stat, spending at most maxExp. Returns EXP spent.
-        private static long BuyStat(Character c, string name, long maxExp)
+        // Replicates the game's buyCustom* math for one stat, spending at most maxExp. Power and bars
+        // are per-unit costs; cap is bought in blocks of 250 priced by customCapCost(250), as the game
+        // rounds cap to 250s. Returns EXP spent.
+        private static long BuyStat(Character c, Stat stat, long maxExp, double[] cost)
         {
             if (maxExp < 1) return 0;
             if (maxExp > c.realExp) maxExp = (long)c.realExp;
+            long unitCost = (long)cost[stat.Index];
+            if (unitCost < 1) return 0;
+            long units = maxExp / unitCost;
+            if (units < 1) return 0;
+            long spent = units * unitCost;
 
-            switch (name)
+            switch (stat.Index)
             {
-                case "Energy POWER":
-                {
-                    long units = maxExp / 150;
-                    if (units < 1) return 0;
-                    long cost = units * 150;
-                    c.realExp -= cost;
-                    c.energyPower += units;
-                    return cost;
-                }
-                case "Energy CAP":
-                {
+                case 0: c.realExp -= spent; c.energyPower += units; return spent;
+                case 2: c.realExp -= spent; c.energyBars += units; return spent;
+                case 3: c.realExp -= spent; c.magic.magicPower += units; return spent;
+                case 5: c.realExp -= spent; c.magic.magicPerBar += units; return spent;
+                case 6: c.realExp -= spent; c.res3.res3Power += units; return spent;
+                case 8: c.realExp -= spent; c.res3.res3PerBar += units; return spent;
+                case 1:
                     if (c.capEnergy < 100000) return 0;          // game gate
-                    double units = (double)maxExp * 250;         // 250 cap per 1 EXP
-                    units -= units % 250;                        // game rounds cap to 250s
-                    if (units < 250) return 0;
-                    long cost = maxExp;                          // == units / 250 exactly (units is maxExp*250)
-                    c.realExp -= cost;
-                    if (c.capEnergy + units >= c.hardCap()) c.capEnergy = c.hardCap();
-                    else c.capEnergy += (long)units;
-                    return cost;
-                }
-                case "Energy BARS":
-                {
-                    long units = maxExp / 80;
-                    if (units < 1) return 0;
-                    long cost = units * 80;
-                    c.realExp -= cost;
-                    c.energyBars += units;
-                    return cost;
-                }
-                case "Magic POWER":
-                {
-                    long units = maxExp / 450;
-                    if (units < 1) return 0;
-                    long cost = units * 450;
-                    c.realExp -= cost;
-                    c.magic.magicPower += units;
-                    return cost;
-                }
-                case "Magic CAP":
-                {
-                    double units = Math.Floor((double)maxExp * 250 / 3);
-                    units -= units % 250;
-                    if (units < 250) return 0;
-                    long cost = (long)(units / 250 * 3);
-                    c.realExp -= cost;
-                    if (c.magic.capMagic + units >= c.hardCap()) c.magic.capMagic = c.hardCap();
-                    else c.magic.capMagic += (long)units;
-                    return cost;
-                }
-                case "Magic BARS":
-                {
-                    long units = maxExp / 240;
-                    if (units < 1) return 0;
-                    long cost = units * 240;
-                    c.realExp -= cost;
-                    c.magic.magicPerBar += units;
-                    return cost;
-                }
+                    c.realExp -= spent;
+                    c.capEnergy = AddCap(c.capEnergy, units * 250, c.hardCap());
+                    return spent;
+                case 4:
+                    c.realExp -= spent;
+                    c.magic.capMagic = AddCap(c.magic.capMagic, units * 250, c.hardCap());
+                    return spent;
+                case 7:
+                    c.realExp -= spent;
+                    c.res3.capRes3 = AddCap(c.res3.capRes3, units * 250, c.hardCap());
+                    return spent;
             }
             return 0;
         }
+
+        private static long AddCap(long current, long add, long hardCap) => current + add >= hardCap ? hardCap : current + add;
 
         // Canonical abbreviation lives in NumberFormatter.Abbrev (finding #31). Kept as a thin public alias
         // because external callers reference ExpBalancer.Fmt.

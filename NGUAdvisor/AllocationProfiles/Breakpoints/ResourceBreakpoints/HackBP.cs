@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using NGUAdvisor.Managers;
 
 namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
@@ -45,6 +47,7 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
         public override bool Allocate()
         {
             _character.hacksController.addR3(Index, CalculateHackCap());
+            HackValueReport.Refresh(_character);
             return true;
         }
 
@@ -83,6 +86,70 @@ namespace NGUAdvisor.AllocationProfiles.BreakpointTypes
             ret.Num = alloc;
             ret.PPT = ticks > 0 ? 1.0 / ticks : 0;
             return ret;
+        }
+    }
+
+    // Reports where hack value disagrees with the guide's fixed order. Advisory only: the auto profile keeps
+    // running HackPlan.Order. Refreshed from HackBP.Allocate, so it is as live as the R3 pass.
+    public static class HackValueReport
+    {
+        private const int IncriminatingEvidenceId = 294;
+        private const int HackCount = 15;
+
+        // Empty until the first pass has produced a ranking.
+        public static string Summary { get; private set; } = "";
+
+        public static void Refresh(Character c)
+        {
+            try
+            {
+                HacksController hc = c.hacksController;
+                long totalCap = c.totalCapRes3();
+                int n = Math.Min(HackCount, c.hacks.hacks.Count);
+                List<HackPlan.Lane> lanes = new List<HackPlan.Lane>();
+                long[] levels = new long[n];
+                long[] thresholds = new long[n];
+                long[] hardCaps = new long[n];
+                for (int id = 0; id < n; id++)
+                {
+                    levels[id] = c.hacks.hacks[id].level;
+                    thresholds[id] = hc.milestoneThreshold(id);
+                    hardCaps[id] = hc.hardCapLevel(id);
+                    lanes.Add(new HackPlan.Lane
+                    {
+                        Id = id,
+                        Level = levels[id],
+                        HardCap = hardCaps[id],
+                        BaseEffectPerLevel = hc.properties[id].baseEffectPerLevel,
+                        MilestoneEffect = hc.properties[id].milestoneEffect,
+                        MilestoneThreshold = thresholds[id],
+                        Saturation = HackMath.Saturation(totalCap, hc.progressPerTickCap(id)),
+                    });
+                }
+
+                List<bool> maxxed = c.inventory.itemList.itemMaxxed;
+                bool evidence = IncriminatingEvidenceId < maxxed.Count && maxxed[IncriminatingEvidenceId];
+                int[] guide = HackPlan.Order(ChallengeDetector.CBlock3Complete(), evidence, levels, thresholds, hardCaps);
+                int[] ranked = HackPlan.RankByValue(lanes);
+                if (guide.Length == 0 || ranked.Length == 0) return;
+
+                int guideId = guide[0];
+                int bestId = ranked[0];
+                double ratio = HackPlan.ValueRatio(lanes, bestId, guideId);
+                string summary = bestId == guideId
+                    ? $"Hack value agrees with the guide: {hc.properties[guideId].hackName} (hack {guideId + 1})"
+                    : $"Hack value prefers {hc.properties[bestId].hackName} (hack {bestId + 1}) over the guide's "
+                      + $"{hc.properties[guideId].hackName} (hack {guideId + 1}): "
+                      + (ratio > 0 ? $"{ratio:0.0}x value per R3" : "guide lane value n/a");
+                if (summary == Summary) return;
+                Summary = summary;
+                string order = string.Join(" ", ranked.Take(5).Select(i => (i + 1).ToString()).ToArray());
+                Main.LogDebug($"[HackDbg] value rank (hack numbers, 1% on any stat counted equal): {order} | {summary}");
+            }
+            catch (Exception e)
+            {
+                Main.LogDebug($"[HackDbg] value rank failed: {e.Message}");
+            }
         }
     }
 }

@@ -445,16 +445,14 @@ namespace NGUAdvisor.Managers
                 return false;
             }
 
-            ItopodRewards.Difficulty diff = ItopodFarmAdvisor.CurrentDifficulty();
             ItopodPerkController perks = _ac.itopod;
             double ppBonus = perks.totalPPBonus(false);
-            double sadisticBase = diff == ItopodRewards.Difficulty.Sadistic ? perks.totalBasePPBonus() : 0.0;
             double respawn = BaseRespawnTime();
             double farmPps = ItopodFarmAdvisor.ForMode(Settings.ITOPODCombatMode).PpPerSecond;
 
             ItopodRewards.BonusClaim claim = ItopodRewards.BestBonusClaim(highest, reach, farmPps,
                 floor => ItopodConstants.ExpectedKillSeconds(fighter, floor, respawn),
-                floor => ItopodRewards.PpPerKill(floor, diff, ppBonus, sadisticBase),
+                floor => ItopodFarmAdvisor.PpPerKill(perks, floor, ppBonus),
                 _ac.maxItopodLevel());
             if (claim == null)
             {

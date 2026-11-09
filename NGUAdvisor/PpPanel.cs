@@ -38,6 +38,7 @@ namespace NGUAdvisor
         private readonly Label _cardCost;
         private readonly Label _cardNote;
         private readonly Label _queued;
+        private readonly Label _value;
         private readonly Label _modelled;
         private readonly Button _toggle;
         private readonly Label _toggleNote;
@@ -117,11 +118,20 @@ namespace NGUAdvisor
             };
             Controls.Add(_queued);
 
+            // Ranking only: the guide order above is what gets bought. Two lines reserved, constant height.
+            _value = new Label
+            {
+                AutoSize = false, Size = new Size(inner, UiTheme.SHead(36)), Font = UiTheme.Chip,
+                ForeColor = UiTheme.Faint, BackColor = UiTheme.Ground,
+                Location = new Point(UiTheme.S(10), _queued.Bottom + UiTheme.S(2))
+            };
+            Controls.Add(_value);
+
             _modelled = new Label
             {
                 AutoSize = false, Size = new Size(inner, UiTheme.SText(20)), Font = UiTheme.Ui,
                 ForeColor = UiTheme.Muted, BackColor = UiTheme.Ground,
-                Location = new Point(UiTheme.S(10), _queued.Bottom + UiTheme.S(2))
+                Location = new Point(UiTheme.S(10), _value.Bottom + UiTheme.S(2))
             };
             Controls.Add(_modelled);
 
@@ -237,6 +247,7 @@ namespace NGUAdvisor
                 SpendPlanner.PlannedBuy planned = SpendPlanner.NextPerkPlanned();
                 RenderCard(SpendPlanner.NextPerk(), planned, banked, perHour, rateLabel);
                 RenderQueued(planned, banked);
+                UiLayout.WrapInto(_value, SpendPlanner.PerkValueLine());
 
                 UiLayout.FitInto(_modelled, rates.Known
                     ? $"ITOPOD would pay {NumberFormatter.Abbrev(modelledPerHour)} PP/hr ({BoostFarmAdvisor.ModeName(rates.CombatMode)}, floors {rates.DefaultFloor}-{rates.PeakFloor})"

@@ -138,3 +138,9 @@ chapter 8 and every titan run got the farm digger/beard sets (see ProgressionAna
 
 **Wandoos-as-power contexts**: challenge block, NORB (Number mult dead), NOAUG, or gold-starved
 for augs — AT-3/AT-4 (Wandoos E/M) become the power source and the AT rec switches accordingly.
+
+**Beard value view** (`LogBeardValue`, `BeardValue.cs`): beside `RecommendedBeards` (still what gets
+equipped) the advisor logs `[BeardValue]` — the perm bonus each beard would bank at the scheduled
+rebirth if it ran from now on (game temp/perm curves, `timeFactor`, `addedTrimmings`). Each beard feeds a
+different stat, so the ratios are not exchangeable 1:1; without a clocked rebirth it is the bank at
+current levels.

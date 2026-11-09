@@ -4,8 +4,27 @@ All notable changes to NGU Advisor are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Wish mode "Value"** picks wishes by what a level is worth (every multiplying wish compounds into
+  its bonus) per second of progress, keeps Kickass, Faster Wishes and Money Pit first, and splits
+  resources across slots by value instead of evenly.
+- **Hack, perk and quirk value views** — next to the guide order the advisor still follows, the log
+  and the PP planner show the lane or buy with the most gain per R3/PP/QP and by how much.
+- **EXP buys Rich Jerks attack/defense up to the guide's milestones** (1k %, 10k %, 100k %), and
+  Resource 3 joins the EXP ratio once it is unlocked.
+- **Drift check** — once a minute the advisor compares its own formulas (NGU bonuses, Wandoos, AT,
+  blood spells, cube, hack dividers, zone unlocks) with the game's and logs any difference.
+- **State export** lists achievement points and the unfinished ones, the Number gained by the next
+  hour of the run, card tag advice, the best value Yggdrasil upgrade per seed, and daycare growth with
+  the fastest candidates outside every loadout.
+- **Beard value view** — the log shows what each beard would bank permanently by the scheduled rebirth,
+  next to the guide set the advisor keeps equipping.
+
 ### Changed
 
+- **NGU speed, ITOPOD rewards, cube bonuses and EXP prices are read from the game** instead of
+  re-computed, so a game-side change can no longer leave the advisor's copy behind.
 - **Wandoos ATs keep leveling toward the next OS** — with MEH (or XL) unlocked, the auto profile
   raises the Wandoos AT targets to the cheapest levels at which a whole run on the next OS beats the
   current one by the auto-switch margin. Before, they stopped as soon as the current OS was cheap.

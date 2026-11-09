@@ -130,5 +130,71 @@ namespace NGUAdvisor.Tests
             Assert.Equal(1.0, t.ShareP + t.ShareC + t.ShareB, 10);
             Assert.Equal(1.0, t.PoolE + t.PoolM, 10);
         }
+
+        [Fact]
+        public void HackDayUnknown_KeepsTodaysTargets()
+        {
+            ExpRatioTables.Targets t = ExpRatioTables.For(6, true, 4, true, ExpRatioTables.HackDayPhase.Unknown, false);
+            Assert.Equal(0.0, t.PoolR);
+            Assert.Equal(1.0, t.PoolE + t.PoolM, 10);
+        }
+
+        [Fact]
+        public void BeforeHd1_IsR3Only()
+        {
+            ExpRatioTables.Targets t = ExpRatioTables.For(6, true, 4, true, ExpRatioTables.HackDayPhase.BeforeHd1, false);
+            Assert.Equal(1.0, t.PoolR);
+            Assert.Equal(0.0, t.PoolE);
+            Assert.Equal(0.0, t.PoolM);
+        }
+
+        [Fact]
+        public void AfterHd1_BuysEmUntilFloorThenR3()
+        {
+            ExpRatioTables.Targets walking = ExpRatioTables.For(6, true, 4, true, ExpRatioTables.HackDayPhase.AfterHd1, false);
+            Assert.Equal(0.0, walking.PoolR);
+            Assert.Equal(1.0, walking.PoolE + walking.PoolM, 10);
+            ExpRatioTables.Targets done = ExpRatioTables.For(6, true, 4, true, ExpRatioTables.HackDayPhase.AfterHd1, true);
+            Assert.Equal(1.0, done.PoolR);
+        }
+
+        [Fact]
+        public void EmFloor_DoublesAfterHd2()
+        {
+            double e, m;
+            Assert.True(ExpRatioTables.EmFloor(ExpRatioTables.HackDayPhase.AfterHd1, out e, out m));
+            Assert.Equal(3e6, e); Assert.Equal(1e6, m);
+            Assert.True(ExpRatioTables.EmFloor(ExpRatioTables.HackDayPhase.AfterHd2, out e, out m));
+            Assert.Equal(6e6, e); Assert.Equal(2e6, m);
+            Assert.False(ExpRatioTables.EmFloor(ExpRatioTables.HackDayPhase.Unknown, out e, out m));
+        }
+
+        [Fact]
+        public void EmFloorReached_NeedsPowerAndCapBarsInRatio()
+        {
+            ExpRatioTables.Targets t = ExpRatioTables.For(6, true, 4, true);
+            double eNeed = 3e6 * 150, mNeed = 1e6 * 450;
+            double[] ok =
+            {
+                eNeed, eNeed * t.ShareC / t.ShareP, eNeed * t.ShareB / t.ShareP,
+                mNeed, mNeed * t.ShareC / t.ShareP, mNeed * t.ShareB / t.ShareP,
+            };
+            Assert.True(ExpRatioTables.EmFloorReached(ExpRatioTables.HackDayPhase.AfterHd1, ok, 150, 450, t));
+            double[] lowCap = (double[])ok.Clone();
+            lowCap[1] = 0;
+            Assert.False(ExpRatioTables.EmFloorReached(ExpRatioTables.HackDayPhase.AfterHd1, lowCap, 150, 450, t));
+            double[] unbuyable = { ok[0], double.PositiveInfinity, ok[2], ok[3], ok[4], ok[5] };
+            Assert.True(ExpRatioTables.EmFloorReached(ExpRatioTables.HackDayPhase.AfterHd1, unbuyable, 150, 450, t));
+        }
+
+        [Theory]
+        [InlineData(3, false, 0, 0)]
+        [InlineData(3, true, 0, 1000)]
+        [InlineData(4, true, 1, 10000)]
+        [InlineData(6, true, 4, 100000)]
+        public void RichJerksMilestones_FollowTheGuide(int chapter, bool t5, int t6v, double expected)
+        {
+            Assert.Equal(expected, ExpRatioTables.RichJerksTargetPct(chapter, t5, t6v));
+        }
     }
 }

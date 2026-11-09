@@ -135,6 +135,13 @@ Every plan ends in an `ALLHACK` tail so a hack whose in-game target is met never
   TC ≥ 1; NONGU ≥ 1; NOTM ≥ 1; NORB ≥ 6; BLIND ≥ 1 — plus "Finish all Normal challenges" (`completions()`
   ≥ `maxCompletions` for all eleven). Never `currentCompletions()`: it follows the rebirth difficulty, so
   the Normal rebirth the block asks for would flip the plan back to A/D.
+- **Value ranking is advisory, never what runs.** `HackPlan.RankByValue` orders lanes by
+  `HackMath.MarginalDensity + MilestoneStep` (rate per saturation plus the amortised next-milestone step);
+  `HackValueReport` (HackBP.cs, refreshed from `HackBP.Allocate`) logs `[HackDbg] value rank` and sets
+  `HackValueReport.Summary` when the best lane differs from the guide's current lane, with the value ratio.
+  ⚠ 1% on different stats is treated as equal (hack 11 feeds attack, hack 1 the adventure stack, hack 7
+  blood magic), so the ordering is trustworthy only where cost dominates; a ~5% gap means nothing.
+  No panel shows the hack plan, so the summary has no UI line yet.
 - **Evidence maxxed = `inventory.itemList.itemMaxxed[294]`**, the flag `InventoryController.checkItemTransform`
   sets at item level 100 (`markItemAsMaxxed`).
 - `R3Breakpoints` funds only the first valid priority, so the milestone pass is sequential.

@@ -23,6 +23,7 @@ namespace NGUAdvisor.Managers
             public double ShareP;   // within a pool: power / cap / bars shares, EXP-space, summing to 1
             public double ShareC;
             public double ShareB;
+            public double PoolR;    // fraction of EXP for Resource 3 (E/M pools are scaled down by it)
             public string Phase;    // guide phase this came from, for the advisor readout
         }
 
@@ -33,11 +34,86 @@ namespace NGUAdvisor.Managers
             {
                 PoolE = poolE,
                 PoolM = 1.0 - poolE,
+                PoolR = 0.0,
                 ShareP = shP / sum,
                 ShareC = shC / sum,
                 ShareB = shB / sum,
                 Phase = phase
             };
+        }
+
+        // Guide ch.6 "E/M/R3 Ratios": R3 4/150k/1, in EXP-space 600:600:80 (same conversion as above).
+        public const double R3ShareP = 600.0 / 1280.0;
+        public const double R3ShareC = 600.0 / 1280.0;
+        public const double R3ShareB = 80.0 / 1280.0;
+
+        // Guide ch.6 "EXP Spending": Hack Day 1 / Hack Day 2 completed. The game stores no such flag.
+        public enum HackDayPhase { Unknown, BeforeHd1, AfterHd1, AfterHd2 }
+
+        // Guide ch.6: post-HD1 E/M up to 3M/1M power, post-HD2 doubled to 6M/2M.
+        public static bool EmFloor(HackDayPhase hd, out double energyPower, out double magicPower)
+        {
+            energyPower = hd == HackDayPhase.AfterHd2 ? 6e6 : 3e6;
+            magicPower = hd == HackDayPhase.AfterHd2 ? 2e6 : 1e6;
+            return hd == HackDayPhase.AfterHd1 || hd == HackDayPhase.AfterHd2;
+        }
+
+        // Cap/bars count as "in ratio" at this fraction of what the floor's power implies.
+        private const double FloorBandTolerance = 0.75;
+
+        /// <param name="spent">EXP-space spent per stat, order ePow,eCap,eBar,mPow,mCap,mBar;
+        /// PositiveInfinity for a stat that cannot be bought (locked, gated, at the hard cap).</param>
+        public static bool EmFloorReached(HackDayPhase hd, double[] spent, double ePowUnit, double mPowUnit, Targets t)
+        {
+            double ePow, mPow;
+            if (!EmFloor(hd, out ePow, out mPow)) return false;
+            double eNeed = ePow * ePowUnit;
+            double mNeed = mPow * mPowUnit;
+            return spent[0] >= eNeed && spent[1] >= FloorBandTolerance * eNeed * t.ShareC / t.ShareP
+                && spent[2] >= FloorBandTolerance * eNeed * t.ShareB / t.ShareP
+                && spent[3] >= mNeed && spent[4] >= FloorBandTolerance * mNeed * t.ShareC / t.ShareP
+                && spent[5] >= FloorBandTolerance * mNeed * t.ShareB / t.ShareP;
+        }
+
+        // Guide Rich Jerks (attack/defense boost, % of the permanent stat-boost shop) milestones, or 0:
+        // ch.3 "After getting CCoD from T5 ... buy 1k% Rich Jerks", ch.4 CBlock 2 Prep "buy 10k%",
+        // ch.4 Evil Prep (T6v4 defeated) "100k Rich Jerks".
+        public static double RichJerksTargetPct(int chapter, bool t5Beaten, int t6VersionsBeaten)
+        {
+            if (t6VersionsBeaten >= 4) return 100000;
+            if (chapter >= 4) return 10000;
+            if (t5Beaten) return 1000;
+            return 0;
+        }
+
+        // Same phase, with the R3 pool carved out of the E/M pools (poolR 0..1).
+        public static Targets WithR3Pool(Targets t, double poolR, string phase)
+        {
+            t.PoolE *= 1.0 - poolR;
+            t.PoolM *= 1.0 - poolR;
+            t.PoolR = poolR;
+            t.Phase = phase;
+            return t;
+        }
+
+        /// <summary>E/M ratio for the chapter, then the ch.6 Hack Day split on top of it.</summary>
+        /// <param name="emFloorReached">EmFloorReached() for the current hack-day phase.</param>
+        public static Targets For(int chapter, bool t5Beaten, int t6VersionsBeaten, bool magicUnlocked,
+            HackDayPhase hd, bool emFloorReached)
+        {
+            Targets t = For(chapter, t5Beaten, t6VersionsBeaten, magicUnlocked);
+            switch (hd)
+            {
+                case HackDayPhase.BeforeHd1:
+                    return WithR3Pool(t, 1.0, "R3 only until HD1 (4:150k:1)");
+                case HackDayPhase.AfterHd1:
+                case HackDayPhase.AfterHd2:
+                    string hdName = hd == HackDayPhase.AfterHd1 ? "HD1" : "HD2";
+                    return emFloorReached
+                        ? WithR3Pool(t, 1.0, $"R3 only after {hdName} E/M floor (4:150k:1)")
+                        : WithR3Pool(t, 0.0, $"E/M floor after {hdName}, {t.Phase}");
+            }
+            return t;
         }
 
         // EXP split for a target E:M VALUE ratio of r:1 (see conversion 2 in the class note).

@@ -59,6 +59,7 @@ namespace NGUAdvisor.Managers
             {45, "THE TRAITOR"}
         };
 
+        // DriftProbe compares this table with the game's own zone dropdown once a minute.
         // Boss (effectiveBossID) required to unlock each adventure zone, indexed by zone number, sourced 1:1
         // from AdventureController.constructDropdown. Previously omitted zone 38 (ROCK LOBSTER, also 826, the
         // second of two consecutive 826 zones with The Halloweenies) which shifted every later Sadistic
@@ -250,7 +251,7 @@ namespace NGUAdvisor.Managers
                     case 7: if (!_character.adventure.titan8Unlocked) return false; break;
                     case 8: if (!_character.adventure.titan9Unlocked) return false; break;
                 }
-                return _character.adventureController.CallMethod<AdventureController, bool>($"autokillTitan{titanIndex + 1}V{version}Achieved");
+                return TitanAutokillAchieved(_character.adventureController, titanIndex + 1, version);
             }
 
             if (version != 1)
@@ -273,6 +274,21 @@ namespace NGUAdvisor.Managers
             }
 
             return false;
+        }
+
+        // Titans 6-12, versions 1-4: the game's public autokillTitan{N}V{V}Achieved methods.
+        private static bool TitanAutokillAchieved(AdventureController ac, int titan, int version)
+        {
+            switch (titan)
+            {
+                case 6: return version == 1 ? ac.autokillTitan6V1Achieved() : version == 2 ? ac.autokillTitan6V2Achieved() : version == 3 ? ac.autokillTitan6V3Achieved() : ac.autokillTitan6V4Achieved();
+                case 7: return version == 1 ? ac.autokillTitan7V1Achieved() : version == 2 ? ac.autokillTitan7V2Achieved() : version == 3 ? ac.autokillTitan7V3Achieved() : ac.autokillTitan7V4Achieved();
+                case 8: return version == 1 ? ac.autokillTitan8V1Achieved() : version == 2 ? ac.autokillTitan8V2Achieved() : version == 3 ? ac.autokillTitan8V3Achieved() : ac.autokillTitan8V4Achieved();
+                case 9: return version == 1 ? ac.autokillTitan9V1Achieved() : version == 2 ? ac.autokillTitan9V2Achieved() : version == 3 ? ac.autokillTitan9V3Achieved() : ac.autokillTitan9V4Achieved();
+                case 10: return version == 1 ? ac.autokillTitan10V1Achieved() : version == 2 ? ac.autokillTitan10V2Achieved() : version == 3 ? ac.autokillTitan10V3Achieved() : ac.autokillTitan10V4Achieved();
+                case 11: return version == 1 ? ac.autokillTitan11V1Achieved() : version == 2 ? ac.autokillTitan11V2Achieved() : version == 3 ? ac.autokillTitan11V3Achieved() : ac.autokillTitan11V4Achieved();
+                default: return version == 1 ? ac.autokillTitan12V1Achieved() : version == 2 ? ac.autokillTitan12V2Achieved() : version == 3 ? ac.autokillTitan12V3Achieved() : ac.autokillTitan12V4Achieved();
+            }
         }
 
         public static bool AutokillAvailable(int titanIndex) => AutokillAvailable(titanIndex, TitanVersion(titanIndex));

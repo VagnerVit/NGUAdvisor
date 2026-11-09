@@ -114,6 +114,9 @@ namespace NGUAdvisor.Managers
             Section(sb, "BEAST QUIRKS", () => Quirks(sb, c));
             Section(sb, "QUESTS", () => Quests(sb, c));
             Section(sb, "YGGDRASIL FRUITS", () => Fruits(sb, c));
+            Section(sb, "ACHIEVEMENTS", () => Achievements(sb, c));
+            Section(sb, "CARDS", () => Cards(sb, c));
+            Section(sb, "DAYCARE", () => Daycare(sb, c));
             Section(sb, "R3 / HACKS", () => Hacks(sb, c));
             Section(sb, "TITAN FIGHT INPUTS", () => TitanFightInputs(sb, c));
             return sb.ToString();
@@ -151,6 +154,7 @@ namespace NGUAdvisor.Managers
             sb.AppendLine($"  titans beaten {TitansBeaten()}");
             sb.AppendLine($"  run time      {NumberFormatter.Duration(c.rebirthTime.totalseconds / 3600.0)}");
             sb.AppendLine($"  NGU track     {c.settings.nguLevelTrack}");
+            sb.AppendLine($"  rebirth       {RebirthLength.Describe(c.rebirthTime.totalseconds, (int)c.adventure.itopod.perkLevel[21])}");
         }
 
         // T5..T12, with the highest VERSION beaten for the versioned ones — the two reads that gate
@@ -546,6 +550,79 @@ namespace NGUAdvisor.Managers
             sb.AppendLine($"  drop          {(qc.questDropChance() * 100).ToString("0.00", inv)} % per kill · {qc.expectedTimePerDrop().ToString("0.0", inv)} s/item manual · idle ×{qc.idleDropFactor().ToString("0", inv)} slower");
         }
 
+        // Achievement BP multiplies every AP gain (AllAchievementsController.bonusAP = 1 + totalBP / 10000).
+        // The BP values are scene data and the hints are the only in-process names, so the open ones are
+        // listed with both, biggest first.
+        private static void Achievements(StringBuilder sb, Character c)
+        {
+            AllAchievementsController ac = c.allAchievements;
+            List<bool> done = c.achievements.achievementComplete;
+            long total = 0;
+            long max = 0;
+            List<int> open = new List<int>();
+            for (int id = 0; id < done.Count && id < ac.achievementBP.Length; id++)
+            {
+                max += ac.achievementBP[id];
+                if (done[id]) total += ac.achievementBP[id];
+                else open.Add(id);
+            }
+            sb.AppendLine($"  total BP      {total} / {max} · AP bonus +{(ac.bonusAP() - 1f) * 100f:0.##}%"
+                        + $" · {done.Count - open.Count}/{done.Count} done");
+            open.Sort((a, b) => ac.achievementBP[b] != ac.achievementBP[a]
+                ? ac.achievementBP[b].CompareTo(ac.achievementBP[a])
+                : a.CompareTo(b));
+            foreach (int id in open)
+            {
+                string hint = "";
+                try { hint = ac.achievementHint(id)?.Replace("\r", " ").Replace("\n", " ").Trim(); } catch { }
+                sb.AppendLine($"  [{id}] +{ac.achievementBP[id]} BP · {hint}");
+            }
+        }
+
+        private static void Cards(StringBuilder sb, Character c)
+        {
+            sb.AppendLine($"  cards {(c.cards.cardsOn ? "on" : "OFF")} · {CardManager.TagAdvice()}");
+        }
+
+        // Advisory only: the advisor fills daycare from Settings.Shockwave alone, because an item in daycare
+        // cannot be worn and an automatic pick could take a loadout piece. Candidates are therefore items
+        // no advisor loadout names. Rate is the game's: daycareTime() game-seconds per level, sped up by the
+        // daycare digger (DaycareItemController.updateDaycareTimer).
+        private static void Daycare(StringBuilder sb, Character c)
+        {
+            if (!c.purchases.hasDaycare) { sb.AppendLine("  not owned"); return; }
+            AllDaycareController dc = c.inventoryController.daycaresController;
+            double speed = c.allDiggers.totalDaycareBonus();
+            foreach (Equipment e in c.inventory.daycare)
+            {
+                if (e.id <= 0) { sb.AppendLine("  (empty slot)"); continue; }
+                bool grows = e.level < 100 || e.type == part.MacGuffin;
+                sb.AppendLine($"  {Main.ItemNameNice(e.id)} (#{e.id}) L{e.level}"
+                            + (grows ? $" · {LevelsPerHour(dc, e, speed):0.##} levels/h" : " · maxed, not growing"));
+            }
+            SavedSettings s = Main.Settings;
+            HashSet<int> worn = new HashSet<int>();
+            foreach (int[] list in new[] { s.TitanLoadout, s.YggdrasilLoadout, s.GoldDropLoadout, s.QuickLoadout, s.QuestLoadout, s.CookingLoadout, s.Shockwave })
+                if (list != null) foreach (int id in list) worn.Add(id);
+            List<Equipment> candidates = new List<Equipment>();
+            foreach (Equipment e in c.inventory.inventory)
+                if (e.id > 0 && !worn.Contains(e.id) && (e.level < 100 || e.type == part.MacGuffin)
+                    && e.type != part.atkBoost && e.type != part.defBoost && e.type != part.specBoost && e.type != part.Misc)
+                    candidates.Add(e);
+            candidates.Sort((a, b) => LevelsPerHour(dc, b, speed).CompareTo(LevelsPerHour(dc, a, speed)));
+            sb.AppendLine(s.Shockwave != null && s.Shockwave.Length > 0
+                ? $"  advisor fills from the shockwave set ({s.Shockwave.Length} items)"
+                : "  shockwave set empty — the advisor fills nothing; fastest candidates outside every loadout:");
+            for (int i = 0; i < candidates.Count && i < 8; i++)
+                sb.AppendLine($"    {Main.ItemNameNice(candidates[i].id)} (#{candidates[i].id}) L{candidates[i].level} · {LevelsPerHour(dc, candidates[i], speed):0.##} levels/h");
+        }
+
+        private static double LevelsPerHour(AllDaycareController dc, Equipment e, double speed)
+        {
+            double perLevel = dc.daycareTime(e);
+            return perLevel > 0 ? 3600.0 * speed / perLevel : 0.0;
+        }
+
         private static void Fruits(StringBuilder sb, Character c)
         {
             var ycon = c.yggdrasilController;
@@ -554,6 +631,9 @@ namespace NGUAdvisor.Managers
             for (int id = 0; id < fruits.Count && id < ycon.fruitName.Count; id++)
                 sb.AppendLine($"  [{id}] {ycon.fruitName[id]?.Trim()} — tier {fruits[id].maxTier}");
             sb.AppendLine($"  tier cap      {cap}");
+            foreach (YggdrasilManager.SeedUpgrade row in YggdrasilManager.SeedUpgradeRanking())
+                sb.AppendLine($"  next tier [{row.Id}] {row.Name} T{row.Tier} -> T{row.Tier + 1}: {NumberFormatter.Abbrev(row.Cost)} seeds"
+                            + $" · +{row.GainPerSeed * 1000000:0.##} per 1M seeds (relative effect)");
         }
     }
 }

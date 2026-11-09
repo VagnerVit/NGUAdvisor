@@ -19,7 +19,7 @@ advisor disagree, the fix is to share the manager's struct (as `MoneyPitManager.
   `Deferred form update failed: … Parameter name: SelectedIndex` in `debug.log`.
   A legacy combo may be NARROWER than the live panel editing the same setting: measured 2026-08-10,
   `ITOPODCombatMode` carries 2 items (Idle, Snipe) against `AdventurePanel`'s 4, while `CombatMode`,
-  `QuestCombatMode` and `TitanCombatMode` carry 5 and `ITOPODOptimizeMode`/`WishMode` carry 4.
+  `QuestCombatMode` and `TitanCombatMode` carry 5 and `ITOPODOptimizeMode` carries 4 and `WishMode` 5 (Value added).
   **So `SelectedIndex` on a legacy combo must be clamped to `Items.Count - 1`, never assigned raw** —
   and a settings validator's range in `SavedSettings.Assign*` describes the LEGACY combo it feeds, not
   the live panel's mode count. Widening a validator without clamping here turns a transient reset into

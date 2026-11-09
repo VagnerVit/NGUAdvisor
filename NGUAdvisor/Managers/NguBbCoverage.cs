@@ -7,7 +7,7 @@ namespace NGUAdvisor.Managers
     // Does another gear set still keep every funded NGU lane at BB? The pure half of NguBbGear.
     // Gear enters each game total as (1 + Σ gear bonuses) — decomp Character.totalEnergyPower,
     // totalCapEnergy, totalNGUSpeedBonus and their magic twins — and a lane's BB is inversely
-    // proportional to power × NGU speed (NGUBP.EnergyBb), so a set's effect is three factors per pool.
+    // proportional to power × NGU speed (NGUBP.Bb), so a set's effect is three factors per pool.
     public static class NguBbCoverage
     {
         // The factor a game total moves by when the worn set is swapped for another. Fractions are the

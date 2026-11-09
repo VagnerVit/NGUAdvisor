@@ -10,7 +10,7 @@ namespace NGUAdvisor.Managers
     // Now EVERY unlocked NGU is a candidate and the ranking uses the game's exact math:
     //
     //   levels/hr = power / speedDivider(id) x allocation x multiplierStack / (level+1) x 50 x 3600
-    //               (decomp NGUController.progressPerTick — the stack here matches it term for term)
+    //               (decomp NGUController.progressPerTick; read off progressPerTick1000, not rebuilt)
     //   value     = every NGU bonus is 1 + level x boostFactor on the current track (decomp
     //               AllNGUController), so the x/hr score = (1 + f(L+Δ)) / (1 + fL) — the same
     //               per-NGU rating the GO site shows. Respawn (E2) is the one nonlinear curve
@@ -88,54 +88,17 @@ namespace NGUAdvisor.Managers
         private const double HotEnterRatio = NguLaneRank.HotEnterRatio;
         internal const double HotExitRatio = NguLaneRank.HotExitRatio;
 
-        private static double Mul(Func<double> f)
+        // Levels per tick per allocated unit at the lane's current level: the game's progressPerTick1000
+        // (whole cap allocated, current track, full speed stack) over the cap. 0 when the game reads 0.
+        internal static double ProgressPerUnit(Character c, bool magic, int id)
         {
-            try { var v = f(); return v > 0 ? v : 1; } catch { return 1; }
-        }
-
-        // The full speed-multiplier stack from the game's progressPerTick (everything independent
-        // of the specific NGU): itopod, macguffin, NGU-speed NGUs, diggers, hacks, beast quirks,
-        // wishes, cards, troll-challenge x3, sadistic divider. The old version missed the last six.
-        private static double SpeedMult(Character c, bool magic)
-        {
-            double m;
-            if (magic)
-            {
-                m = Mul(() => c.totalNGUSpeedBonus())
-                    * Mul(() => c.adventureController.itopod.totalMagicNGUBonus())
-                    * Mul(() => c.inventory.macguffinBonuses[5])
-                    * Mul(() => c.NGUController.magicNGUBonus())
-                    * Mul(() => c.allDiggers.totalMagicNGUBonus())
-                    * Mul(() => c.hacksController.totalMagicNGUBonus())
-                    * Mul(() => c.beastQuestPerkController.totalMagicNGUSpeed())
-                    * Mul(() => c.wishesController.totalMagicNGUSpeed())
-                    * Mul(() => c.cardsController.getBonus(cardBonus.magicNGUSpeed));
-                try { if (c.allChallenges.trollChallenge.completions() >= 1) m *= 3.0; } catch { }
-            }
-            else
-            {
-                m = Mul(() => c.totalNGUSpeedBonus())
-                    * Mul(() => c.adventureController.itopod.totalEnergyNGUBonus())
-                    * Mul(() => c.inventory.macguffinBonuses[4])
-                    * Mul(() => c.NGUController.energyNGUBonus())
-                    * Mul(() => c.allDiggers.totalEnergyNGUBonus())
-                    * Mul(() => c.hacksController.totalEnergyNGUBonus())
-                    * Mul(() => c.beastQuestPerkController.totalEnergyNGUSpeed())
-                    * Mul(() => c.wishesController.totalEnergyNGUSpeed())
-                    * Mul(() => c.cardsController.getBonus(cardBonus.energyNGUSpeed));
-                try { if (c.allChallenges.trollChallenge.sadisticCompletions() >= 1) m *= 3.0; } catch { }
-            }
-            try
-            {
-                if (c.settings.nguLevelTrack >= difficulty.sadistic)
-                    m /= magic ? c.NGUController.NGUMagic[0].sadisticDivider() : c.NGUController.NGU[0].sadisticDivider();
-            }
-            catch { }
-            return m;
+            float perTick = magic ? c.NGUController.NGUMagic[id].progressPerTick1000() : c.NGUController.NGU[id].progressPerTick1000();
+            double cap = magic ? c.totalCapMagic() : c.totalCapEnergy();
+            return NguLaneRank.ProgressPerUnit(perTick, cap);
         }
 
         // Level on the track currently being leveled.
-        private static long Level(Character c, bool magic, int id)
+        internal static long Level(Character c, bool magic, int id)
         {
             var s = magic ? c.NGU.magicSkills[id] : c.NGU.skills[id];
             switch (c.settings.nguLevelTrack)
@@ -295,8 +258,6 @@ namespace NGUAdvisor.Managers
         private static void Build(Character c, int[] cands, bool magic, double pool, List<Entry> into)
         {
             if (cands == null || cands.Length == 0) return;
-            double mult = SpeedMult(c, magic);
-            double power = magic ? Math.Max(1, c.totalMagicPower()) : Math.Max(1, c.totalEnergyPower());
             var names = magic ? MNames : ENames;
             foreach (var id in cands)
             {
@@ -304,12 +265,11 @@ namespace NGUAdvisor.Managers
                 {
                     if (id < 0 || id >= names.Length) continue;
                     long level = Level(c, magic, id);
-                    double divider = magic ? c.NGUController.magicSpeedDivider(id) : c.NGUController.energySpeedDivider(id);
-                    if (divider <= 0) continue;
-                    // progressPerTick = power / divider x allocated x mult / (level+1); 50 ticks/s.
-                    double lphPerUnit = power / divider * mult / (level + 1) * 50.0 * 3600.0;
+                    double perUnit = ProgressPerUnit(c, magic, id);
+                    if (perUnit <= 0) continue;
+                    double lphPerUnit = perUnit * 50.0 * 3600.0;
                     double rating = ValueRatio(c, magic, id, level, NguGain.LevelsInHour(level, lphPerUnit * pool));
-                    double bb = NguLaneRank.BbCost(divider, level, power, mult);
+                    double bb = NguLaneRank.BbCost(perUnit, level, NguLaneRank.BbLookaheadLevels);
                     into.Add(new Entry
                     {
                         Id = id,
